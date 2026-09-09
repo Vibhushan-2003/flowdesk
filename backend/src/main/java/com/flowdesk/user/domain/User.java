@@ -60,7 +60,27 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    // Required by JPA / Hibernate
     protected User() {
+    }
+
+    // Used by our application when creating a new user
+    public User(
+            String email,
+            String passwordHash,
+            String firstName,
+            String lastName
+    ) {
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.status = UserStatus.ACTIVE;
+    }
+
+    // Controlled way to assign a role to a user
+    public void assignRole(Role role) {
+        this.roles.add(role);
     }
 
     public UUID getId() {
