@@ -36,16 +36,24 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtGra
 
 import org.springframework.security.web.SecurityFilterChain;
 
+import java.util.List;
+
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 @Configuration
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http,
-            JwtAuthenticationConverter jwtAuthenticationConverter
-    ) throws Exception {
+public SecurityFilterChain securityFilterChain(
+        HttpSecurity http,
+        JwtAuthenticationConverter jwtAuthenticationConverter,
+        CorsConfigurationSource corsConfigurationSource
+) throws Exception {
 
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
 
                 .sessionManagement(session ->
@@ -161,4 +169,30 @@ public class SecurityConfig {
 
         return authenticationConverter;
     }
+
+    @Bean
+public CorsConfigurationSource corsConfigurationSource(
+        @Value("${app.cors.allowed-origin}") String allowedOrigin
+) {
+    CorsConfiguration configuration = new CorsConfiguration();
+
+    configuration.setAllowedOrigins(List.of(allowedOrigin));
+
+    configuration.setAllowedMethods(
+            List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+    );
+
+    configuration.setAllowedHeaders(
+            List.of("Authorization", "Content-Type")
+    );
+
+    configuration.setAllowCredentials(false);
+
+    UrlBasedCorsConfigurationSource source =
+            new UrlBasedCorsConfigurationSource();
+
+    source.registerCorsConfiguration("/**", configuration);
+
+    return source;
+}
 }
