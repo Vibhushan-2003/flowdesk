@@ -45,6 +45,9 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Generate JWT secret
+        run: echo "JWT_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+
       - name: Run backend tests
         working-directory: backend
         run: mvn clean test

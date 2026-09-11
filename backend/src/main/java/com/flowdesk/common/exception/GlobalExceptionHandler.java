@@ -14,6 +14,10 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -36,6 +40,30 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.CONFLICT)
                 .body(error);
     }
+
+    @ExceptionHandler({
+        BadCredentialsException.class,
+        UsernameNotFoundException.class,
+        DisabledException.class
+})
+public ResponseEntity<ApiError> handleAuthenticationFailure(
+        RuntimeException exception,
+        HttpServletRequest request
+) {
+
+    ApiError error = new ApiError(
+            Instant.now(),
+            HttpStatus.UNAUTHORIZED.value(),
+            HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+            "Invalid email or password",
+            request.getRequestURI(),
+            Map.of()
+    );
+
+    return ResponseEntity
+            .status(HttpStatus.UNAUTHORIZED)
+            .body(error);
+}
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(
