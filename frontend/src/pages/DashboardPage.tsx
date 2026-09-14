@@ -31,15 +31,29 @@ export function DashboardPage() {
         <h2>IT Support</h2>
 
         <p>
-          Report an incident or submit a service request.
+          Report an incident, submit a service
+          request, or track your existing tickets.
         </p>
 
-        <button
-          type="button"
-          onClick={() => navigate('/tickets/new')}
-        >
-          Create ticket
-        </button>
+        <div className="dashboard-action-buttons">
+          <button
+            type="button"
+            onClick={() =>
+              navigate('/tickets/new')
+            }
+          >
+            Create ticket
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              navigate('/tickets')
+            }
+          >
+            My tickets
+          </button>
+        </div>
       </section>
 
       <section className="user-card">
