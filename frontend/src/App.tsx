@@ -11,6 +11,7 @@ import { CreateTicketPage } from './pages/CreateTicketPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyTicketsPage } from './pages/MyTicketsPage'
+import { SupportQueuePage } from './pages/SupportQueuePage'
 import { TicketDetailsPage } from './pages/TicketDetailsPage'
 
 function App() {
@@ -40,6 +41,11 @@ function App() {
         <Route
           path="/tickets/:ticketNumber"
           element={<TicketDetailsPage />}
+        />
+
+        <Route
+          path="/support/queue"
+          element={<SupportQueuePage />}
         />
       </Route>
 

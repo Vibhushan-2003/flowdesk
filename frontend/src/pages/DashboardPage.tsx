@@ -6,6 +6,9 @@ export function DashboardPage() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
 
+  const isSupportEngineer =
+    user?.roles.includes('SUPPORT_ENGINEER') ?? false
+
   function handleSignOut() {
     signOut()
     navigate('/login')
@@ -53,6 +56,17 @@ export function DashboardPage() {
           >
             My tickets
           </button>
+
+          {isSupportEngineer && (
+            <button
+              type="button"
+              onClick={() =>
+                navigate('/support/queue')
+              }
+            >
+              Support queue
+            </button>
+          )}
         </div>
       </section>
 

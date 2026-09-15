@@ -1,11 +1,20 @@
 package com.flowdesk.ticket.service;
 
 import com.flowdesk.common.dto.PageResponse;
+
 import com.flowdesk.ticket.domain.Ticket;
+import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.TicketStatus;
+
+import com.flowdesk.ticket.dto.ClaimTicketResponse;
 import com.flowdesk.ticket.dto.CreateTicketRequest;
 import com.flowdesk.ticket.dto.TicketResponse;
 import com.flowdesk.ticket.dto.TicketSummaryResponse;
+
+import com.flowdesk.ticket.repository.TicketAssignmentRepository;
 import com.flowdesk.ticket.repository.TicketRepository;
+
+import com.flowdesk.user.domain.RoleCode;
 import com.flowdesk.user.domain.User;
 import com.flowdesk.user.repository.UserRepository;
 
@@ -15,8 +24,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+
 import org.springframework.http.HttpStatus;
+
 import org.springframework.stereotype.Service;
+
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -27,13 +39,17 @@ import java.util.UUID;
 public class TicketService {
 
     private final TicketRepository ticketRepository;
+    private final TicketAssignmentRepository ticketAssignmentRepository;
     private final UserRepository userRepository;
 
     public TicketService(
             TicketRepository ticketRepository,
+            TicketAssignmentRepository ticketAssignmentRepository,
             UserRepository userRepository
     ) {
         this.ticketRepository = ticketRepository;
+        this.ticketAssignmentRepository =
+                ticketAssignmentRepository;
         this.userRepository = userRepository;
     }
 
@@ -42,15 +58,18 @@ public class TicketService {
             UUID authenticatedUserId,
             CreateTicketRequest request
     ) {
-        User creator = userRepository.findById(authenticatedUserId)
-                .orElseThrow(
-                        () -> new IllegalStateException(
-                                "Authenticated user no longer exists"
-                        )
-                );
+        User creator =
+                userRepository
+                        .findById(authenticatedUserId)
+                        .orElseThrow(
+                                () -> new IllegalStateException(
+                                        "Authenticated user no longer exists"
+                                )
+                        );
 
         long sequenceValue =
-                ticketRepository.getNextTicketNumberSequenceValue();
+                ticketRepository
+                        .getNextTicketNumberSequenceValue();
 
         String ticketNumber =
                 "FD-%06d".formatted(sequenceValue);
@@ -90,21 +109,7 @@ public class TicketService {
                         pageable
                 );
 
-        List<TicketSummaryResponse> content =
-                ticketPage.getContent()
-                        .stream()
-                        .map(this::toSummaryResponse)
-                        .toList();
-
-        return new PageResponse<>(
-                content,
-                ticketPage.getNumber(),
-                ticketPage.getSize(),
-                ticketPage.getTotalElements(),
-                ticketPage.getTotalPages(),
-                ticketPage.isFirst(),
-                ticketPage.isLast()
-        );
+        return toPageResponse(ticketPage);
     }
 
     @Transactional
@@ -113,9 +118,7 @@ public class TicketService {
             String ticketNumber
     ) {
         String normalizedTicketNumber =
-                ticketNumber
-                        .trim()
-                        .toUpperCase(Locale.ROOT);
+                normalizeTicketNumber(ticketNumber);
 
         Ticket ticket =
                 ticketRepository
@@ -131,6 +134,146 @@ public class TicketService {
                         );
 
         return toResponse(ticket);
+    }
+
+    @Transactional
+    public PageResponse<TicketSummaryResponse> getSupportQueue(
+            int page,
+            int size
+    ) {
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(
+                        Sort.Direction.ASC,
+                        "createdAt"
+                )
+        );
+
+        Page<Ticket> ticketPage =
+                ticketRepository.findByStatus(
+                        TicketStatus.OPEN,
+                        pageable
+                );
+
+        return toPageResponse(ticketPage);
+    }
+
+    @Transactional
+    public ClaimTicketResponse claimTicket(
+            UUID authenticatedUserId,
+            String ticketNumber
+    ) {
+        User engineer =
+                getSupportEngineer(
+                        authenticatedUserId
+                );
+
+        String normalizedTicketNumber =
+                normalizeTicketNumber(
+                        ticketNumber
+                );
+
+        Ticket ticket =
+                ticketRepository
+                        .findByTicketNumberForUpdate(
+                                normalizedTicketNumber
+                        )
+                        .orElseThrow(
+                                () -> new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Ticket not found"
+                                )
+                        );
+
+        if (ticket.getStatus() != TicketStatus.OPEN) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Ticket is no longer available to claim"
+            );
+        }
+
+        ticket.markAssigned();
+
+        TicketAssignment assignment =
+                new TicketAssignment(
+                        ticket,
+                        engineer
+                );
+
+        TicketAssignment savedAssignment =
+                ticketAssignmentRepository
+                        .saveAndFlush(assignment);
+
+        return new ClaimTicketResponse(
+                savedAssignment.getId(),
+                ticket.getId(),
+                ticket.getTicketNumber(),
+                ticket.getStatus(),
+                engineer.getId(),
+                engineer.getEmail(),
+                savedAssignment.getAssignedAt()
+        );
+    }
+
+    private User getSupportEngineer(
+            UUID authenticatedUserId
+    ) {
+        User user =
+                userRepository
+                        .findById(authenticatedUserId)
+                        .orElseThrow(
+                                () -> new IllegalStateException(
+                                        "Authenticated user no longer exists"
+                                )
+                        );
+
+        boolean isSupportEngineer =
+                user.getRoles()
+                        .stream()
+                        .anyMatch(
+                                role ->
+                                        role.getCode()
+                                                == RoleCode.SUPPORT_ENGINEER
+                        );
+
+        if (!isSupportEngineer) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Support engineer role required"
+            );
+        }
+
+        return user;
+    }
+
+    private String normalizeTicketNumber(
+            String ticketNumber
+    ) {
+        return ticketNumber
+                .trim()
+                .toUpperCase(Locale.ROOT);
+    }
+
+    private PageResponse<TicketSummaryResponse> toPageResponse(
+            Page<Ticket> ticketPage
+    ) {
+        List<TicketSummaryResponse> content =
+                ticketPage
+                        .getContent()
+                        .stream()
+                        .map(this::toSummaryResponse)
+                        .toList();
+
+        return new PageResponse<>(
+                content,
+                ticketPage.getNumber(),
+                ticketPage.getSize(),
+                ticketPage.getTotalElements(),
+                ticketPage.getTotalPages(),
+                ticketPage.isFirst(),
+                ticketPage.isLast()
+        );
     }
 
     private TicketResponse toResponse(

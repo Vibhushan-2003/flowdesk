@@ -25,7 +25,12 @@ public class Ticket {
     @Id
     private UUID id;
 
-    @Column(name = "ticket_number", nullable = false, unique = true, length = 30)
+    @Column(
+            name = "ticket_number",
+            nullable = false,
+            unique = true,
+            length = 30
+    )
     private String ticketNumber;
 
     @Enumerated(EnumType.STRING)
@@ -46,14 +51,27 @@ public class Ticket {
     @Column(nullable = false, length = 30)
     private TicketStatus status;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "created_by_user_id", nullable = false)
+    @ManyToOne(
+            fetch = FetchType.LAZY,
+            optional = false
+    )
+    @JoinColumn(
+            name = "created_by_user_id",
+            nullable = false
+    )
     private User createdByUser;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(
+            name = "created_at",
+            nullable = false,
+            updatable = false
+    )
     private OffsetDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(
+            name = "updated_at",
+            nullable = false
+    )
     private OffsetDateTime updatedAt;
 
     protected Ticket() {
@@ -89,7 +107,8 @@ public class Ticket {
             status = TicketStatus.OPEN;
         }
 
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now =
+                OffsetDateTime.now(ZoneOffset.UTC);
 
         createdAt = now;
         updatedAt = now;
@@ -97,7 +116,18 @@ public class Ticket {
 
     @PreUpdate
     void onUpdate() {
-        updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        updatedAt =
+                OffsetDateTime.now(ZoneOffset.UTC);
+    }
+
+    public void markAssigned() {
+        if (status != TicketStatus.OPEN) {
+            throw new IllegalStateException(
+                    "Only open tickets can be assigned"
+            );
+        }
+
+        status = TicketStatus.ASSIGNED;
     }
 
     public UUID getId() {

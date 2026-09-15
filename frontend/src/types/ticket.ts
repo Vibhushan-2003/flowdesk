@@ -57,3 +57,13 @@ export interface PageResponse<T> {
   first: boolean
   last: boolean
 }
+
+export interface ClaimTicketResponse {
+  assignmentId: string
+  ticketId: string
+  ticketNumber: string
+  status: TicketStatus
+  assignedToUserId: string
+  assignedToEmail: string
+  assignedAt: string
+}
