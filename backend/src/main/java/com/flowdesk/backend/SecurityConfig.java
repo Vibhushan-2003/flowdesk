@@ -3,6 +3,7 @@ package com.flowdesk.backend;
 import com.flowdesk.auth.security.FlowDeskUserDetailsService;
 
 import java.util.Base64;
+import java.util.List;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -10,6 +11,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
 import org.springframework.http.HttpMethod;
 
 import org.springframework.security.authentication.AuthenticationManager;
@@ -36,8 +38,6 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtGra
 
 import org.springframework.security.web.SecurityFilterChain;
 
-import java.util.List;
-
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -46,15 +46,22 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
-public SecurityFilterChain securityFilterChain(
-        HttpSecurity http,
-        JwtAuthenticationConverter jwtAuthenticationConverter,
-        CorsConfigurationSource corsConfigurationSource
-) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            CorsConfigurationSource corsConfigurationSource
+    ) throws Exception {
 
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource))
-                .csrf(csrf -> csrf.disable())
+                .cors(cors ->
+                        cors.configurationSource(
+                                corsConfigurationSource
+                        )
+                )
+
+                .csrf(csrf ->
+                        csrf.disable()
+                )
 
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
@@ -63,11 +70,40 @@ public SecurityFilterChain securityFilterChain(
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                        .requestMatchers("/error").permitAll()
-                        .anyRequest().authenticated()
+
+                        // Public endpoints
+                        .requestMatchers(
+                                "/api/health"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/users"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/auth/login"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                "/error"
+                        ).permitAll()
+
+                        // Support Engineer endpoints
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/tickets/queue"
+                        ).hasRole("SUPPORT_ENGINEER")
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/tickets/*/claim"
+                        ).hasRole("SUPPORT_ENGINEER")
+
+                        // Everything else requires authentication
+                        .anyRequest()
+                        .authenticated()
                 )
 
                 .oauth2ResourceServer(oauth2 ->
@@ -93,9 +129,13 @@ public SecurityFilterChain securityFilterChain(
     ) {
 
         DaoAuthenticationProvider provider =
-                new DaoAuthenticationProvider(userDetailsService);
+                new DaoAuthenticationProvider(
+                        userDetailsService
+                );
 
-        provider.setPasswordEncoder(passwordEncoder);
+        provider.setPasswordEncoder(
+                passwordEncoder
+        );
 
         return provider;
     }
@@ -104,16 +144,21 @@ public SecurityFilterChain securityFilterChain(
     public AuthenticationManager authenticationManager(
             AuthenticationProvider authenticationProvider
     ) {
-        return new ProviderManager(authenticationProvider);
+
+        return new ProviderManager(
+                authenticationProvider
+        );
     }
 
     @Bean
     public SecretKey jwtSecretKey(
-            @Value("${app.security.jwt.secret}") String encodedSecret
+            @Value("${app.security.jwt.secret}")
+            String encodedSecret
     ) {
 
         byte[] keyBytes =
-                Base64.getDecoder().decode(encodedSecret);
+                Base64.getDecoder()
+                        .decode(encodedSecret);
 
         return new SecretKeySpec(
                 keyBytes,
@@ -135,7 +180,8 @@ public SecurityFilterChain securityFilterChain(
     @Bean
     public JwtDecoder jwtDecoder(
             SecretKey secretKey,
-            @Value("${app.security.jwt.issuer}") String issuer
+            @Value("${app.security.jwt.issuer}")
+            String issuer
     ) {
 
         NimbusJwtDecoder decoder =
@@ -145,7 +191,10 @@ public SecurityFilterChain securityFilterChain(
                         .build();
 
         decoder.setJwtValidator(
-                JwtValidators.createDefaultWithIssuer(issuer)
+                JwtValidators
+                        .createDefaultWithIssuer(
+                                issuer
+                        )
         );
 
         return decoder;
@@ -157,42 +206,66 @@ public SecurityFilterChain securityFilterChain(
         JwtGrantedAuthoritiesConverter authoritiesConverter =
                 new JwtGrantedAuthoritiesConverter();
 
-        authoritiesConverter.setAuthoritiesClaimName("roles");
-        authoritiesConverter.setAuthorityPrefix("ROLE_");
+        authoritiesConverter.setAuthoritiesClaimName(
+                "roles"
+        );
+
+        authoritiesConverter.setAuthorityPrefix(
+                "ROLE_"
+        );
 
         JwtAuthenticationConverter authenticationConverter =
                 new JwtAuthenticationConverter();
 
-        authenticationConverter.setJwtGrantedAuthoritiesConverter(
-                authoritiesConverter
-        );
+        authenticationConverter
+                .setJwtGrantedAuthoritiesConverter(
+                        authoritiesConverter
+                );
 
         return authenticationConverter;
     }
 
     @Bean
-public CorsConfigurationSource corsConfigurationSource(
-        @Value("${app.cors.allowed-origin}") String allowedOrigin
-) {
-    CorsConfiguration configuration = new CorsConfiguration();
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origin}")
+            String allowedOrigin
+    ) {
 
-    configuration.setAllowedOrigins(List.of(allowedOrigin));
+        CorsConfiguration configuration =
+                new CorsConfiguration();
 
-    configuration.setAllowedMethods(
-            List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-    );
+        configuration.setAllowedOrigins(
+                List.of(allowedOrigin)
+        );
 
-    configuration.setAllowedHeaders(
-            List.of("Authorization", "Content-Type")
-    );
+        configuration.setAllowedMethods(
+                List.of(
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "PATCH",
+                        "DELETE",
+                        "OPTIONS"
+                )
+        );
 
-    configuration.setAllowCredentials(false);
+        configuration.setAllowedHeaders(
+                List.of(
+                        "Authorization",
+                        "Content-Type"
+                )
+        );
 
-    UrlBasedCorsConfigurationSource source =
-            new UrlBasedCorsConfigurationSource();
+        configuration.setAllowCredentials(false);
 
-    source.registerCorsConfiguration("/**", configuration);
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
 
-    return source;
-}
+        source.registerCorsConfiguration(
+                "/**",
+                configuration
+        );
+
+        return source;
+    }
 }
