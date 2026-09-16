@@ -90,15 +90,21 @@ public class SecurityConfig {
                                 "/error"
                         ).permitAll()
 
-                        // Support Engineer endpoints
+                        // Existing Support Engineer queue
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/tickets/queue"
                         ).hasRole("SUPPORT_ENGINEER")
 
+                        // Existing Support Engineer claim endpoint
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/tickets/*/claim"
+                        ).hasRole("SUPPORT_ENGINEER")
+
+                        // Day 13 Support Engineer workbench
+                        .requestMatchers(
+                                "/api/support/**"
                         ).hasRole("SUPPORT_ENGINEER")
 
                         // Everything else requires authentication
@@ -201,7 +207,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+    public JwtAuthenticationConverter
+            jwtAuthenticationConverter() {
 
         JwtGrantedAuthoritiesConverter authoritiesConverter =
                 new JwtGrantedAuthoritiesConverter();

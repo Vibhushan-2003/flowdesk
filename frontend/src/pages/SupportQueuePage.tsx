@@ -2,6 +2,7 @@ import {
   useEffect,
   useState,
 } from 'react'
+
 import { useNavigate } from 'react-router-dom'
 
 import {
@@ -28,20 +29,20 @@ function formatDate(value: string) {
 
 export function SupportQueuePage() {
   const { accessToken } = useAuth()
+
   const navigate = useNavigate()
 
   const [page, setPage] = useState(0)
 
   const [queue, setQueue] =
-    useState<PageResponse<TicketSummary> | null>(null)
+    useState<PageResponse<TicketSummary> | null>(
+      null,
+    )
 
   const [isLoading, setIsLoading] =
     useState(true)
 
   const [error, setError] =
-    useState<string | null>(null)
-
-  const [successMessage, setSuccessMessage] =
     useState<string | null>(null)
 
   const [
@@ -58,7 +59,10 @@ export function SupportQueuePage() {
     async function loadQueue() {
       if (!accessToken) {
         if (!cancelled) {
-          setError('Your session is no longer valid')
+          setError(
+            'Your session is no longer valid',
+          )
+
           setIsLoading(false)
         }
 
@@ -69,11 +73,12 @@ export function SupportQueuePage() {
       setError(null)
 
       try {
-        const response = await getSupportQueue(
-          accessToken,
-          page,
-          PAGE_SIZE,
-        )
+        const response =
+          await getSupportQueue(
+            accessToken,
+            page,
+            PAGE_SIZE,
+          )
 
         if (!cancelled) {
           setQueue(response)
@@ -102,19 +107,25 @@ export function SupportQueuePage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, page, refreshKey])
+  }, [
+    accessToken,
+    page,
+    refreshKey,
+  ])
 
   async function handleClaim(
     ticketNumber: string,
   ) {
     if (!accessToken) {
-      setError('Your session is no longer valid')
+      setError(
+        'Your session is no longer valid',
+      )
+
       return
     }
 
     setClaimingTicketNumber(ticketNumber)
     setError(null)
-    setSuccessMessage(null)
 
     try {
       const response = await claimTicket(
@@ -122,21 +133,21 @@ export function SupportQueuePage() {
         ticketNumber,
       )
 
-      setSuccessMessage(
-        `${response.ticketNumber} was assigned to you successfully.`,
+      navigate(
+        `/support/tickets/${response.ticketNumber}`,
       )
-
-      setRefreshKey((current) => current + 1)
     } catch (caughtError) {
       if (caughtError instanceof Error) {
         setError(caughtError.message)
       } else {
-        setError('Unable to claim ticket')
+        setError(
+          'Unable to claim ticket',
+        )
       }
 
-      // Refresh because another engineer may
-      // have claimed the ticket concurrently.
-      setRefreshKey((current) => current + 1)
+      setRefreshKey(
+        (current) => current + 1,
+      )
     } finally {
       setClaimingTicketNumber(null)
     }
@@ -159,12 +170,27 @@ export function SupportQueuePage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate('/dashboard')}
-        >
-          Dashboard
-        </button>
+        <div className="support-header-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() =>
+              navigate('/support/tickets')
+            }
+          >
+            My assignments
+          </button>
+
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() =>
+              navigate('/dashboard')
+            }
+          >
+            Dashboard
+          </button>
+        </div>
       </header>
 
       <section className="queue-overview">
@@ -183,7 +209,9 @@ export function SupportQueuePage() {
             Queue order
           </span>
 
-          <strong>Oldest first</strong>
+          <strong>
+            Oldest first
+          </strong>
         </div>
 
         <div>
@@ -191,31 +219,28 @@ export function SupportQueuePage() {
             Assignment
           </span>
 
-          <strong>Claim-based</strong>
+          <strong>
+            Claim based
+          </strong>
         </div>
       </section>
 
-      {successMessage && (
-        <p
-          className="queue-success"
-          aria-live="polite"
-        >
-          {successMessage}
-        </p>
-      )}
-
       {error && (
-        <p
-          className="form-error"
+        <div
+          className="support-alert support-alert-error"
           role="alert"
         >
           {error}
-        </p>
+        </div>
       )}
 
       {isLoading && (
-        <section className="queue-loading">
-          <p>Loading support queue...</p>
+        <section className="support-loading-state">
+          <div className="support-loading-dot" />
+
+          <p>
+            Loading support queue...
+          </p>
         </section>
       )}
 
@@ -223,8 +248,8 @@ export function SupportQueuePage() {
         !error &&
         queue &&
         queue.content.length === 0 && (
-          <section className="queue-empty-state">
-            <div className="queue-empty-icon">
+          <section className="support-empty-state">
+            <div className="support-empty-mark">
               ✓
             </div>
 
@@ -234,10 +259,23 @@ export function SupportQueuePage() {
               There are currently no open tickets
               waiting to be claimed.
             </p>
+
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() =>
+                navigate(
+                  '/support/tickets',
+                )
+              }
+            >
+              View my assignments
+            </button>
           </section>
         )}
 
       {!isLoading &&
+        !error &&
         queue &&
         queue.content.length > 0 && (
           <section className="support-queue-list">
@@ -258,31 +296,46 @@ export function SupportQueuePage() {
                           {ticket.ticketNumber}
                         </p>
 
-                        <h2>{ticket.title}</h2>
+                        <h2>
+                          {ticket.title}
+                        </h2>
                       </div>
 
                       <span className="queue-status-badge">
-                        {formatLabel(ticket.status)}
+                        {formatLabel(
+                          ticket.status,
+                        )}
                       </span>
                     </div>
 
                     <div className="support-ticket-meta">
                       <div>
-                        <span>Type</span>
+                        <span>
+                          Type
+                        </span>
+
                         <strong>
-                          {formatLabel(ticket.type)}
+                          {formatLabel(
+                            ticket.type,
+                          )}
                         </strong>
                       </div>
 
                       <div>
-                        <span>Priority</span>
+                        <span>
+                          Priority
+                        </span>
+
                         <strong>
                           {ticket.priority}
                         </strong>
                       </div>
 
                       <div>
-                        <span>Created</span>
+                        <span>
+                          Created
+                        </span>
+
                         <strong>
                           {formatDate(
                             ticket.createdAt,
@@ -296,7 +349,8 @@ export function SupportQueuePage() {
                     <button
                       type="button"
                       disabled={
-                        claimingTicketNumber !== null
+                        claimingTicketNumber !==
+                        null
                       }
                       onClick={() =>
                         void handleClaim(
@@ -316,6 +370,7 @@ export function SupportQueuePage() {
         )}
 
       {!isLoading &&
+        !error &&
         queue &&
         queue.totalElements > 0 && (
           <nav
@@ -326,10 +381,10 @@ export function SupportQueuePage() {
               type="button"
               disabled={queue.first}
               onClick={() =>
-                setPage((currentPage) =>
+                setPage((current) =>
                   Math.max(
                     0,
-                    currentPage - 1,
+                    current - 1,
                   ),
                 )
               }
@@ -347,8 +402,7 @@ export function SupportQueuePage() {
               disabled={queue.last}
               onClick={() =>
                 setPage(
-                  (currentPage) =>
-                    currentPage + 1,
+                  (current) => current + 1,
                 )
               }
             >
