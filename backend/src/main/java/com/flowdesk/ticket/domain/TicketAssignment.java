@@ -63,6 +63,17 @@ public class TicketAssignment {
         }
     }
 
+    public void release() {
+        if (releasedAt != null) {
+            throw new IllegalStateException(
+                    "Ticket assignment is already released"
+            );
+        }
+
+        releasedAt =
+                OffsetDateTime.now(ZoneOffset.UTC);
+    }
+
     public UUID getId() {
         return id;
     }

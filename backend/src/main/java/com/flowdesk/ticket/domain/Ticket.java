@@ -74,6 +74,9 @@ public class Ticket {
     )
     private OffsetDateTime updatedAt;
 
+    @Column(name = "resolved_at")
+    private OffsetDateTime resolvedAt;
+
     protected Ticket() {
     }
 
@@ -130,6 +133,46 @@ public class Ticket {
         status = TicketStatus.ASSIGNED;
     }
 
+    public void transitionSupportStatus(
+            TicketStatus newStatus
+    ) {
+        if (newStatus == null) {
+            throw new IllegalArgumentException(
+                    "New ticket status is required"
+            );
+        }
+
+        boolean validTransition = switch (status) {
+            case ASSIGNED ->
+                    newStatus == TicketStatus.IN_PROGRESS;
+
+            case IN_PROGRESS ->
+                    newStatus == TicketStatus.WAITING_FOR_USER
+                            || newStatus == TicketStatus.RESOLVED;
+
+            case WAITING_FOR_USER ->
+                    newStatus == TicketStatus.IN_PROGRESS;
+
+            default -> false;
+        };
+
+        if (!validTransition) {
+            throw new IllegalStateException(
+                    "Invalid ticket status transition: "
+                            + status
+                            + " -> "
+                            + newStatus
+            );
+        }
+
+        status = newStatus;
+
+        if (newStatus == TicketStatus.RESOLVED) {
+            resolvedAt =
+                    OffsetDateTime.now(ZoneOffset.UTC);
+        }
+    }
+
     public UUID getId() {
         return id;
     }
@@ -168,5 +211,9 @@ public class Ticket {
 
     public OffsetDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public OffsetDateTime getResolvedAt() {
+        return resolvedAt;
     }
 }

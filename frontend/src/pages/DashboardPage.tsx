@@ -4,13 +4,17 @@ import { useAuth } from '../auth/useAuth'
 
 export function DashboardPage() {
   const { user, signOut } = useAuth()
+
   const navigate = useNavigate()
 
   const isSupportEngineer =
-    user?.roles.includes('SUPPORT_ENGINEER') ?? false
+    user?.roles.includes(
+      'SUPPORT_ENGINEER',
+    ) ?? false
 
   function handleSignOut() {
     signOut()
+
     navigate('/login')
   }
 
@@ -18,8 +22,16 @@ export function DashboardPage() {
     <main className="dashboard-page">
       <header className="dashboard-header">
         <div>
-          <p className="eyebrow">FlowDesk</p>
+          <p className="eyebrow">
+            FlowDesk
+          </p>
+
           <h1>Dashboard</h1>
+
+          <p className="dashboard-subtitle">
+            Manage your support requests and
+            operational work from one place.
+          </p>
         </div>
 
         <button
@@ -30,63 +42,124 @@ export function DashboardPage() {
         </button>
       </header>
 
-      <section className="dashboard-actions">
-        <h2>IT Support</h2>
+      <section className="dashboard-workspace-grid">
+        <article className="dashboard-workspace-card">
+          <p className="dashboard-card-label">
+            Employee workspace
+          </p>
 
-        <p>
-          Report an incident, submit a service
-          request, or track your existing tickets.
-        </p>
+          <h2>IT support</h2>
 
-        <div className="dashboard-action-buttons">
-          <button
-            type="button"
-            onClick={() =>
-              navigate('/tickets/new')
-            }
-          >
-            Create ticket
-          </button>
+          <p>
+            Report an incident, request a service,
+            or track tickets you have already
+            created.
+          </p>
 
-          <button
-            type="button"
-            onClick={() =>
-              navigate('/tickets')
-            }
-          >
-            My tickets
-          </button>
-
-          {isSupportEngineer && (
+          <div className="dashboard-action-buttons">
             <button
               type="button"
               onClick={() =>
-                navigate('/support/queue')
+                navigate('/tickets/new')
               }
             >
-              Support queue
+              Create ticket
             </button>
-          )}
-        </div>
+
+            <button
+              type="button"
+              className="dashboard-secondary-button"
+              onClick={() =>
+                navigate('/tickets')
+              }
+            >
+              My tickets
+            </button>
+          </div>
+        </article>
+
+        {isSupportEngineer && (
+          <article className="dashboard-workspace-card dashboard-support-card">
+            <p className="dashboard-card-label">
+              Support workspace
+            </p>
+
+            <h2>Engineer operations</h2>
+
+            <p>
+              Claim incoming tickets and manage the
+              active issues currently assigned to
+              you.
+            </p>
+
+            <div className="dashboard-action-buttons">
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    '/support/tickets',
+                  )
+                }
+              >
+                My assigned tickets
+              </button>
+
+              <button
+                type="button"
+                className="dashboard-secondary-button"
+                onClick={() =>
+                  navigate(
+                    '/support/queue',
+                  )
+                }
+              >
+                Support queue
+              </button>
+            </div>
+          </article>
+        )}
       </section>
 
       <section className="user-card">
-        <h2>Your account</h2>
+        <div className="account-card-heading">
+          <div>
+            <p className="dashboard-card-label">
+              Account
+            </p>
 
-        <p>
-          <strong>Email:</strong>{' '}
-          {user?.email}
-        </p>
+            <h2>Your profile</h2>
+          </div>
 
-        <p>
-          <strong>User ID:</strong>{' '}
-          {user?.userId}
-        </p>
+          <span className="account-status">
+            Active
+          </span>
+        </div>
 
-        <p>
-          <strong>Roles:</strong>{' '}
-          {user?.roles.join(', ')}
-        </p>
+        <div className="account-details-grid">
+          <div>
+            <span>Email</span>
+
+            <strong>
+              {user?.email}
+            </strong>
+          </div>
+
+          <div>
+            <span>User ID</span>
+
+            <strong>
+              {user?.userId}
+            </strong>
+          </div>
+
+          <div>
+            <span>Roles</span>
+
+            <strong>
+              {user?.roles.join(', ')}
+            </strong>
+          </div>
+        </div>
       </section>
     </main>
   )

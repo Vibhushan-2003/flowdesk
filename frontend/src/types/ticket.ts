@@ -67,3 +67,34 @@ export interface ClaimTicketResponse {
   assignedToEmail: string
   assignedAt: string
 }
+
+export interface SupportTicketSummary {
+  ticketId: string
+  ticketNumber: string
+  type: TicketType
+  title: string
+  priority: TicketPriority
+  status: TicketStatus
+  createdAt: string
+  assignedAt: string
+}
+
+export interface SupportTicketResponse {
+  ticketId: string
+  ticketNumber: string
+  type: TicketType
+  title: string
+  description: string
+  priority: TicketPriority
+  status: TicketStatus
+  createdByUserId: string
+  createdByEmail: string
+  createdAt: string
+  updatedAt: string
+  assignedAt: string
+  resolvedAt: string | null
+}
+
+export interface UpdateTicketStatusRequest {
+  status: TicketStatus
+}

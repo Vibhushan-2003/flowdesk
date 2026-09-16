@@ -7,11 +7,14 @@ import {
 import './App.css'
 
 import { ProtectedRoute } from './components/ProtectedRoute'
+
 import { CreateTicketPage } from './pages/CreateTicketPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
+import { MyAssignedTicketsPage } from './pages/MyAssignedTicketsPage'
 import { MyTicketsPage } from './pages/MyTicketsPage'
 import { SupportQueuePage } from './pages/SupportQueuePage'
+import { SupportTicketDetailsPage } from './pages/SupportTicketDetailsPage'
 import { TicketDetailsPage } from './pages/TicketDetailsPage'
 
 function App() {
@@ -46,6 +49,16 @@ function App() {
         <Route
           path="/support/queue"
           element={<SupportQueuePage />}
+        />
+
+        <Route
+          path="/support/tickets"
+          element={<MyAssignedTicketsPage />}
+        />
+
+        <Route
+          path="/support/tickets/:ticketNumber"
+          element={<SupportTicketDetailsPage />}
         />
       </Route>
 
