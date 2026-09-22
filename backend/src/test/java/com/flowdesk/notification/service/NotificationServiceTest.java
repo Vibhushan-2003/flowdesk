@@ -1,12 +1,19 @@
 package com.flowdesk.notification.service;
 
 import com.flowdesk.common.dto.PageResponse;
+
 import com.flowdesk.notification.domain.Notification;
 import com.flowdesk.notification.domain.NotificationType;
+
 import com.flowdesk.notification.dto.NotificationResponse;
 import com.flowdesk.notification.dto.UnreadNotificationCountResponse;
+
+import com.flowdesk.notification.realtime.NotificationCreatedEvent;
+
 import com.flowdesk.notification.repository.NotificationRepository;
+
 import com.flowdesk.ticket.domain.Ticket;
+
 import com.flowdesk.user.domain.User;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -17,13 +24,18 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.context.ApplicationEventPublisher;
+
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+
 import org.springframework.http.HttpStatus;
+
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,45 +59,78 @@ import static org.mockito.Mockito.when;
 class NotificationServiceTest {
 
     @Mock
-    private NotificationRepository notificationRepository;
+    private NotificationRepository
+            notificationRepository;
 
-    private NotificationService notificationService;
+    @Mock
+    private ApplicationEventPublisher
+            applicationEventPublisher;
+
+    private NotificationService
+            notificationService;
 
     private UUID recipientUserId;
 
     @BeforeEach
     void setUp() {
+
         notificationService =
                 new NotificationService(
-                        notificationRepository
+                        notificationRepository,
+                        applicationEventPublisher
                 );
 
-        recipientUserId = UUID.randomUUID();
+        recipientUserId =
+                UUID.randomUUID();
     }
 
     @Test
     void createNotificationShouldNormalizeAndPersistNotification() {
-        User recipientUser = mock(User.class);
-        User actorUser = mock(User.class);
-        Ticket ticket = mock(Ticket.class);
 
-        UUID actorUserId = UUID.randomUUID();
-        UUID ticketId = UUID.randomUUID();
+        User recipientUser =
+                mock(User.class);
+
+        User actorUser =
+                mock(User.class);
+
+        Ticket ticket =
+                mock(Ticket.class);
+
+        UUID actorUserId =
+                UUID.randomUUID();
+
+        UUID ticketId =
+                UUID.randomUUID();
+
+        when(recipientUser.getId())
+                .thenReturn(
+                        recipientUserId
+                );
 
         when(actorUser.getId())
-                .thenReturn(actorUserId);
+                .thenReturn(
+                        actorUserId
+                );
 
         when(actorUser.getFirstName())
-                .thenReturn("Auth");
+                .thenReturn(
+                        "Auth"
+                );
 
         when(actorUser.getLastName())
-                .thenReturn("Tester");
+                .thenReturn(
+                        "Tester"
+                );
 
         when(ticket.getId())
-                .thenReturn(ticketId);
+                .thenReturn(
+                        ticketId
+                );
 
         when(ticket.getTicketNumber())
-                .thenReturn("FD-000008");
+                .thenReturn(
+                        "FD-000008"
+                );
 
         when(
                 notificationRepository
@@ -144,9 +189,12 @@ class NotificationServiceTest {
                 response.ticketNumber()
         );
 
-        assertFalse(response.read());
+        assertFalse(
+                response.read()
+        );
 
-        ArgumentCaptor<Notification> notificationCaptor =
+        ArgumentCaptor<Notification>
+                notificationCaptor =
                 ArgumentCaptor.forClass(
                         Notification.class
                 );
@@ -161,17 +209,20 @@ class NotificationServiceTest {
 
         assertSame(
                 recipientUser,
-                savedNotification.getRecipientUser()
+                savedNotification
+                        .getRecipientUser()
         );
 
         assertSame(
                 actorUser,
-                savedNotification.getActorUser()
+                savedNotification
+                        .getActorUser()
         );
 
         assertSame(
                 ticket,
-                savedNotification.getTicket()
+                savedNotification
+                        .getTicket()
         );
 
         assertEquals(
@@ -191,15 +242,95 @@ class NotificationServiceTest {
     }
 
     @Test
+    void createNotificationShouldPublishCreatedEvent() {
+
+        User recipientUser =
+                mock(User.class);
+
+        UUID userId =
+                UUID.randomUUID();
+
+        when(recipientUser.getId())
+                .thenReturn(
+                        userId
+                );
+
+        when(
+                notificationRepository
+                        .saveAndFlush(
+                                any(Notification.class)
+                        )
+        ).thenAnswer(
+                invocation ->
+                        invocation.getArgument(0)
+        );
+
+        NotificationResponse response =
+                notificationService
+                        .createNotification(
+                                recipientUser,
+                                null,
+                                null,
+                                NotificationType
+                                        .TICKET_STATUS_CHANGED,
+                                "Ticket updated",
+                                "Your ticket status changed"
+                        );
+
+        ArgumentCaptor<NotificationCreatedEvent>
+                eventCaptor =
+                ArgumentCaptor.forClass(
+                        NotificationCreatedEvent.class
+                );
+
+        verify(applicationEventPublisher)
+                .publishEvent(
+                        eventCaptor.capture()
+                );
+
+        NotificationCreatedEvent event =
+                eventCaptor.getValue();
+
+        assertEquals(
+                userId,
+                event.recipientUserId()
+        );
+
+        assertSame(
+                response,
+                event.notification()
+        );
+
+        assertEquals(
+                NotificationType.TICKET_STATUS_CHANGED,
+                event.notification().type()
+        );
+
+        assertEquals(
+                "Ticket updated",
+                event.notification().title()
+        );
+
+        assertEquals(
+                "Your ticket status changed",
+                event.notification().message()
+        );
+    }
+
+    @Test
     void getMyNotificationsShouldReturnPaginatedNotifications() {
+
         Notification newestNotification =
                 mock(Notification.class);
 
         Notification olderNotification =
                 mock(Notification.class);
 
-        User actorUser = mock(User.class);
-        Ticket ticket = mock(Ticket.class);
+        User actorUser =
+                mock(User.class);
+
+        Ticket ticket =
+                mock(Ticket.class);
 
         UUID newestNotificationId =
                 UUID.randomUUID();
@@ -224,7 +355,9 @@ class NotificationServiceTest {
                 );
 
         when(newestNotification.getId())
-                .thenReturn(newestNotificationId);
+                .thenReturn(
+                        newestNotificationId
+                );
 
         when(newestNotification.getType())
                 .thenReturn(
@@ -233,7 +366,9 @@ class NotificationServiceTest {
                 );
 
         when(newestNotification.getTitle())
-                .thenReturn("New ticket reply");
+                .thenReturn(
+                        "New ticket reply"
+                );
 
         when(newestNotification.getMessage())
                 .thenReturn(
@@ -241,37 +376,59 @@ class NotificationServiceTest {
                 );
 
         when(newestNotification.getActorUser())
-                .thenReturn(actorUser);
+                .thenReturn(
+                        actorUser
+                );
 
         when(newestNotification.getTicket())
-                .thenReturn(ticket);
+                .thenReturn(
+                        ticket
+                );
 
         when(newestNotification.isRead())
-                .thenReturn(false);
+                .thenReturn(
+                        false
+                );
 
         when(newestNotification.getReadAt())
-                .thenReturn(null);
+                .thenReturn(
+                        null
+                );
 
         when(newestNotification.getCreatedAt())
-                .thenReturn(newestCreatedAt);
+                .thenReturn(
+                        newestCreatedAt
+                );
 
         when(actorUser.getId())
-                .thenReturn(actorUserId);
+                .thenReturn(
+                        actorUserId
+                );
 
         when(actorUser.getFirstName())
-                .thenReturn("Auth");
+                .thenReturn(
+                        "Auth"
+                );
 
         when(actorUser.getLastName())
-                .thenReturn("Tester");
+                .thenReturn(
+                        "Tester"
+                );
 
         when(ticket.getId())
-                .thenReturn(ticketId);
+                .thenReturn(
+                        ticketId
+                );
 
         when(ticket.getTicketNumber())
-                .thenReturn("FD-000008");
+                .thenReturn(
+                        "FD-000008"
+                );
 
         when(olderNotification.getId())
-                .thenReturn(olderNotificationId);
+                .thenReturn(
+                        olderNotificationId
+                );
 
         when(olderNotification.getType())
                 .thenReturn(
@@ -280,7 +437,9 @@ class NotificationServiceTest {
                 );
 
         when(olderNotification.getTitle())
-                .thenReturn("Ticket status updated");
+                .thenReturn(
+                        "Ticket status updated"
+                );
 
         when(olderNotification.getMessage())
                 .thenReturn(
@@ -288,13 +447,19 @@ class NotificationServiceTest {
                 );
 
         when(olderNotification.getActorUser())
-                .thenReturn(null);
+                .thenReturn(
+                        null
+                );
 
         when(olderNotification.getTicket())
-                .thenReturn(null);
+                .thenReturn(
+                        null
+                );
 
         when(olderNotification.isRead())
-                .thenReturn(true);
+                .thenReturn(
+                        true
+                );
 
         OffsetDateTime readAt =
                 OffsetDateTime.parse(
@@ -302,10 +467,14 @@ class NotificationServiceTest {
                 );
 
         when(olderNotification.getReadAt())
-                .thenReturn(readAt);
+                .thenReturn(
+                        readAt
+                );
 
         when(olderNotification.getCreatedAt())
-                .thenReturn(olderCreatedAt);
+                .thenReturn(
+                        olderCreatedAt
+                );
 
         PageRequest pageRequest =
                 PageRequest.of(
@@ -410,10 +579,16 @@ class NotificationServiceTest {
                 response.totalPages()
         );
 
-        assertTrue(response.first());
-        assertTrue(response.last());
+        assertTrue(
+                response.first()
+        );
 
-        ArgumentCaptor<Pageable> pageableCaptor =
+        assertTrue(
+                response.last()
+        );
+
+        ArgumentCaptor<Pageable>
+                pageableCaptor =
                 ArgumentCaptor.forClass(
                         Pageable.class
                 );
@@ -429,23 +604,28 @@ class NotificationServiceTest {
 
         assertEquals(
                 0,
-                capturedPageable.getPageNumber()
+                capturedPageable
+                        .getPageNumber()
         );
 
         assertEquals(
                 20,
-                capturedPageable.getPageSize()
+                capturedPageable
+                        .getPageSize()
         );
     }
 
     @Test
     void getUnreadCountShouldReturnRepositoryCount() {
+
         when(
                 notificationRepository
                         .countByRecipientUser_IdAndReadAtIsNull(
                                 recipientUserId
                         )
-        ).thenReturn(4L);
+        ).thenReturn(
+                4L
+        );
 
         UnreadNotificationCountResponse response =
                 notificationService
@@ -466,6 +646,7 @@ class NotificationServiceTest {
 
     @Test
     void markAsReadShouldMarkOwnedNotificationAsRead() {
+
         UUID notificationId =
                 UUID.randomUUID();
 
@@ -490,10 +671,14 @@ class NotificationServiceTest {
                                 recipientUserId
                         )
         ).thenReturn(
-                Optional.of(notification)
+                Optional.of(
+                        notification
+                )
         );
 
-        assertFalse(notification.isRead());
+        assertFalse(
+                notification.isRead()
+        );
 
         NotificationResponse response =
                 notificationService
@@ -502,9 +687,17 @@ class NotificationServiceTest {
                                 notificationId
                         );
 
-        assertTrue(notification.isRead());
-        assertTrue(response.read());
-        assertNotNull(response.readAt());
+        assertTrue(
+                notification.isRead()
+        );
+
+        assertTrue(
+                response.read()
+        );
+
+        assertNotNull(
+                response.readAt()
+        );
 
         verify(notificationRepository)
                 .findByIdAndRecipientUser_Id(
@@ -522,6 +715,7 @@ class NotificationServiceTest {
 
     @Test
     void markAsReadShouldBeIdempotent() {
+
         UUID notificationId =
                 UUID.randomUUID();
 
@@ -551,7 +745,9 @@ class NotificationServiceTest {
                                 recipientUserId
                         )
         ).thenReturn(
-                Optional.of(notification)
+                Optional.of(
+                        notification
+                )
         );
 
         NotificationResponse response =
@@ -571,11 +767,14 @@ class NotificationServiceTest {
                 response.readAt()
         );
 
-        assertTrue(response.read());
+        assertTrue(
+                response.read()
+        );
     }
 
     @Test
     void markAsReadShouldReturnNotFoundWhenNotificationIsNotOwned() {
+
         UUID notificationId =
                 UUID.randomUUID();
 
@@ -614,6 +813,7 @@ class NotificationServiceTest {
 
     @Test
     void getMyNotificationsShouldRejectNegativePage() {
+
         ResponseStatusException exception =
                 assertThrows(
                         ResponseStatusException.class,
@@ -634,6 +834,7 @@ class NotificationServiceTest {
 
     @Test
     void getMyNotificationsShouldRejectInvalidPageSize() {
+
         ResponseStatusException exception =
                 assertThrows(
                         ResponseStatusException.class,
