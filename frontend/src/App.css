@@ -1763,3 +1763,294 @@
     width: 100%;
   }
 }
+
+/* =========================================================
+   Day 15 - Notifications
+   ========================================================= */
+
+.dashboard-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.notification-bell-wrapper {
+  position: relative;
+}
+
+.dashboard-header .notification-bell-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+
+  padding: 0;
+
+  border-radius: 12px;
+
+  cursor: pointer;
+}
+
+.notification-bell-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 20px;
+  height: 20px;
+
+  padding: 0 5px;
+
+  border-radius: 999px;
+
+  background: #dc2626;
+  color: #ffffff;
+
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.notification-dropdown {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  z-index: 50;
+
+  width: min(
+    390px,
+    calc(100vw - 2rem)
+  );
+
+  max-height: 520px;
+
+  overflow-y: auto;
+
+  padding: 1rem;
+
+  border: 1px solid
+    rgba(148, 163, 184, 0.25);
+
+  border-radius: 16px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 20px 45px
+    rgba(15, 23, 42, 0.16);
+}
+
+.notification-dropdown-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+
+  margin-bottom: 0.75rem;
+}
+
+.notification-dropdown-header h2 {
+  margin: 0;
+
+  color: #111827;
+
+  font-size: 1.1rem;
+}
+
+.notification-refresh-button {
+  padding: 0.45rem 0.7rem;
+
+  font-size: 0.8rem;
+}
+
+.notification-refresh-button:disabled {
+  cursor: not-allowed;
+
+  opacity: 0.6;
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dashboard-header .notification-item {
+  width: 100%;
+
+  padding: 0.85rem;
+
+  border: 1px solid
+    rgba(148, 163, 184, 0.2);
+
+  border-radius: 12px;
+
+  background: transparent;
+  color: #111827;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.dashboard-header .notification-item:hover {
+  border-color:
+    rgba(148, 163, 184, 0.4);
+
+  background:
+    rgba(148, 163, 184, 0.08);
+}
+
+.dashboard-header .notification-item-unread {
+  background:
+    rgba(59, 130, 246, 0.07);
+}
+
+.dashboard-header .notification-item-unread:hover {
+  background:
+    rgba(59, 130, 246, 0.11);
+}
+
+.notification-item-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.notification-item-heading strong {
+  min-width: 0;
+
+  color: #111827;
+
+  font-size: 0.92rem;
+
+  overflow-wrap: anywhere;
+}
+
+.notification-item p {
+  margin: 0.35rem 0 0;
+
+  color: #4b5563;
+
+  font-size: 0.85rem;
+  line-height: 1.45;
+
+  overflow-wrap: anywhere;
+}
+
+.notification-item-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+
+  margin-top: 0.6rem;
+
+  color: #6b7280;
+
+  font-size: 0.72rem;
+}
+
+.notification-item-meta span {
+  min-width: 0;
+
+  overflow-wrap: anywhere;
+}
+
+.notification-unread-dot {
+  flex: 0 0 auto;
+
+  width: 8px;
+  height: 8px;
+
+  border-radius: 999px;
+
+  background: #2563eb;
+}
+
+.notification-empty {
+  margin: 1rem 0;
+
+  color: #6b7280;
+
+  text-align: center;
+}
+
+.notification-error {
+  margin: 0.75rem 0;
+
+  padding: 0.75rem;
+
+  border: 1px solid #fecaca;
+
+  border-radius: 10px;
+
+  background: #fef2f2;
+  color: #991b1b;
+
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* Day 15 responsive */
+
+@media (max-width: 700px) {
+  .dashboard-header-actions {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .dashboard-header .notification-bell-button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-header {
+    align-items: flex-start;
+  }
+
+  .dashboard-header-actions {
+    align-self: stretch;
+    justify-content: flex-end;
+  }
+
+  .notification-dropdown {
+    position: fixed;
+
+    top: 80px;
+    right: 1rem;
+    left: 1rem;
+
+    width: auto;
+
+    max-height:
+      calc(100vh - 100px);
+  }
+
+  .notification-item-meta {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
