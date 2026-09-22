@@ -1,4 +1,5 @@
 import {
+  type FormEvent,
   useEffect,
   useState,
 } from 'react'
@@ -9,7 +10,9 @@ import {
 } from 'react-router-dom'
 
 import {
+  addSupportTicketComment,
   getSupportTicket,
+  getSupportTicketComments,
   updateSupportTicketStatus,
 } from '../api/ticket'
 
@@ -17,6 +20,7 @@ import { useAuth } from '../auth/useAuth'
 
 import type {
   SupportTicketResponse,
+  TicketCommentResponse,
   TicketStatus,
 } from '../types/ticket'
 
@@ -64,13 +68,25 @@ export function SupportTicketDetailsPage() {
       null,
     )
 
+  const [comments, setComments] =
+    useState<TicketCommentResponse[]>([])
+
+  const [commentBody, setCommentBody] =
+    useState('')
+
   const [isLoading, setIsLoading] =
     useState(true)
 
   const [isUpdating, setIsUpdating] =
     useState(false)
 
+  const [isSendingComment, setIsSendingComment] =
+    useState(false)
+
   const [error, setError] =
+    useState<string | null>(null)
+
+  const [commentError, setCommentError] =
     useState<string | null>(null)
 
   const [successMessage, setSuccessMessage] =
@@ -108,14 +124,23 @@ export function SupportTicketDetailsPage() {
       setError(null)
 
       try {
-        const response =
-          await getSupportTicket(
+        const [
+          ticketResponse,
+          commentsResponse,
+        ] = await Promise.all([
+          getSupportTicket(
             accessToken,
             ticketNumber,
-          )
+          ),
+          getSupportTicketComments(
+            accessToken,
+            ticketNumber,
+          ),
+        ])
 
         if (!cancelled) {
-          setTicket(response)
+          setTicket(ticketResponse)
+          setComments(commentsResponse)
         }
       } catch (caughtError) {
         if (cancelled) {
@@ -123,7 +148,9 @@ export function SupportTicketDetailsPage() {
         }
 
         if (caughtError instanceof Error) {
-          setError(caughtError.message)
+          setError(
+            caughtError.message,
+          )
         } else {
           setError(
             'Unable to load support ticket',
@@ -175,7 +202,9 @@ export function SupportTicketDetailsPage() {
       )
     } catch (caughtError) {
       if (caughtError instanceof Error) {
-        setError(caughtError.message)
+        setError(
+          caughtError.message,
+        )
       } else {
         setError(
           'Unable to update ticket status',
@@ -185,6 +214,77 @@ export function SupportTicketDetailsPage() {
       setIsUpdating(false)
     }
   }
+
+  async function handleSendComment(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault()
+
+    if (!accessToken || !ticketNumber) {
+      setCommentError(
+        'Your session is no longer valid',
+      )
+
+      return
+    }
+
+    const normalizedBody =
+      commentBody.trim()
+
+    if (!normalizedBody) {
+      setCommentError(
+        'Please enter a message',
+      )
+
+      return
+    }
+
+    if (normalizedBody.length > 4000) {
+      setCommentError(
+        'Message must not exceed 4000 characters',
+      )
+
+      return
+    }
+
+    setIsSendingComment(true)
+    setCommentError(null)
+
+    try {
+      const response =
+        await addSupportTicketComment(
+          accessToken,
+          ticketNumber,
+          {
+            body: normalizedBody,
+          },
+        )
+
+      setComments((currentComments) => [
+        ...currentComments,
+        response,
+      ])
+
+      setCommentBody('')
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setCommentError(
+          caughtError.message,
+        )
+      } else {
+        setCommentError(
+          'Unable to send message',
+        )
+      }
+    } finally {
+      setIsSendingComment(false)
+    }
+  }
+
+  const isConversationReadOnly =
+    ticket?.status === 'RESOLVED' ||
+    ticket?.status === 'CLOSED' ||
+    ticket?.status === 'CANCELLED'
 
   return (
     <main className="support-ticket-details-page">
@@ -248,7 +348,9 @@ export function SupportTicketDetailsPage() {
         <section className="support-loading-state">
           <div className="support-loading-dot" />
 
-          <p>Loading support ticket...</p>
+          <p>
+            Loading support ticket...
+          </p>
         </section>
       )}
 
@@ -278,243 +380,406 @@ export function SupportTicketDetailsPage() {
         )}
 
       {!isLoading && ticket && (
-        <div className="support-ticket-layout">
-          <article className="support-ticket-detail-card">
-            <header className="support-ticket-detail-heading">
-              <div>
-                <p className="support-ticket-number">
-                  {ticket.ticketNumber}
+        <>
+          <div className="support-ticket-layout">
+            <article className="support-ticket-detail-card">
+              <header className="support-ticket-detail-heading">
+                <div>
+                  <p className="support-ticket-number">
+                    {ticket.ticketNumber}
+                  </p>
+
+                  <h2>
+                    {ticket.title}
+                  </h2>
+                </div>
+
+                <span
+                  className={getStatusClass(
+                    ticket.status,
+                  )}
+                >
+                  {formatLabel(
+                    ticket.status,
+                  )}
+                </span>
+              </header>
+
+              <section className="support-description-section">
+                <p className="support-section-label">
+                  Issue description
                 </p>
 
-                <h2>{ticket.title}</h2>
-              </div>
+                <p className="support-ticket-description-text">
+                  {ticket.description}
+                </p>
+              </section>
 
-              <span
-                className={getStatusClass(
-                  ticket.status,
-                )}
-              >
-                {formatLabel(
-                  ticket.status,
-                )}
-              </span>
-            </header>
-
-            <section className="support-description-section">
-              <p className="support-section-label">
-                Issue description
-              </p>
-
-              <p className="support-ticket-description-text">
-                {ticket.description}
-              </p>
-            </section>
-
-            <section className="support-detail-grid">
-              <div>
-                <span>Type</span>
-
-                <strong>
-                  {formatLabel(
-                    ticket.type,
-                  )}
-                </strong>
-              </div>
-
-              <div>
-                <span>Priority</span>
-
-                <strong>
-                  {ticket.priority}
-                </strong>
-              </div>
-
-              <div>
-                <span>Requester</span>
-
-                <strong>
-                  {ticket.createdByEmail}
-                </strong>
-              </div>
-
-              <div>
-                <span>Created</span>
-
-                <strong>
-                  {formatDate(
-                    ticket.createdAt,
-                  )}
-                </strong>
-              </div>
-
-              <div>
-                <span>Assigned</span>
-
-                <strong>
-                  {formatDate(
-                    ticket.assignedAt,
-                  )}
-                </strong>
-              </div>
-
-              <div>
-                <span>Last updated</span>
-
-                <strong>
-                  {formatDate(
-                    ticket.updatedAt,
-                  )}
-                </strong>
-              </div>
-
-              {ticket.resolvedAt && (
+              <section className="support-detail-grid">
                 <div>
-                  <span>Resolved</span>
+                  <span>Type</span>
 
                   <strong>
-                    {formatDate(
-                      ticket.resolvedAt,
+                    {formatLabel(
+                      ticket.type,
                     )}
                   </strong>
                 </div>
-              )}
-            </section>
-          </article>
 
-          <aside className="support-workflow-panel">
-            <p className="support-section-label">
-              Workflow
-            </p>
+                <div>
+                  <span>Priority</span>
 
-            <h2>Next action</h2>
-
-            {ticket.status === 'ASSIGNED' && (
-              <>
-                <p>
-                  The ticket is assigned to you but
-                  work has not started yet.
-                </p>
-
-                <button
-                  type="button"
-                  className="primary-button support-workflow-button"
-                  disabled={isUpdating}
-                  onClick={() =>
-                    void handleStatusChange(
-                      'IN_PROGRESS',
-                    )
-                  }
-                >
-                  {isUpdating
-                    ? 'Starting...'
-                    : 'Start work'}
-                </button>
-              </>
-            )}
-
-            {ticket.status === 'IN_PROGRESS' && (
-              <>
-                <p>
-                  You are actively working on this
-                  ticket.
-                </p>
-
-                <div className="support-workflow-actions">
-                  <button
-                    type="button"
-                    className="secondary-button support-workflow-button"
-                    disabled={isUpdating}
-                    onClick={() =>
-                      void handleStatusChange(
-                        'WAITING_FOR_USER',
-                      )
-                    }
-                  >
-                    {isUpdating
-                      ? 'Updating...'
-                      : 'Wait for user'}
-                  </button>
-
-                  <button
-                    type="button"
-                    className="resolve-button support-workflow-button"
-                    disabled={isUpdating}
-                    onClick={() =>
-                      void handleStatusChange(
-                        'RESOLVED',
-                      )
-                    }
-                  >
-                    {isUpdating
-                      ? 'Updating...'
-                      : 'Resolve ticket'}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {ticket.status ===
-              'WAITING_FOR_USER' && (
-              <>
-                <p>
-                  Work is paused while waiting for
-                  information from the requester.
-                </p>
-
-                <button
-                  type="button"
-                  className="primary-button support-workflow-button"
-                  disabled={isUpdating}
-                  onClick={() =>
-                    void handleStatusChange(
-                      'IN_PROGRESS',
-                    )
-                  }
-                >
-                  {isUpdating
-                    ? 'Resuming...'
-                    : 'Resume work'}
-                </button>
-              </>
-            )}
-
-            {ticket.status === 'RESOLVED' && (
-              <div className="resolved-workflow-state">
-                <div className="resolved-workflow-icon">
-                  ✓
+                  <strong>
+                    {ticket.priority}
+                  </strong>
                 </div>
 
-                <h3>Ticket resolved</h3>
+                <div>
+                  <span>Requester</span>
 
-                <p>
-                  This ticket has been completed and
-                  removed from your active
-                  assignments.
-                </p>
+                  <strong>
+                    {ticket.createdByEmail}
+                  </strong>
+                </div>
 
-                <button
-                  type="button"
-                  className="primary-button support-workflow-button"
-                  onClick={() =>
-                    navigate('/support/tickets')
-                  }
-                >
-                  Back to my assignments
-                </button>
-              </div>
-            )}
+                <div>
+                  <span>Created</span>
 
-            <div className="workflow-rule">
-              <span>Current status</span>
+                  <strong>
+                    {formatDate(
+                      ticket.createdAt,
+                    )}
+                  </strong>
+                </div>
 
-              <strong>
-                {formatLabel(
-                  ticket.status,
+                <div>
+                  <span>Assigned</span>
+
+                  <strong>
+                    {formatDate(
+                      ticket.assignedAt,
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Last updated
+                  </span>
+
+                  <strong>
+                    {formatDate(
+                      ticket.updatedAt,
+                    )}
+                  </strong>
+                </div>
+
+                {ticket.resolvedAt && (
+                  <div>
+                    <span>Resolved</span>
+
+                    <strong>
+                      {formatDate(
+                        ticket.resolvedAt,
+                      )}
+                    </strong>
+                  </div>
                 )}
-              </strong>
+              </section>
+            </article>
+
+            <aside className="support-workflow-panel">
+              <p className="support-section-label">
+                Workflow
+              </p>
+
+              <h2>Next action</h2>
+
+              {ticket.status ===
+                'ASSIGNED' && (
+                <>
+                  <p>
+                    The ticket is assigned to you
+                    but work has not started yet.
+                  </p>
+
+                  <button
+                    type="button"
+                    className="primary-button support-workflow-button"
+                    disabled={
+                      isUpdating
+                    }
+                    onClick={() =>
+                      void handleStatusChange(
+                        'IN_PROGRESS',
+                      )
+                    }
+                  >
+                    {isUpdating
+                      ? 'Starting...'
+                      : 'Start work'}
+                  </button>
+                </>
+              )}
+
+              {ticket.status ===
+                'IN_PROGRESS' && (
+                <>
+                  <p>
+                    You are actively working on
+                    this ticket.
+                  </p>
+
+                  <div className="support-workflow-actions">
+                    <button
+                      type="button"
+                      className="secondary-button support-workflow-button"
+                      disabled={
+                        isUpdating
+                      }
+                      onClick={() =>
+                        void handleStatusChange(
+                          'WAITING_FOR_USER',
+                        )
+                      }
+                    >
+                      {isUpdating
+                        ? 'Updating...'
+                        : 'Wait for user'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="resolve-button support-workflow-button"
+                      disabled={
+                        isUpdating
+                      }
+                      onClick={() =>
+                        void handleStatusChange(
+                          'RESOLVED',
+                        )
+                      }
+                    >
+                      {isUpdating
+                        ? 'Updating...'
+                        : 'Resolve ticket'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {ticket.status ===
+                'WAITING_FOR_USER' && (
+                <>
+                  <p>
+                    Work is paused while waiting
+                    for information from the
+                    requester.
+                  </p>
+
+                  <button
+                    type="button"
+                    className="primary-button support-workflow-button"
+                    disabled={
+                      isUpdating
+                    }
+                    onClick={() =>
+                      void handleStatusChange(
+                        'IN_PROGRESS',
+                      )
+                    }
+                  >
+                    {isUpdating
+                      ? 'Resuming...'
+                      : 'Resume work'}
+                  </button>
+                </>
+              )}
+
+              {ticket.status ===
+                'RESOLVED' && (
+                <div className="resolved-workflow-state">
+                  <div className="resolved-workflow-icon">
+                    ✓
+                  </div>
+
+                  <h3>
+                    Ticket resolved
+                  </h3>
+
+                  <p>
+                    This ticket has been completed
+                    and removed from your active
+                    assignments.
+                  </p>
+
+                  <button
+                    type="button"
+                    className="primary-button support-workflow-button"
+                    onClick={() =>
+                      navigate(
+                        '/support/tickets',
+                      )
+                    }
+                  >
+                    Back to my assignments
+                  </button>
+                </div>
+              )}
+
+              <div className="workflow-rule">
+                <span>
+                  Current status
+                </span>
+
+                <strong>
+                  {formatLabel(
+                    ticket.status,
+                  )}
+                </strong>
+              </div>
+            </aside>
+          </div>
+
+          <section className="support-conversation-card">
+            <header className="ticket-conversation-header">
+              <div>
+                <p className="support-section-label">
+                  Conversation
+                </p>
+
+                <h2>
+                  Requester messages
+                </h2>
+              </div>
+
+              <span>
+                {comments.length}{' '}
+                {comments.length === 1
+                  ? 'message'
+                  : 'messages'}
+              </span>
+            </header>
+
+            <div className="ticket-comment-list">
+              {comments.length === 0 && (
+                <div className="ticket-conversation-empty">
+                  <p>
+                    No messages yet.
+                  </p>
+
+                  <span>
+                    Ask the requester for more
+                    information when needed.
+                  </span>
+                </div>
+              )}
+
+              {comments.map((comment) => (
+                <article
+                  key={comment.commentId}
+                  className="ticket-comment"
+                >
+                  <header className="ticket-comment-header">
+                    <strong>
+                      {comment.authorName}
+                    </strong>
+
+                    <time
+                      dateTime={
+                        comment.createdAt
+                      }
+                    >
+                      {formatDate(
+                        comment.createdAt,
+                      )}
+                    </time>
+                  </header>
+
+                  <p>
+                    {comment.body}
+                  </p>
+                </article>
+              ))}
             </div>
-          </aside>
-        </div>
+
+            {isConversationReadOnly ? (
+              <div className="ticket-conversation-readonly">
+                <strong>
+                  Conversation closed
+                </strong>
+
+                <p>
+                  The ticket is resolved. Existing
+                  messages remain visible, but new
+                  messages cannot be added.
+                </p>
+              </div>
+            ) : (
+              <form
+                className="ticket-comment-form"
+                onSubmit={
+                  handleSendComment
+                }
+              >
+                <label htmlFor="support-comment-body">
+                  Message requester
+                </label>
+
+                <textarea
+                  id="support-comment-body"
+                  value={commentBody}
+                  maxLength={4000}
+                  rows={4}
+                  placeholder="Ask a question or send an update..."
+                  disabled={
+                    isSendingComment
+                  }
+                  onChange={(event) => {
+                    setCommentBody(
+                      event.target.value,
+                    )
+
+                    if (commentError) {
+                      setCommentError(
+                        null,
+                      )
+                    }
+                  }}
+                />
+
+                <div className="ticket-comment-form-footer">
+                  <span>
+                    {commentBody.length}
+                    /4000
+                  </span>
+
+                  <button
+                    type="submit"
+                    className="primary-button"
+                    disabled={
+                      isSendingComment ||
+                      !commentBody.trim()
+                    }
+                  >
+                    {isSendingComment
+                      ? 'Sending...'
+                      : 'Send message'}
+                  </button>
+                </div>
+
+                {commentError && (
+                  <p
+                    className="form-error"
+                    role="alert"
+                  >
+                    {commentError}
+                  </p>
+                )}
+              </form>
+            )}
+          </section>
+        </>
       )}
     </main>
   )

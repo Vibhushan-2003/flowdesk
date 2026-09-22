@@ -98,3 +98,15 @@ export interface SupportTicketResponse {
 export interface UpdateTicketStatusRequest {
   status: TicketStatus
 }
+
+export interface CreateTicketCommentRequest {
+  body: string
+}
+
+export interface TicketCommentResponse {
+  commentId: string
+  authorUserId: string
+  authorName: string
+  body: string
+  createdAt: string
+}

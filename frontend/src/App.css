@@ -1513,3 +1513,253 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================
+   Day 14 - Ticket Conversation
+   ========================= */
+
+.ticket-conversation-card,
+.support-conversation-card {
+  margin-top: 22px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.ticket-conversation-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 26px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.ticket-conversation-header h2 {
+  margin: 5px 0 0;
+  color: #111827;
+  font-size: 1.2rem;
+}
+
+.ticket-conversation-header > span {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.ticket-comment-list {
+  display: grid;
+  gap: 14px;
+  padding: 24px 26px;
+  background: #f9fafb;
+}
+
+.ticket-comment {
+  padding: 16px 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.ticket-comment-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 9px;
+}
+
+.ticket-comment-header strong {
+  min-width: 0;
+  color: #111827;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.ticket-comment-header time {
+  flex-shrink: 0;
+  color: #9ca3af;
+  font-size: 0.76rem;
+}
+
+.ticket-comment > p {
+  margin: 0;
+  color: #374151;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.ticket-conversation-empty {
+  padding: 34px 20px;
+  text-align: center;
+}
+
+.ticket-conversation-empty p {
+  margin: 0 0 6px;
+  color: #374151;
+  font-weight: 700;
+}
+
+.ticket-conversation-empty span {
+  color: #6b7280;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.ticket-comment-form {
+  display: grid;
+  gap: 10px;
+  padding: 24px 26px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.ticket-comment-form label {
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.ticket-comment-form textarea {
+  width: 100%;
+  min-height: 110px;
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1f2937;
+  font: inherit;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.ticket-comment-form textarea::placeholder {
+  color: #9ca3af;
+}
+
+.ticket-comment-form textarea:focus {
+  outline: 2px solid #c7d2fe;
+  outline-offset: 1px;
+  border-color: #818cf8;
+}
+
+.ticket-comment-form textarea:disabled {
+  cursor: not-allowed;
+  background: #f3f4f6;
+  opacity: 0.7;
+}
+
+.ticket-comment-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ticket-comment-form-footer > span {
+  color: #9ca3af;
+  font-size: 0.78rem;
+}
+
+.ticket-comment-form-footer button {
+  padding: 10px 16px;
+  border: 1px solid #111827;
+  border-radius: 9px;
+  background: #111827;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.ticket-comment-form-footer button:hover:not(:disabled) {
+  background: #374151;
+  border-color: #374151;
+}
+
+.ticket-comment-form-footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ticket-comment-form .form-error {
+  margin-top: 2px;
+}
+
+.ticket-conversation-readonly {
+  padding: 20px 26px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.ticket-conversation-readonly strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #374151;
+}
+
+.ticket-conversation-readonly p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* Employee conversation */
+
+.ticket-details-page .ticket-conversation-card {
+  width: 100%;
+}
+
+/* Support conversation */
+
+.support-conversation-card {
+  width: 100%;
+}
+
+.support-conversation-card .ticket-comment-list {
+  min-height: 120px;
+}
+
+/* Day 14 responsive */
+
+@media (max-width: 700px) {
+  .ticket-conversation-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 20px;
+  }
+
+  .ticket-conversation-header > span {
+    align-self: flex-start;
+  }
+
+  .ticket-comment-list,
+  .ticket-comment-form,
+  .ticket-conversation-readonly {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .ticket-comment-header {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .ticket-comment-form-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ticket-comment-form-footer button {
+    width: 100%;
+  }
+}

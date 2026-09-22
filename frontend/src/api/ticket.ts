@@ -2,10 +2,12 @@ import { API_BASE_URL } from './config'
 
 import type {
   ClaimTicketResponse,
+  CreateTicketCommentRequest,
   CreateTicketRequest,
   PageResponse,
   SupportTicketResponse,
   SupportTicketSummary,
+  TicketCommentResponse,
   TicketResponse,
   TicketStatus,
   TicketSummary,
@@ -120,6 +122,95 @@ export async function getTicket(
   }
 
   return response.json() as Promise<TicketResponse>
+}
+
+export async function getTicketComments(
+  accessToken: string,
+  ticketNumber: string,
+): Promise<TicketCommentResponse[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/tickets/${encodeURIComponent(
+      ticketNumber,
+    )}/comments`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  )
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        'Your session is no longer valid',
+      )
+    }
+
+    if (response.status === 404) {
+      throw new Error('Ticket not found')
+    }
+
+    throw new Error(
+      'Unable to load the conversation. Please try again.',
+    )
+  }
+
+  return response.json() as Promise<
+    TicketCommentResponse[]
+  >
+}
+
+export async function addTicketComment(
+  accessToken: string,
+  ticketNumber: string,
+  request: CreateTicketCommentRequest,
+): Promise<TicketCommentResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/tickets/${encodeURIComponent(
+      ticketNumber,
+    )}/comments`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(request),
+    },
+  )
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        'Your session is no longer valid',
+      )
+    }
+
+    if (response.status === 404) {
+      throw new Error('Ticket not found')
+    }
+
+    if (response.status === 400) {
+      throw new Error(
+        'Please enter a valid message',
+      )
+    }
+
+    if (response.status === 409) {
+      throw new Error(
+        'New messages cannot be added to this finished ticket',
+      )
+    }
+
+    throw new Error(
+      'Unable to send your message. Please try again.',
+    )
+  }
+
+  return response.json() as Promise<
+    TicketCommentResponse
+  >
 }
 
 export async function getSupportQueue(
@@ -301,6 +392,111 @@ export async function getSupportTicket(
 
   return response.json() as Promise<
     SupportTicketResponse
+  >
+}
+
+export async function getSupportTicketComments(
+  accessToken: string,
+  ticketNumber: string,
+): Promise<TicketCommentResponse[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/support/tickets/${encodeURIComponent(
+      ticketNumber,
+    )}/comments`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  )
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        'Your session is no longer valid',
+      )
+    }
+
+    if (response.status === 403) {
+      throw new Error(
+        'You do not have permission to access this conversation',
+      )
+    }
+
+    if (response.status === 404) {
+      throw new Error(
+        'Ticket not found or it is no longer assigned to you',
+      )
+    }
+
+    throw new Error(
+      'Unable to load the conversation. Please try again.',
+    )
+  }
+
+  return response.json() as Promise<
+    TicketCommentResponse[]
+  >
+}
+
+export async function addSupportTicketComment(
+  accessToken: string,
+  ticketNumber: string,
+  request: CreateTicketCommentRequest,
+): Promise<TicketCommentResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/support/tickets/${encodeURIComponent(
+      ticketNumber,
+    )}/comments`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(request),
+    },
+  )
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        'Your session is no longer valid',
+      )
+    }
+
+    if (response.status === 403) {
+      throw new Error(
+        'You do not have permission to send messages on this ticket',
+      )
+    }
+
+    if (response.status === 404) {
+      throw new Error(
+        'Ticket not found or it is no longer assigned to you',
+      )
+    }
+
+    if (response.status === 400) {
+      throw new Error(
+        'Please enter a valid message',
+      )
+    }
+
+    if (response.status === 409) {
+      throw new Error(
+        'New messages cannot be added to this finished ticket',
+      )
+    }
+
+    throw new Error(
+      'Unable to send your message. Please try again.',
+    )
+  }
+
+  return response.json() as Promise<
+    TicketCommentResponse
   >
 }
 
