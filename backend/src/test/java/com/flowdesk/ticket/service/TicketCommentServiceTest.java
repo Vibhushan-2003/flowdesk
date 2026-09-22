@@ -1,14 +1,20 @@
 package com.flowdesk.ticket.service;
 
+import com.flowdesk.notification.domain.NotificationType;
+import com.flowdesk.notification.service.NotificationService;
+
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
 import com.flowdesk.ticket.domain.TicketComment;
 import com.flowdesk.ticket.domain.TicketStatus;
+
 import com.flowdesk.ticket.dto.CreateTicketCommentRequest;
 import com.flowdesk.ticket.dto.TicketCommentResponse;
+
 import com.flowdesk.ticket.repository.TicketAssignmentRepository;
 import com.flowdesk.ticket.repository.TicketCommentRepository;
 import com.flowdesk.ticket.repository.TicketRepository;
+
 import com.flowdesk.user.domain.User;
 import com.flowdesk.user.repository.UserRepository;
 
@@ -36,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,6 +60,9 @@ class TicketCommentServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     private TicketCommentService ticketCommentService;
 
     @BeforeEach
@@ -62,7 +72,8 @@ class TicketCommentServiceTest {
                         ticketCommentRepository,
                         ticketRepository,
                         ticketAssignmentRepository,
-                        userRepository
+                        userRepository,
+                        notificationService
                 );
     }
 
@@ -73,8 +84,12 @@ class TicketCommentServiceTest {
         UUID ticketId = UUID.randomUUID();
         UUID authorId = UUID.randomUUID();
 
-        Ticket ticket = org.mockito.Mockito.mock(Ticket.class);
-        User author = org.mockito.Mockito.mock(User.class);
+        Ticket ticket =
+                org.mockito.Mockito.mock(Ticket.class);
+
+        User author =
+                org.mockito.Mockito.mock(User.class);
+
         TicketComment comment =
                 org.mockito.Mockito.mock(TicketComment.class);
 
@@ -89,7 +104,9 @@ class TicketCommentServiceTest {
                 .thenReturn(Optional.of(ticket));
 
         when(ticketCommentRepository
-                .findByTicket_IdOrderByCreatedAtAsc(ticketId))
+                .findByTicket_IdOrderByCreatedAtAsc(
+                        ticketId
+                ))
                 .thenReturn(List.of(comment));
 
         when(comment.getAuthorUser())
@@ -99,11 +116,15 @@ class TicketCommentServiceTest {
                 .thenReturn(UUID.randomUUID());
 
         when(comment.getBody())
-                .thenReturn("Please restart the application.");
+                .thenReturn(
+                        "Please restart the application."
+                );
 
         when(comment.getCreatedAt())
                 .thenReturn(
-                        OffsetDateTime.now(ZoneOffset.UTC)
+                        OffsetDateTime.now(
+                                ZoneOffset.UTC
+                        )
                 );
 
         when(author.getId())
@@ -122,11 +143,16 @@ class TicketCommentServiceTest {
                                 "fd-000001"
                         );
 
-        assertEquals(1, result.size());
+        assertEquals(
+                1,
+                result.size()
+        );
+
         assertEquals(
                 "Support Engineer",
                 result.getFirst().authorName()
         );
+
         assertEquals(
                 "Please restart the application.",
                 result.getFirst().body()
@@ -136,7 +162,8 @@ class TicketCommentServiceTest {
     @Test
     void employeeCannotReadAnotherEmployeesTicket() {
 
-        UUID employeeId = UUID.randomUUID();
+        UUID employeeId =
+                UUID.randomUUID();
 
         when(ticketRepository
                 .findByTicketNumberAndCreatedByUser_Id(
@@ -164,32 +191,46 @@ class TicketCommentServiceTest {
         verify(
                 ticketCommentRepository,
                 never()
-        ).findByTicket_IdOrderByCreatedAtAsc(any());
+        ).findByTicket_IdOrderByCreatedAtAsc(
+                any()
+        );
     }
 
     @Test
     void employeeCanAddCommentToOwnActiveTicket() {
 
-        UUID employeeId = UUID.randomUUID();
+        UUID employeeId =
+                UUID.randomUUID();
 
         Ticket ticket =
-                org.mockito.Mockito.mock(Ticket.class);
+                org.mockito.Mockito.mock(
+                        Ticket.class
+                );
 
         User employee =
-                org.mockito.Mockito.mock(User.class);
+                org.mockito.Mockito.mock(
+                        User.class
+                );
 
         when(ticket.getStatus())
-                .thenReturn(TicketStatus.OPEN);
+                .thenReturn(
+                        TicketStatus.OPEN
+                );
 
         when(ticketRepository
                 .findByTicketNumberAndCreatedByUser_Id(
                         "FD-000003",
                         employeeId
                 ))
-                .thenReturn(Optional.of(ticket));
+                .thenReturn(
+                        Optional.of(ticket)
+                );
 
-        when(userRepository.findById(employeeId))
-                .thenReturn(Optional.of(employee));
+        when(userRepository
+                .findById(employeeId))
+                .thenReturn(
+                        Optional.of(employee)
+                );
 
         when(employee.getId())
                 .thenReturn(employeeId);
@@ -200,7 +241,8 @@ class TicketCommentServiceTest {
         when(employee.getLastName())
                 .thenReturn("Employee");
 
-        when(ticketCommentRepository.saveAndFlush(any()))
+        when(ticketCommentRepository
+                .saveAndFlush(any()))
                 .thenAnswer(
                         invocation ->
                                 invocation.getArgument(0)
@@ -212,11 +254,12 @@ class TicketCommentServiceTest {
                 );
 
         TicketCommentResponse response =
-                ticketCommentService.addEmployeeComment(
-                        employeeId,
-                        "FD-000003",
-                        request
-                );
+                ticketCommentService
+                        .addEmployeeComment(
+                                employeeId,
+                                "FD-000003",
+                                request
+                        );
 
         assertEquals(
                 "The issue is still happening.",
@@ -234,7 +277,9 @@ class TicketCommentServiceTest {
                 );
 
         verify(ticketCommentRepository)
-                .saveAndFlush(captor.capture());
+                .saveAndFlush(
+                        captor.capture()
+                );
 
         assertEquals(
                 "The issue is still happening.",
@@ -245,11 +290,16 @@ class TicketCommentServiceTest {
     @Test
     void assignedSupportEngineerCanReadComments() {
 
-        UUID engineerId = UUID.randomUUID();
-        UUID ticketId = UUID.randomUUID();
+        UUID engineerId =
+                UUID.randomUUID();
+
+        UUID ticketId =
+                UUID.randomUUID();
 
         Ticket ticket =
-                org.mockito.Mockito.mock(Ticket.class);
+                org.mockito.Mockito.mock(
+                        Ticket.class
+                );
 
         TicketAssignment assignment =
                 org.mockito.Mockito.mock(
@@ -267,10 +317,14 @@ class TicketCommentServiceTest {
                         "FD-000004",
                         engineerId
                 ))
-                .thenReturn(Optional.of(assignment));
+                .thenReturn(
+                        Optional.of(assignment)
+                );
 
         when(ticketCommentRepository
-                .findByTicket_IdOrderByCreatedAtAsc(ticketId))
+                .findByTicket_IdOrderByCreatedAtAsc(
+                        ticketId
+                ))
                 .thenReturn(List.of());
 
         List<TicketCommentResponse> result =
@@ -280,7 +334,9 @@ class TicketCommentServiceTest {
                                 "FD-000004"
                         );
 
-        assertTrue(result.isEmpty());
+        assertTrue(
+                result.isEmpty()
+        );
 
         verify(ticketCommentRepository)
                 .findByTicket_IdOrderByCreatedAtAsc(
@@ -291,7 +347,8 @@ class TicketCommentServiceTest {
     @Test
     void differentSupportEngineerCannotReadTicketComments() {
 
-        UUID engineerId = UUID.randomUUID();
+        UUID engineerId =
+                UUID.randomUUID();
 
         when(ticketAssignmentRepository
                 .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
@@ -320,10 +377,13 @@ class TicketCommentServiceTest {
     @Test
     void assignedSupportEngineerCanAddComment() {
 
-        UUID engineerId = UUID.randomUUID();
+        UUID engineerId =
+                UUID.randomUUID();
 
         Ticket ticket =
-                org.mockito.Mockito.mock(Ticket.class);
+                org.mockito.Mockito.mock(
+                        Ticket.class
+                );
 
         TicketAssignment assignment =
                 org.mockito.Mockito.mock(
@@ -331,23 +391,32 @@ class TicketCommentServiceTest {
                 );
 
         User engineer =
-                org.mockito.Mockito.mock(User.class);
+                org.mockito.Mockito.mock(
+                        User.class
+                );
 
         when(assignment.getTicket())
                 .thenReturn(ticket);
 
         when(ticket.getStatus())
-                .thenReturn(TicketStatus.IN_PROGRESS);
+                .thenReturn(
+                        TicketStatus.IN_PROGRESS
+                );
 
         when(ticketAssignmentRepository
                 .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
                         "FD-000006",
                         engineerId
                 ))
-                .thenReturn(Optional.of(assignment));
+                .thenReturn(
+                        Optional.of(assignment)
+                );
 
-        when(userRepository.findById(engineerId))
-                .thenReturn(Optional.of(engineer));
+        when(userRepository
+                .findById(engineerId))
+                .thenReturn(
+                        Optional.of(engineer)
+                );
 
         when(engineer.getId())
                 .thenReturn(engineerId);
@@ -358,20 +427,22 @@ class TicketCommentServiceTest {
         when(engineer.getLastName())
                 .thenReturn("Engineer");
 
-        when(ticketCommentRepository.saveAndFlush(any()))
+        when(ticketCommentRepository
+                .saveAndFlush(any()))
                 .thenAnswer(
                         invocation ->
                                 invocation.getArgument(0)
                 );
 
         TicketCommentResponse response =
-                ticketCommentService.addSupportComment(
-                        engineerId,
-                        "FD-000006",
-                        new CreateTicketCommentRequest(
-                                "Can you confirm the device model?"
-                        )
-                );
+                ticketCommentService
+                        .addSupportComment(
+                                engineerId,
+                                "FD-000006",
+                                new CreateTicketCommentRequest(
+                                        "Can you confirm the device model?"
+                                )
+                        );
 
         assertEquals(
                 "Can you confirm the device model?",
@@ -387,20 +458,27 @@ class TicketCommentServiceTest {
     @Test
     void cannotAddCommentToResolvedTicket() {
 
-        UUID employeeId = UUID.randomUUID();
+        UUID employeeId =
+                UUID.randomUUID();
 
         Ticket ticket =
-                org.mockito.Mockito.mock(Ticket.class);
+                org.mockito.Mockito.mock(
+                        Ticket.class
+                );
 
         when(ticket.getStatus())
-                .thenReturn(TicketStatus.RESOLVED);
+                .thenReturn(
+                        TicketStatus.RESOLVED
+                );
 
         when(ticketRepository
                 .findByTicketNumberAndCreatedByUser_Id(
                         "FD-000007",
                         employeeId
                 ))
-                .thenReturn(Optional.of(ticket));
+                .thenReturn(
+                        Optional.of(ticket)
+                );
 
         ResponseStatusException exception =
                 assertThrows(
@@ -430,26 +508,38 @@ class TicketCommentServiceTest {
     @Test
     void blankCommentIsRejected() {
 
-        UUID employeeId = UUID.randomUUID();
+        UUID employeeId =
+                UUID.randomUUID();
 
         Ticket ticket =
-                org.mockito.Mockito.mock(Ticket.class);
+                org.mockito.Mockito.mock(
+                        Ticket.class
+                );
 
         User employee =
-                org.mockito.Mockito.mock(User.class);
+                org.mockito.Mockito.mock(
+                        User.class
+                );
 
         when(ticket.getStatus())
-                .thenReturn(TicketStatus.OPEN);
+                .thenReturn(
+                        TicketStatus.OPEN
+                );
 
         when(ticketRepository
                 .findByTicketNumberAndCreatedByUser_Id(
                         "FD-000008",
                         employeeId
                 ))
-                .thenReturn(Optional.of(ticket));
+                .thenReturn(
+                        Optional.of(ticket)
+                );
 
-        when(userRepository.findById(employeeId))
-                .thenReturn(Optional.of(employee));
+        when(userRepository
+                .findById(employeeId))
+                .thenReturn(
+                        Optional.of(employee)
+                );
 
         ResponseStatusException exception =
                 assertThrows(
@@ -474,5 +564,296 @@ class TicketCommentServiceTest {
                 ticketCommentRepository,
                 never()
         ).saveAndFlush(any());
+    }
+
+    /*
+     * DAY 15 NOTIFICATION TESTS
+     */
+
+    @Test
+    void supportCommentShouldNotifyTicketCreator() {
+
+        UUID engineerId =
+                UUID.randomUUID();
+
+        UUID employeeId =
+                UUID.randomUUID();
+
+        Ticket ticket =
+                org.mockito.Mockito.mock(
+                        Ticket.class
+                );
+
+        TicketAssignment assignment =
+                org.mockito.Mockito.mock(
+                        TicketAssignment.class
+                );
+
+        User engineer =
+                org.mockito.Mockito.mock(
+                        User.class
+                );
+
+        User employee =
+                org.mockito.Mockito.mock(
+                        User.class
+                );
+
+        when(assignment.getTicket())
+                .thenReturn(ticket);
+
+        when(ticket.getStatus())
+                .thenReturn(
+                        TicketStatus.IN_PROGRESS
+                );
+
+        when(ticket.getCreatedByUser())
+                .thenReturn(employee);
+
+        when(ticket.getTicketNumber())
+                .thenReturn("FD-000009");
+
+        when(ticketAssignmentRepository
+                .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
+                        "FD-000009",
+                        engineerId
+                ))
+                .thenReturn(
+                        Optional.of(assignment)
+                );
+
+        when(userRepository
+                .findById(engineerId))
+                .thenReturn(
+                        Optional.of(engineer)
+                );
+
+        when(engineer.getId())
+                .thenReturn(engineerId);
+
+        when(engineer.getFirstName())
+                .thenReturn("Support");
+
+        when(engineer.getLastName())
+                .thenReturn("Engineer");
+
+        when(employee.getId())
+                .thenReturn(employeeId);
+
+        when(ticketCommentRepository
+                .saveAndFlush(any()))
+                .thenAnswer(
+                        invocation ->
+                                invocation.getArgument(0)
+                );
+
+        ticketCommentService
+                .addSupportComment(
+                        engineerId,
+                        "FD-000009",
+                        new CreateTicketCommentRequest(
+                                "Please confirm whether the issue still occurs."
+                        )
+                );
+
+        verify(notificationService)
+                .createNotification(
+                        employee,
+                        engineer,
+                        ticket,
+                        NotificationType
+                                .TICKET_COMMENT_ADDED,
+                        "New support reply",
+                        "A support engineer replied to FD-000009"
+                );
+    }
+
+    @Test
+    void employeeCommentShouldNotifyAssignedEngineer() {
+
+        UUID employeeId =
+                UUID.randomUUID();
+
+        UUID engineerId =
+                UUID.randomUUID();
+
+        UUID ticketId =
+                UUID.randomUUID();
+
+        Ticket ticket =
+                org.mockito.Mockito.mock(
+                        Ticket.class
+                );
+
+        TicketAssignment assignment =
+                org.mockito.Mockito.mock(
+                        TicketAssignment.class
+                );
+
+        User employee =
+                org.mockito.Mockito.mock(
+                        User.class
+                );
+
+        User engineer =
+                org.mockito.Mockito.mock(
+                        User.class
+                );
+
+        when(ticket.getId())
+                .thenReturn(ticketId);
+
+        when(ticket.getStatus())
+                .thenReturn(
+                        TicketStatus.WAITING_FOR_USER
+                );
+
+        when(ticket.getTicketNumber())
+                .thenReturn("FD-000010");
+
+        when(ticketRepository
+                .findByTicketNumberAndCreatedByUser_Id(
+                        "FD-000010",
+                        employeeId
+                ))
+                .thenReturn(
+                        Optional.of(ticket)
+                );
+
+        when(userRepository
+                .findById(employeeId))
+                .thenReturn(
+                        Optional.of(employee)
+                );
+
+        when(employee.getId())
+                .thenReturn(employeeId);
+
+        when(employee.getFirstName())
+                .thenReturn("Test");
+
+        when(employee.getLastName())
+                .thenReturn("Employee");
+
+        when(ticketAssignmentRepository
+                .findByTicket_IdAndReleasedAtIsNull(
+                        ticketId
+                ))
+                .thenReturn(
+                        Optional.of(assignment)
+                );
+
+        when(assignment.getAssignedToUser())
+                .thenReturn(engineer);
+
+        when(engineer.getId())
+                .thenReturn(engineerId);
+
+        when(ticketCommentRepository
+                .saveAndFlush(any()))
+                .thenAnswer(
+                        invocation ->
+                                invocation.getArgument(0)
+                );
+
+        ticketCommentService
+                .addEmployeeComment(
+                        employeeId,
+                        "fd-000010",
+                        new CreateTicketCommentRequest(
+                                "Yes, the problem is still happening."
+                        )
+                );
+
+        verify(notificationService)
+                .createNotification(
+                        engineer,
+                        employee,
+                        ticket,
+                        NotificationType
+                                .TICKET_COMMENT_ADDED,
+                        "New requester reply",
+                        "The requester replied to FD-000010"
+                );
+    }
+
+    @Test
+    void employeeCommentBeforeAssignmentShouldNotCreateNotification() {
+
+        UUID employeeId =
+                UUID.randomUUID();
+
+        UUID ticketId =
+                UUID.randomUUID();
+
+        Ticket ticket =
+                org.mockito.Mockito.mock(
+                        Ticket.class
+                );
+
+        User employee =
+                org.mockito.Mockito.mock(
+                        User.class
+                );
+
+        when(ticket.getId())
+                .thenReturn(ticketId);
+
+        when(ticket.getStatus())
+                .thenReturn(
+                        TicketStatus.OPEN
+                );
+
+        when(ticketRepository
+                .findByTicketNumberAndCreatedByUser_Id(
+                        "FD-000011",
+                        employeeId
+                ))
+                .thenReturn(
+                        Optional.of(ticket)
+                );
+
+        when(userRepository
+                .findById(employeeId))
+                .thenReturn(
+                        Optional.of(employee)
+                );
+
+        when(employee.getId())
+                .thenReturn(employeeId);
+
+        when(employee.getFirstName())
+                .thenReturn("Test");
+
+        when(employee.getLastName())
+                .thenReturn("Employee");
+
+        when(ticketAssignmentRepository
+                .findByTicket_IdAndReleasedAtIsNull(
+                        ticketId
+                ))
+                .thenReturn(
+                        Optional.empty()
+                );
+
+        when(ticketCommentRepository
+                .saveAndFlush(any()))
+                .thenAnswer(
+                        invocation ->
+                                invocation.getArgument(0)
+                );
+
+        ticketCommentService
+                .addEmployeeComment(
+                        employeeId,
+                        "FD-000011",
+                        new CreateTicketCommentRequest(
+                                "Adding some extra information."
+                        )
+                );
+
+        verifyNoInteractions(
+                notificationService
+        );
     }
 }

@@ -1,9 +1,13 @@
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/useAuth'
+import { NotificationBell } from '../components/NotificationBell'
 
 export function DashboardPage() {
-  const { user, signOut } = useAuth()
+  const {
+    user,
+    signOut,
+  } = useAuth()
 
   const navigate = useNavigate()
 
@@ -34,12 +38,16 @@ export function DashboardPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSignOut}
-        >
-          Sign out
-        </button>
+        <div className="dashboard-header-actions">
+          <NotificationBell />
+
+          <button
+            type="button"
+            onClick={handleSignOut}
+          >
+            Sign out
+          </button>
+        </div>
       </header>
 
       <section className="dashboard-workspace-grid">

@@ -1,5 +1,8 @@
 package com.flowdesk.ticket.service;
 
+import com.flowdesk.notification.domain.NotificationType;
+import com.flowdesk.notification.service.NotificationService;
+
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
 import com.flowdesk.ticket.domain.TicketComment;
@@ -39,11 +42,15 @@ public class TicketCommentService {
     private final UserRepository
             userRepository;
 
+    private final NotificationService
+            notificationService;
+
     public TicketCommentService(
             TicketCommentRepository ticketCommentRepository,
             TicketRepository ticketRepository,
             TicketAssignmentRepository ticketAssignmentRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            NotificationService notificationService
     ) {
         this.ticketCommentRepository =
                 ticketCommentRepository;
@@ -56,6 +63,9 @@ public class TicketCommentService {
 
         this.userRepository =
                 userRepository;
+
+        this.notificationService =
+                notificationService;
     }
 
     /*
@@ -85,6 +95,10 @@ public class TicketCommentService {
      *
      * Can add a comment only to a ticket
      * created by that employee.
+     *
+     * If the ticket currently has an active
+     * support engineer, that engineer receives
+     * a persistent notification.
      */
     @Transactional
     public TicketCommentResponse
@@ -105,11 +119,19 @@ public class TicketCommentService {
         User author =
                 findUser(employeeId);
 
-        return createComment(
+        TicketCommentResponse response =
+                createComment(
+                        ticket,
+                        author,
+                        request
+                );
+
+        notifyAssignedEngineer(
                 ticket,
-                author,
-                request
+                author
         );
+
+        return response;
     }
 
     /*
@@ -141,6 +163,9 @@ public class TicketCommentService {
      *
      * Can add comments only while they have
      * the active assignment.
+     *
+     * The employee who created the ticket
+     * receives a persistent notification.
      */
     @Transactional
     public TicketCommentResponse
@@ -164,11 +189,19 @@ public class TicketCommentService {
         User author =
                 findUser(supportEngineerId);
 
-        return createComment(
+        TicketCommentResponse response =
+                createComment(
+                        ticket,
+                        author,
+                        request
+                );
+
+        notifyTicketCreator(
                 ticket,
-                author,
-                request
+                author
         );
+
+        return response;
     }
 
     private Ticket findEmployeeOwnedTicket(
@@ -216,7 +249,9 @@ public class TicketCommentService {
                 );
     }
 
-    private User findUser(UUID userId) {
+    private User findUser(
+            UUID userId
+    ) {
 
         return userRepository
                 .findById(userId)
@@ -230,7 +265,9 @@ public class TicketCommentService {
     }
 
     private List<TicketCommentResponse>
-            getComments(Ticket ticket) {
+            getComments(
+                    Ticket ticket
+            ) {
 
         return ticketCommentRepository
                 .findByTicket_IdOrderByCreatedAtAsc(
@@ -241,22 +278,24 @@ public class TicketCommentService {
                 .toList();
     }
 
-    private TicketCommentResponse createComment(
-            Ticket ticket,
-            User author,
-            CreateTicketCommentRequest request
-    ) {
+    private TicketCommentResponse
+            createComment(
+                    Ticket ticket,
+                    User author,
+                    CreateTicketCommentRequest request
+            ) {
 
         validateRequest(request);
 
         TicketComment comment;
 
         try {
-            comment = new TicketComment(
-                    ticket,
-                    author,
-                    request.body()
-            );
+            comment =
+                    new TicketComment(
+                            ticket,
+                            author,
+                            request.body()
+                    );
         }
         catch (IllegalArgumentException exception) {
             throw new ResponseStatusException(
@@ -270,6 +309,112 @@ public class TicketCommentService {
                         .saveAndFlush(comment);
 
         return toResponse(savedComment);
+    }
+
+    /*
+     * Employee -> Support Engineer
+     *
+     * An employee may comment before anybody
+     * has claimed the ticket. In that case
+     * there is no notification recipient yet,
+     * so no notification is created.
+     */
+    private void notifyAssignedEngineer(
+            Ticket ticket,
+            User employee
+    ) {
+
+        if (ticket.getId() == null) {
+            return;
+        }
+
+        ticketAssignmentRepository
+                .findByTicket_IdAndReleasedAtIsNull(
+                        ticket.getId()
+                )
+                .ifPresent(
+                        assignment -> {
+                            User recipient =
+                                    assignment
+                                            .getAssignedToUser();
+
+                            if (recipient == null
+                                    || isSameUser(
+                                            recipient,
+                                            employee
+                                    )) {
+                                return;
+                            }
+
+                            notificationService
+                                    .createNotification(
+                                            recipient,
+                                            employee,
+                                            ticket,
+                                            NotificationType
+                                                    .TICKET_COMMENT_ADDED,
+                                            "New requester reply",
+                                            "The requester replied to "
+                                                    + ticket.getTicketNumber()
+                                    );
+                        }
+                );
+    }
+
+    /*
+     * Support Engineer -> Employee
+     */
+    private void notifyTicketCreator(
+            Ticket ticket,
+            User supportEngineer
+    ) {
+
+        User recipient =
+                ticket.getCreatedByUser();
+
+        if (recipient == null
+                || isSameUser(
+                        recipient,
+                        supportEngineer
+                )) {
+            return;
+        }
+
+        notificationService
+                .createNotification(
+                        recipient,
+                        supportEngineer,
+                        ticket,
+                        NotificationType
+                                .TICKET_COMMENT_ADDED,
+                        "New support reply",
+                        "A support engineer replied to "
+                                + ticket.getTicketNumber()
+                );
+    }
+
+    /*
+     * Avoid creating a notification where
+     * actor and recipient are the same user.
+     */
+    private boolean isSameUser(
+            User first,
+            User second
+    ) {
+
+        if (first == null
+                || second == null
+                || first.getId() == null
+                || second.getId() == null) {
+
+            return false;
+        }
+
+        return first
+                .getId()
+                .equals(
+                        second.getId()
+                );
     }
 
     private void validateRequest(
@@ -286,7 +431,10 @@ public class TicketCommentService {
             );
         }
 
-        if (request.body().trim().length() > 4000) {
+        if (request.body()
+                .trim()
+                .length() > 4000) {
+
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Comment body must not exceed 4000 characters"
@@ -312,9 +460,10 @@ public class TicketCommentService {
         }
     }
 
-    private TicketCommentResponse toResponse(
-            TicketComment comment
-    ) {
+    private TicketCommentResponse
+            toResponse(
+                    TicketComment comment
+            ) {
 
         User author =
                 comment.getAuthorUser();
