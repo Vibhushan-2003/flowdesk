@@ -9,6 +9,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,6 +18,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.ProviderManager;
+
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -71,43 +73,73 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // Public endpoints
+                        // Public health endpoint
                         .requestMatchers(
                                 "/api/health"
-                        ).permitAll()
+                        )
+                        .permitAll()
 
+                        // User registration
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/users"
-                        ).permitAll()
+                        )
+                        .permitAll()
 
+                        // Login
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/login"
-                        ).permitAll()
+                        )
+                        .permitAll()
+
+                        /*
+                         * Day 16 WebSocket handshake.
+                         *
+                         * The HTTP upgrade itself is public.
+                         *
+                         * Authentication happens afterwards
+                         * inside the STOMP CONNECT frame using
+                         * WebSocketJwtChannelInterceptor.
+                         */
+                        .requestMatchers(
+                                "/ws",
+                                "/ws/**"
+                        )
+                        .permitAll()
 
                         .requestMatchers(
                                 "/error"
-                        ).permitAll()
+                        )
+                        .permitAll()
 
-                        // Existing Support Engineer queue
+                        // Support Engineer queue
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/tickets/queue"
-                        ).hasRole("SUPPORT_ENGINEER")
+                        )
+                        .hasRole(
+                                "SUPPORT_ENGINEER"
+                        )
 
-                        // Existing Support Engineer claim endpoint
+                        // Support Engineer claim endpoint
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/tickets/*/claim"
-                        ).hasRole("SUPPORT_ENGINEER")
+                        )
+                        .hasRole(
+                                "SUPPORT_ENGINEER"
+                        )
 
-                        // Day 13 Support Engineer workbench
+                        // Support Engineer workbench
                         .requestMatchers(
                                 "/api/support/**"
-                        ).hasRole("SUPPORT_ENGINEER")
+                        )
+                        .hasRole(
+                                "SUPPORT_ENGINEER"
+                        )
 
-                        // Everything else requires authentication
+                        // Everything else requires JWT
                         .anyRequest()
                         .authenticated()
                 )
@@ -125,14 +157,19 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
+
         return new BCryptPasswordEncoder();
     }
 
     @Bean
-    public AuthenticationProvider authenticationProvider(
-            FlowDeskUserDetailsService userDetailsService,
-            PasswordEncoder passwordEncoder
-    ) {
+    public AuthenticationProvider
+            authenticationProvider(
+                    FlowDeskUserDetailsService
+                            userDetailsService,
+
+                    PasswordEncoder
+                            passwordEncoder
+            ) {
 
         DaoAuthenticationProvider provider =
                 new DaoAuthenticationProvider(
@@ -147,9 +184,11 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationProvider authenticationProvider
-    ) {
+    public AuthenticationManager
+            authenticationManager(
+                    AuthenticationProvider
+                            authenticationProvider
+            ) {
 
         return new ProviderManager(
                 authenticationProvider
@@ -163,8 +202,11 @@ public class SecurityConfig {
     ) {
 
         byte[] keyBytes =
-                Base64.getDecoder()
-                        .decode(encodedSecret);
+                Base64
+                        .getDecoder()
+                        .decode(
+                                encodedSecret
+                        );
 
         return new SecretKeySpec(
                 keyBytes,
@@ -178,22 +220,31 @@ public class SecurityConfig {
     ) {
 
         return NimbusJwtEncoder
-                .withSecretKey(secretKey)
-                .algorithm(MacAlgorithm.HS256)
+                .withSecretKey(
+                        secretKey
+                )
+                .algorithm(
+                        MacAlgorithm.HS256
+                )
                 .build();
     }
 
     @Bean
     public JwtDecoder jwtDecoder(
             SecretKey secretKey,
+
             @Value("${app.security.jwt.issuer}")
             String issuer
     ) {
 
         NimbusJwtDecoder decoder =
                 NimbusJwtDecoder
-                        .withSecretKey(secretKey)
-                        .macAlgorithm(MacAlgorithm.HS256)
+                        .withSecretKey(
+                                secretKey
+                        )
+                        .macAlgorithm(
+                                MacAlgorithm.HS256
+                        )
                         .build();
 
         decoder.setJwtValidator(
@@ -210,18 +261,22 @@ public class SecurityConfig {
     public JwtAuthenticationConverter
             jwtAuthenticationConverter() {
 
-        JwtGrantedAuthoritiesConverter authoritiesConverter =
+        JwtGrantedAuthoritiesConverter
+                authoritiesConverter =
                 new JwtGrantedAuthoritiesConverter();
 
-        authoritiesConverter.setAuthoritiesClaimName(
-                "roles"
-        );
+        authoritiesConverter
+                .setAuthoritiesClaimName(
+                        "roles"
+                );
 
-        authoritiesConverter.setAuthorityPrefix(
-                "ROLE_"
-        );
+        authoritiesConverter
+                .setAuthorityPrefix(
+                        "ROLE_"
+                );
 
-        JwtAuthenticationConverter authenticationConverter =
+        JwtAuthenticationConverter
+                authenticationConverter =
                 new JwtAuthenticationConverter();
 
         authenticationConverter
@@ -233,16 +288,19 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource(
-            @Value("${app.cors.allowed-origin}")
-            String allowedOrigin
-    ) {
+    public CorsConfigurationSource
+            corsConfigurationSource(
+                    @Value("${app.cors.allowed-origin}")
+                    String allowedOrigin
+            ) {
 
         CorsConfiguration configuration =
                 new CorsConfiguration();
 
         configuration.setAllowedOrigins(
-                List.of(allowedOrigin)
+                List.of(
+                        allowedOrigin
+                )
         );
 
         configuration.setAllowedMethods(
@@ -263,7 +321,9 @@ public class SecurityConfig {
                 )
         );
 
-        configuration.setAllowCredentials(false);
+        configuration.setAllowCredentials(
+                false
+        );
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();

@@ -4,9 +4,13 @@ import {
   useState,
 } from 'react'
 
-import { useNavigate } from 'react-router-dom'
+import {
+  useNavigate,
+} from 'react-router-dom'
 
-import { useAuth } from '../auth/useAuth'
+import {
+  useAuth,
+} from '../auth/useAuth'
 
 import {
   getMyNotifications,
@@ -14,7 +18,13 @@ import {
   markNotificationAsRead,
 } from '../api/notification'
 
-import type { NotificationResponse } from '../types/notification'
+import {
+  createNotificationRealtimeClient,
+} from '../realtime/notificationRealtime'
+
+import type {
+  NotificationResponse,
+} from '../types/notification'
 
 export function NotificationBell() {
   const {
@@ -22,21 +32,36 @@ export function NotificationBell() {
     user,
   } = useAuth()
 
-  const navigate = useNavigate()
+  const navigate =
+    useNavigate()
 
   const [isOpen, setIsOpen] =
     useState(false)
 
-  const [notifications, setNotifications] =
-    useState<NotificationResponse[]>([])
+  const [
+    notifications,
+    setNotifications,
+  ] =
+    useState<NotificationResponse[]>(
+      [],
+    )
 
-  const [unreadCount, setUnreadCount] =
+  const [
+    unreadCount,
+    setUnreadCount,
+  ] =
     useState(0)
 
-  const [isLoading, setIsLoading] =
+  const [
+    isLoading,
+    setIsLoading,
+  ] =
     useState(false)
 
-  const [error, setError] =
+  const [
+    error,
+    setError,
+  ] =
     useState<string | null>(null)
 
   const isSupportEngineer =
@@ -45,12 +70,9 @@ export function NotificationBell() {
     ) ?? false
 
   /*
-   * Load the unread count when the authenticated
-   * user reaches the dashboard.
+   * Initial authoritative unread count.
    *
-   * The state update happens from the resolved
-   * Promise callback rather than synchronously
-   * inside the effect body.
+   * PostgreSQL remains the source of truth.
    */
   useEffect(() => {
     if (!accessToken) {
@@ -64,13 +86,15 @@ export function NotificationBell() {
     )
       .then((count) => {
         if (!cancelled) {
-          setUnreadCount(count)
+          setUnreadCount(
+            count,
+          )
         }
       })
       .catch(() => {
         /*
-         * A temporary count failure should not
-         * prevent the user from using the dashboard.
+         * A temporary REST failure should
+         * not block dashboard usage.
          */
       })
 
@@ -79,43 +103,142 @@ export function NotificationBell() {
     }
   }, [accessToken])
 
+  /*
+   * Day 16:
+   *
+   * Establish one authenticated STOMP connection
+   * while the logged-in user has this component
+   * mounted.
+   */
+  useEffect(() => {
+    if (!accessToken) {
+      return
+    }
+
+    let cancelled = false
+
+    const client =
+      createNotificationRealtimeClient(
+        accessToken,
+        (notification) => {
+          if (cancelled) {
+            return
+          }
+
+          /*
+           * Show the new notification immediately
+           * in the dropdown if it is already open.
+           *
+           * Avoid duplicate notification IDs.
+           */
+          setNotifications(
+            (
+              currentNotifications,
+            ) => {
+              const withoutDuplicate =
+                currentNotifications.filter(
+                  (
+                    currentNotification,
+                  ) =>
+                    currentNotification
+                      .notificationId !==
+                    notification
+                      .notificationId,
+                )
+
+              return [
+                notification,
+                ...withoutDuplicate,
+              ].slice(
+                0,
+                10,
+              )
+            },
+          )
+
+          /*
+           * Do not guess the unread total.
+           *
+           * Ask PostgreSQL-backed REST API for the
+           * authoritative value. This avoids count
+           * drift after reconnects or multiple tabs.
+           */
+          getUnreadNotificationCount(
+            accessToken,
+          )
+            .then((count) => {
+              if (!cancelled) {
+                setUnreadCount(
+                  count,
+                )
+              }
+            })
+            .catch(() => {
+              /*
+               * Real-time delivery already updated
+               * the notification list.
+               *
+               * A later refresh will reconcile the
+               * unread count if this call fails.
+               */
+            })
+        },
+      )
+
+    client.activate()
+
+    return () => {
+      cancelled = true
+
+      void client.deactivate()
+    }
+  }, [accessToken])
+
   const loadNotifications =
-    useCallback(async () => {
-      if (!accessToken) {
-        return
-      }
+    useCallback(
+      async () => {
+        if (!accessToken) {
+          return
+        }
 
-      setIsLoading(true)
-      setError(null)
+        setIsLoading(true)
+        setError(null)
 
-      try {
-        const response =
-          await getMyNotifications(
-            accessToken,
-            0,
-            10,
+        try {
+          const response =
+            await getMyNotifications(
+              accessToken,
+              0,
+              10,
+            )
+
+          setNotifications(
+            response.content,
           )
 
-        setNotifications(
-          response.content,
-        )
+          const count =
+            await getUnreadNotificationCount(
+              accessToken,
+            )
 
-        const count =
-          await getUnreadNotificationCount(
-            accessToken,
+          setUnreadCount(
+            count,
           )
-
-        setUnreadCount(count)
-      } catch (requestError) {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : 'Failed to load notifications.',
-        )
-      } finally {
-        setIsLoading(false)
-      }
-    }, [accessToken])
+        } catch (requestError) {
+          setError(
+            requestError instanceof
+              Error
+              ? requestError.message
+              : 'Failed to load notifications.',
+          )
+        } finally {
+          setIsLoading(
+            false,
+          )
+        }
+      },
+      [accessToken],
+    )
 
   async function handleBellClick() {
     const nextOpenState =
@@ -131,7 +254,8 @@ export function NotificationBell() {
   }
 
   async function handleNotificationClick(
-    notification: NotificationResponse,
+    notification:
+      NotificationResponse,
   ) {
     if (!accessToken) {
       return
@@ -147,16 +271,22 @@ export function NotificationBell() {
         updatedNotification =
           await markNotificationAsRead(
             accessToken,
-            notification.notificationId,
+            notification
+              .notificationId,
           )
 
         setNotifications(
-          (currentNotifications) =>
+          (
+            currentNotifications,
+          ) =>
             currentNotifications.map(
-              (currentNotification) =>
+              (
+                currentNotification,
+              ) =>
                 currentNotification
                   .notificationId ===
-                notification.notificationId
+                notification
+                  .notificationId
                   ? updatedNotification
                   : currentNotification,
             ),
@@ -186,7 +316,8 @@ export function NotificationBell() {
       }
     } catch (requestError) {
       setError(
-        requestError instanceof Error
+        requestError instanceof
+          Error
           ? requestError.message
           : 'Failed to open notification.',
       )
@@ -253,27 +384,34 @@ export function NotificationBell() {
           )}
 
           {isLoading &&
-            notifications.length === 0 && (
+            notifications.length ===
+              0 && (
               <p className="notification-empty">
                 Loading notifications...
               </p>
             )}
 
           {!isLoading &&
-            notifications.length === 0 &&
+            notifications.length ===
+              0 &&
             !error && (
               <p className="notification-empty">
-                You have no notifications yet.
+                You have no notifications
+                yet.
               </p>
             )}
 
-          {notifications.length > 0 && (
+          {notifications.length >
+            0 && (
             <div className="notification-list">
               {notifications.map(
-                (notification) => (
+                (
+                  notification,
+                ) => (
                   <button
                     key={
-                      notification.notificationId
+                      notification
+                        .notificationId
                     }
                     type="button"
                     className={
@@ -289,7 +427,9 @@ export function NotificationBell() {
                   >
                     <div className="notification-item-heading">
                       <strong>
-                        {notification.title}
+                        {
+                          notification.title
+                        }
                       </strong>
 
                       {!notification.read && (
@@ -301,21 +441,25 @@ export function NotificationBell() {
                     </div>
 
                     <p>
-                      {notification.message}
+                      {
+                        notification.message
+                      }
                     </p>
 
                     <div className="notification-item-meta">
                       {notification.ticketNumber && (
                         <span>
                           {
-                            notification.ticketNumber
+                            notification
+                              .ticketNumber
                           }
                         </span>
                       )}
 
                       <span>
                         {formatNotificationTime(
-                          notification.createdAt,
+                          notification
+                            .createdAt,
                         )}
                       </span>
                     </div>
@@ -331,10 +475,13 @@ export function NotificationBell() {
 }
 
 function getTicketPath(
-  notification: NotificationResponse,
+  notification:
+    NotificationResponse,
   isSupportEngineer: boolean,
 ) {
-  if (!notification.ticketNumber) {
+  if (
+    !notification.ticketNumber
+  ) {
     return null
   }
 
@@ -360,7 +507,7 @@ function getTicketPath(
   }
 
   /*
-   * Support reply and status notifications
+   * Support replies and status notifications
    * are intended for the employee.
    */
   return `/tickets/${encodeURIComponent(
@@ -372,7 +519,9 @@ function formatNotificationTime(
   createdAt: string,
 ) {
   const date =
-    new Date(createdAt)
+    new Date(
+      createdAt,
+    )
 
   if (
     Number.isNaN(
@@ -388,5 +537,7 @@ function formatNotificationTime(
       dateStyle: 'medium',
       timeStyle: 'short',
     },
-  ).format(date)
+  ).format(
+    date,
+  )
 }
