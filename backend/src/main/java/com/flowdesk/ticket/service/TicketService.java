@@ -2,6 +2,9 @@ package com.flowdesk.ticket.service;
 
 import com.flowdesk.common.dto.PageResponse;
 
+import com.flowdesk.sla.domain.SlaPolicy;
+import com.flowdesk.sla.repository.SlaPolicyRepository;
+
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
 import com.flowdesk.ticket.domain.TicketStatus;
@@ -31,6 +34,9 @@ import org.springframework.stereotype.Service;
 
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -38,19 +44,35 @@ import java.util.UUID;
 @Service
 public class TicketService {
 
-    private final TicketRepository ticketRepository;
-    private final TicketAssignmentRepository ticketAssignmentRepository;
-    private final UserRepository userRepository;
+    private final TicketRepository
+            ticketRepository;
+
+    private final TicketAssignmentRepository
+            ticketAssignmentRepository;
+
+    private final UserRepository
+            userRepository;
+
+    private final SlaPolicyRepository
+            slaPolicyRepository;
 
     public TicketService(
             TicketRepository ticketRepository,
             TicketAssignmentRepository ticketAssignmentRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            SlaPolicyRepository slaPolicyRepository
     ) {
-        this.ticketRepository = ticketRepository;
+        this.ticketRepository =
+                ticketRepository;
+
         this.ticketAssignmentRepository =
                 ticketAssignmentRepository;
-        this.userRepository = userRepository;
+
+        this.userRepository =
+                userRepository;
+
+        this.slaPolicyRepository =
+                slaPolicyRepository;
     }
 
     @Transactional
@@ -60,11 +82,14 @@ public class TicketService {
     ) {
         User creator =
                 userRepository
-                        .findById(authenticatedUserId)
+                        .findById(
+                                authenticatedUserId
+                        )
                         .orElseThrow(
-                                () -> new IllegalStateException(
-                                        "Authenticated user no longer exists"
-                                )
+                                () ->
+                                        new IllegalStateException(
+                                                "Authenticated user no longer exists"
+                                        )
                         );
 
         long sequenceValue =
@@ -72,44 +97,78 @@ public class TicketService {
                         .getNextTicketNumberSequenceValue();
 
         String ticketNumber =
-                "FD-%06d".formatted(sequenceValue);
+                "FD-%06d".formatted(
+                        sequenceValue
+                );
 
-        Ticket ticket = new Ticket(
-                ticketNumber,
-                request.type(),
-                request.title().trim(),
-                request.description().trim(),
-                creator
-        );
+        Ticket ticket =
+                new Ticket(
+                        ticketNumber,
+                        request.type(),
+                        request.title().trim(),
+                        request.description().trim(),
+                        creator
+                );
 
-        Ticket savedTicket =
-                ticketRepository.saveAndFlush(ticket);
+        SlaPolicy slaPolicy =
+                slaPolicyRepository
+                        .findByPriorityAndActiveTrue(
+                                ticket.getPriority()
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "No active SLA policy configured for priority "
+                                                        + ticket.getPriority()
+                                        )
+                        );
 
-        return toResponse(savedTicket);
-    }
-
-    @Transactional
-    public PageResponse<TicketSummaryResponse> getMyTickets(
-            UUID authenticatedUserId,
-            int page,
-            int size
-    ) {
-        Pageable pageable = PageRequest.of(
-                page,
-                size,
-                Sort.by(
-                        Sort.Direction.DESC,
-                        "createdAt"
+        ticket.applySlaPolicy(
+                slaPolicy,
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
                 )
         );
 
-        Page<Ticket> ticketPage =
-                ticketRepository.findByCreatedByUser_Id(
-                        authenticatedUserId,
-                        pageable
+        Ticket savedTicket =
+                ticketRepository
+                        .saveAndFlush(
+                                ticket
+                        );
+
+        return toResponse(
+                savedTicket
+        );
+    }
+
+    @Transactional
+    public PageResponse<TicketSummaryResponse>
+            getMyTickets(
+                    UUID authenticatedUserId,
+                    int page,
+                    int size
+            ) {
+
+        Pageable pageable =
+                PageRequest.of(
+                        page,
+                        size,
+                        Sort.by(
+                                Sort.Direction.DESC,
+                                "createdAt"
+                        )
                 );
 
-        return toPageResponse(ticketPage);
+        Page<Ticket> ticketPage =
+                ticketRepository
+                        .findByCreatedByUser_Id(
+                                authenticatedUserId,
+                                pageable
+                        );
+
+        return toPageResponse(
+                ticketPage
+        );
     }
 
     @Transactional
@@ -118,7 +177,9 @@ public class TicketService {
             String ticketNumber
     ) {
         String normalizedTicketNumber =
-                normalizeTicketNumber(ticketNumber);
+                normalizeTicketNumber(
+                        ticketNumber
+                );
 
         Ticket ticket =
                 ticketRepository
@@ -127,36 +188,45 @@ public class TicketService {
                                 authenticatedUserId
                         )
                         .orElseThrow(
-                                () -> new ResponseStatusException(
-                                        HttpStatus.NOT_FOUND,
-                                        "Ticket not found"
-                                )
+                                () ->
+                                        new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Ticket not found"
+                                        )
                         );
 
-        return toResponse(ticket);
+        return toResponse(
+                ticket
+        );
     }
 
     @Transactional
-    public PageResponse<TicketSummaryResponse> getSupportQueue(
-            int page,
-            int size
-    ) {
-        Pageable pageable = PageRequest.of(
-                page,
-                size,
-                Sort.by(
-                        Sort.Direction.ASC,
-                        "createdAt"
-                )
-        );
+    public PageResponse<TicketSummaryResponse>
+            getSupportQueue(
+                    int page,
+                    int size
+            ) {
 
-        Page<Ticket> ticketPage =
-                ticketRepository.findByStatus(
-                        TicketStatus.OPEN,
-                        pageable
+        Pageable pageable =
+                PageRequest.of(
+                        page,
+                        size,
+                        Sort.by(
+                                Sort.Direction.ASC,
+                                "createdAt"
+                        )
                 );
 
-        return toPageResponse(ticketPage);
+        Page<Ticket> ticketPage =
+                ticketRepository
+                        .findByStatus(
+                                TicketStatus.OPEN,
+                                pageable
+                        );
+
+        return toPageResponse(
+                ticketPage
+        );
     }
 
     @Transactional
@@ -180,13 +250,16 @@ public class TicketService {
                                 normalizedTicketNumber
                         )
                         .orElseThrow(
-                                () -> new ResponseStatusException(
-                                        HttpStatus.NOT_FOUND,
-                                        "Ticket not found"
-                                )
+                                () ->
+                                        new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Ticket not found"
+                                        )
                         );
 
-        if (ticket.getStatus() != TicketStatus.OPEN) {
+        if (ticket.getStatus()
+                != TicketStatus.OPEN) {
+
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Ticket is no longer available to claim"
@@ -203,7 +276,9 @@ public class TicketService {
 
         TicketAssignment savedAssignment =
                 ticketAssignmentRepository
-                        .saveAndFlush(assignment);
+                        .saveAndFlush(
+                                assignment
+                        );
 
         return new ClaimTicketResponse(
                 savedAssignment.getId(),
@@ -221,11 +296,14 @@ public class TicketService {
     ) {
         User user =
                 userRepository
-                        .findById(authenticatedUserId)
+                        .findById(
+                                authenticatedUserId
+                        )
                         .orElseThrow(
-                                () -> new IllegalStateException(
-                                        "Authenticated user no longer exists"
-                                )
+                                () ->
+                                        new IllegalStateException(
+                                                "Authenticated user no longer exists"
+                                        )
                         );
 
         boolean isSupportEngineer =
@@ -250,19 +328,34 @@ public class TicketService {
     private String normalizeTicketNumber(
             String ticketNumber
     ) {
+        if (ticketNumber == null
+                || ticketNumber.isBlank()) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Ticket number is required"
+            );
+        }
+
         return ticketNumber
                 .trim()
-                .toUpperCase(Locale.ROOT);
+                .toUpperCase(
+                        Locale.ROOT
+                );
     }
 
-    private PageResponse<TicketSummaryResponse> toPageResponse(
-            Page<Ticket> ticketPage
-    ) {
+    private PageResponse<TicketSummaryResponse>
+            toPageResponse(
+                    Page<Ticket> ticketPage
+            ) {
+
         List<TicketSummaryResponse> content =
                 ticketPage
                         .getContent()
                         .stream()
-                        .map(this::toSummaryResponse)
+                        .map(
+                                this::toSummaryResponse
+                        )
                         .toList();
 
         return new PageResponse<>(
@@ -279,6 +372,11 @@ public class TicketService {
     private TicketResponse toResponse(
             Ticket ticket
     ) {
+        OffsetDateTime evaluatedAt =
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
+                );
+
         return new TicketResponse(
                 ticket.getId(),
                 ticket.getTicketNumber(),
@@ -290,13 +388,28 @@ public class TicketService {
                 ticket.getCreatedByUser().getId(),
                 ticket.getCreatedByUser().getEmail(),
                 ticket.getCreatedAt(),
-                ticket.getUpdatedAt()
+                ticket.getUpdatedAt(),
+                ticket.getResponseDueAt(),
+                ticket.getResolutionDueAt(),
+                ticket.getFirstRespondedAt(),
+                ticket.getResolvedAt(),
+                ticket.evaluateResponseSla(
+                        evaluatedAt
+                ),
+                ticket.evaluateResolutionSla(
+                        evaluatedAt
+                )
         );
     }
 
     private TicketSummaryResponse toSummaryResponse(
             Ticket ticket
     ) {
+        OffsetDateTime evaluatedAt =
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
+                );
+
         return new TicketSummaryResponse(
                 ticket.getId(),
                 ticket.getTicketNumber(),
@@ -305,7 +418,15 @@ public class TicketService {
                 ticket.getPriority(),
                 ticket.getStatus(),
                 ticket.getCreatedAt(),
-                ticket.getUpdatedAt()
+                ticket.getUpdatedAt(),
+                ticket.getResponseDueAt(),
+                ticket.getResolutionDueAt(),
+                ticket.evaluateResponseSla(
+                        evaluatedAt
+                ),
+                ticket.evaluateResolutionSla(
+                        evaluatedAt
+                )
         );
     }
 }

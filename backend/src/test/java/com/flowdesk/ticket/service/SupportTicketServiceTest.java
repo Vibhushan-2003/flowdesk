@@ -5,8 +5,11 @@ import com.flowdesk.common.dto.PageResponse;
 import com.flowdesk.notification.domain.NotificationType;
 import com.flowdesk.notification.service.NotificationService;
 
+import com.flowdesk.sla.domain.SlaPolicy;
+
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketStatus;
 import com.flowdesk.ticket.domain.TicketType;
 
@@ -34,6 +37,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 
 import org.springframework.web.server.ResponseStatusException;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 import java.util.List;
 import java.util.Optional;
@@ -599,6 +605,20 @@ class SupportTicketServiceTest {
                         "Unable to connect to office printer",
                         employee
                 );
+
+        SlaPolicy slaPolicy =
+                new SlaPolicy(
+                        TicketPriority.MEDIUM,
+                        60,
+                        1440
+                );
+
+        ticket.applySlaPolicy(
+                slaPolicy,
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
+                )
+        );
 
         ticket.markAssigned();
 

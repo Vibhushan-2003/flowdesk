@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../auth/useAuth'
 
 import type {
+  SlaStatus,
   SupportTicketResponse,
   TicketCommentResponse,
   TicketStatus,
@@ -30,6 +31,32 @@ function formatLabel(value: string) {
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString()
+}
+
+function formatOptionalDate(
+  value: string | null,
+) {
+  return value
+    ? formatDate(value)
+    : 'Not yet'
+}
+
+function formatSlaStatus(
+  status: SlaStatus,
+) {
+  switch (status) {
+    case 'MET':
+      return 'Met'
+
+    case 'BREACHED':
+      return 'Breached'
+
+    case 'PENDING':
+      return 'Pending'
+
+    case 'UNKNOWN':
+      return 'Unknown'
+  }
 }
 
 function getStatusClass(status: string) {
@@ -485,6 +512,74 @@ export function SupportTicketDetailsPage() {
                     </strong>
                   </div>
                 )}
+              </section>
+
+              <section className="support-description-section">
+                <p className="support-section-label">
+                  SLA tracking
+                </p>
+
+                <div className="support-detail-grid">
+                  <div>
+                    <span>Response SLA</span>
+
+                    <strong>
+                      {formatSlaStatus(
+                        ticket.responseSlaStatus,
+                      )}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Response deadline</span>
+
+                    <strong>
+                      {formatDate(
+                        ticket.responseDueAt,
+                      )}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>First response</span>
+
+                    <strong>
+                      {formatOptionalDate(
+                        ticket.firstRespondedAt,
+                      )}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Resolution SLA</span>
+
+                    <strong>
+                      {formatSlaStatus(
+                        ticket.resolutionSlaStatus,
+                      )}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Resolution deadline</span>
+
+                    <strong>
+                      {formatDate(
+                        ticket.resolutionDueAt,
+                      )}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Resolved</span>
+
+                    <strong>
+                      {formatOptionalDate(
+                        ticket.resolvedAt,
+                      )}
+                    </strong>
+                  </div>
+                </div>
               </section>
             </article>
 
