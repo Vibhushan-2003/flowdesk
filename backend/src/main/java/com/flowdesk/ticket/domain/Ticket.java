@@ -1,5 +1,7 @@
 package com.flowdesk.ticket.domain;
 
+import com.flowdesk.sla.domain.SlaPolicy;
+import com.flowdesk.sla.domain.SlaStatus;
 import com.flowdesk.user.domain.User;
 
 import jakarta.persistence.Column;
@@ -16,6 +18,7 @@ import jakarta.persistence.Table;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Objects;
 import java.util.UUID;
 
 @Entity
@@ -60,6 +63,19 @@ public class Ticket {
             nullable = false
     )
     private User createdByUser;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sla_policy_id")
+    private SlaPolicy slaPolicy;
+
+    @Column(name = "response_due_at")
+    private OffsetDateTime responseDueAt;
+
+    @Column(name = "resolution_due_at")
+    private OffsetDateTime resolutionDueAt;
+
+    @Column(name = "first_responded_at")
+    private OffsetDateTime firstRespondedAt;
 
     @Column(
             name = "created_at",
@@ -111,7 +127,9 @@ public class Ticket {
         }
 
         OffsetDateTime now =
-                OffsetDateTime.now(ZoneOffset.UTC);
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
+                );
 
         createdAt = now;
         updatedAt = now;
@@ -120,7 +138,70 @@ public class Ticket {
     @PreUpdate
     void onUpdate() {
         updatedAt =
-                OffsetDateTime.now(ZoneOffset.UTC);
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
+                );
+    }
+
+    public void applySlaPolicy(
+            SlaPolicy slaPolicy,
+            OffsetDateTime slaStartedAt
+    ) {
+        Objects.requireNonNull(
+                slaPolicy,
+                "SLA policy is required"
+        );
+
+        Objects.requireNonNull(
+                slaStartedAt,
+                "SLA start time is required"
+        );
+
+        if (this.slaPolicy != null
+                || responseDueAt != null
+                || resolutionDueAt != null) {
+
+            throw new IllegalStateException(
+                    "SLA policy is already assigned"
+            );
+        }
+
+        if (!slaPolicy.isActive()) {
+            throw new IllegalArgumentException(
+                    "SLA policy must be active"
+            );
+        }
+
+        if (slaPolicy.getPriority()
+                != priority) {
+
+            throw new IllegalArgumentException(
+                    "SLA policy priority does not match ticket priority"
+            );
+        }
+
+        OffsetDateTime normalizedStart =
+                slaStartedAt
+                        .withOffsetSameInstant(
+                                ZoneOffset.UTC
+                        );
+
+        this.slaPolicy =
+                slaPolicy;
+
+        this.responseDueAt =
+                normalizedStart
+                        .plusMinutes(
+                                slaPolicy
+                                        .getResponseMinutes()
+                        );
+
+        this.resolutionDueAt =
+                normalizedStart
+                        .plusMinutes(
+                                slaPolicy
+                                        .getResolutionMinutes()
+                        );
     }
 
     public void markAssigned() {
@@ -142,19 +223,24 @@ public class Ticket {
             );
         }
 
-        boolean validTransition = switch (status) {
-            case ASSIGNED ->
-                    newStatus == TicketStatus.IN_PROGRESS;
+        boolean validTransition =
+                switch (status) {
+                    case ASSIGNED ->
+                            newStatus
+                                    == TicketStatus.IN_PROGRESS;
 
-            case IN_PROGRESS ->
-                    newStatus == TicketStatus.WAITING_FOR_USER
-                            || newStatus == TicketStatus.RESOLVED;
+                    case IN_PROGRESS ->
+                            newStatus
+                                    == TicketStatus.WAITING_FOR_USER
+                                    || newStatus
+                                    == TicketStatus.RESOLVED;
 
-            case WAITING_FOR_USER ->
-                    newStatus == TicketStatus.IN_PROGRESS;
+                    case WAITING_FOR_USER ->
+                            newStatus
+                                    == TicketStatus.IN_PROGRESS;
 
-            default -> false;
-        };
+                    default -> false;
+                };
 
         if (!validTransition) {
             throw new IllegalStateException(
@@ -167,10 +253,102 @@ public class Ticket {
 
         status = newStatus;
 
-        if (newStatus == TicketStatus.RESOLVED) {
-            resolvedAt =
-                    OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now =
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
+                );
+
+        if (newStatus
+                == TicketStatus.IN_PROGRESS
+                && firstRespondedAt == null) {
+
+            firstRespondedAt = now;
         }
+
+        if (newStatus
+                == TicketStatus.RESOLVED) {
+
+            resolvedAt = now;
+        }
+    }
+
+    public SlaStatus evaluateResponseSla(
+            OffsetDateTime evaluatedAt
+    ) {
+        boolean responseAlreadyOccurredButTimestampUnknown =
+                firstRespondedAt == null
+                        && switch (status) {
+                            case IN_PROGRESS,
+                                    WAITING_FOR_USER,
+                                    RESOLVED,
+                                    CLOSED,
+                                    CANCELLED -> true;
+
+                            default -> false;
+                        };
+
+        return evaluateSla(
+                responseDueAt,
+                firstRespondedAt,
+                evaluatedAt,
+                responseAlreadyOccurredButTimestampUnknown,
+                "Response SLA deadline is not configured"
+        );
+    }
+
+    public SlaStatus evaluateResolutionSla(
+            OffsetDateTime evaluatedAt
+    ) {
+        boolean resolutionAlreadyOccurredButTimestampUnknown =
+                resolvedAt == null
+                        && switch (status) {
+                            case RESOLVED,
+                                    CLOSED,
+                                    CANCELLED -> true;
+
+                            default -> false;
+                        };
+
+        return evaluateSla(
+                resolutionDueAt,
+                resolvedAt,
+                evaluatedAt,
+                resolutionAlreadyOccurredButTimestampUnknown,
+                "Resolution SLA deadline is not configured"
+        );
+    }
+
+    private SlaStatus evaluateSla(
+            OffsetDateTime dueAt,
+            OffsetDateTime completedAt,
+            OffsetDateTime evaluatedAt,
+            boolean completionTimestampUnknown,
+            String missingDeadlineMessage
+    ) {
+        Objects.requireNonNull(
+                evaluatedAt,
+                "SLA evaluation time is required"
+        );
+
+        if (dueAt == null) {
+            throw new IllegalStateException(
+                    missingDeadlineMessage
+            );
+        }
+
+        if (completedAt != null) {
+            return completedAt.isAfter(dueAt)
+                    ? SlaStatus.BREACHED
+                    : SlaStatus.MET;
+        }
+
+        if (completionTimestampUnknown) {
+            return SlaStatus.UNKNOWN;
+        }
+
+        return evaluatedAt.isAfter(dueAt)
+                ? SlaStatus.BREACHED
+                : SlaStatus.PENDING;
     }
 
     public UUID getId() {
@@ -203,6 +381,22 @@ public class Ticket {
 
     public User getCreatedByUser() {
         return createdByUser;
+    }
+
+    public SlaPolicy getSlaPolicy() {
+        return slaPolicy;
+    }
+
+    public OffsetDateTime getResponseDueAt() {
+        return responseDueAt;
+    }
+
+    public OffsetDateTime getResolutionDueAt() {
+        return resolutionDueAt;
+    }
+
+    public OffsetDateTime getFirstRespondedAt() {
+        return firstRespondedAt;
     }
 
     public OffsetDateTime getCreatedAt() {

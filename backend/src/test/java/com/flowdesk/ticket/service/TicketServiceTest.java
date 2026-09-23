@@ -2,6 +2,9 @@ package com.flowdesk.ticket.service;
 
 import com.flowdesk.common.dto.PageResponse;
 
+import com.flowdesk.sla.domain.SlaPolicy;
+import com.flowdesk.sla.repository.SlaPolicyRepository;
+
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
 import com.flowdesk.ticket.domain.TicketPriority;
@@ -34,6 +37,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +45,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -66,6 +71,12 @@ class TicketServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private SlaPolicyRepository slaPolicyRepository;
+
+    @Mock
+    private SlaPolicy mediumSlaPolicy;
+
+    @Mock
     private User creator;
 
     private TicketService ticketService;
@@ -77,7 +88,8 @@ class TicketServiceTest {
         ticketService = new TicketService(
                 ticketRepository,
                 ticketAssignmentRepository,
-                userRepository
+                userRepository,
+                slaPolicyRepository
         );
 
         userId = UUID.randomUUID();
@@ -103,6 +115,26 @@ class TicketServiceTest {
 
         when(ticketRepository.getNextTicketNumberSequenceValue())
                 .thenReturn(3L);
+
+        when(
+                slaPolicyRepository.findByPriorityAndActiveTrue(
+                        TicketPriority.MEDIUM
+                )
+        ).thenReturn(
+                Optional.of(mediumSlaPolicy)
+        );
+
+        when(mediumSlaPolicy.isActive())
+                .thenReturn(true);
+
+        when(mediumSlaPolicy.getPriority())
+                .thenReturn(TicketPriority.MEDIUM);
+
+        when(mediumSlaPolicy.getResponseMinutes())
+                .thenReturn(60);
+
+        when(mediumSlaPolicy.getResolutionMinutes())
+                .thenReturn(1440);
 
         when(ticketRepository.saveAndFlush(any(Ticket.class)))
                 .thenAnswer(invocation ->
@@ -184,11 +216,81 @@ class TicketServiceTest {
                 savedTicket.getCreatedByUser()
         );
 
+        assertSame(
+                mediumSlaPolicy,
+                savedTicket.getSlaPolicy()
+        );
+
+        assertNotNull(
+                savedTicket.getResponseDueAt()
+        );
+
+        assertNotNull(
+                savedTicket.getResolutionDueAt()
+        );
+
+        assertEquals(
+                1380L,
+                Duration.between(
+                        savedTicket.getResponseDueAt(),
+                        savedTicket.getResolutionDueAt()
+                ).toMinutes()
+        );
+
+        verify(
+                slaPolicyRepository
+        ).findByPriorityAndActiveTrue(
+                TicketPriority.MEDIUM
+        );
+
         verify(userRepository)
                 .findById(userId);
 
         verify(ticketRepository)
                 .getNextTicketNumberSequenceValue();
+    }
+
+    @Test
+    void createTicketShouldFailWhenNoActiveSlaPolicyExists() {
+        CreateTicketRequest request =
+                new CreateTicketRequest(
+                        TicketType.INCIDENT,
+                        "VPN is not working",
+                        "Cannot connect to company VPN."
+                );
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(creator));
+
+        when(ticketRepository.getNextTicketNumberSequenceValue())
+                .thenReturn(4L);
+
+        when(
+                slaPolicyRepository.findByPriorityAndActiveTrue(
+                        TicketPriority.MEDIUM
+                )
+        ).thenReturn(Optional.empty());
+
+        IllegalStateException exception =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> ticketService.createTicket(
+                                userId,
+                                request
+                        )
+                );
+
+        assertEquals(
+                "No active SLA policy configured for priority MEDIUM",
+                exception.getMessage()
+        );
+
+        verify(
+                ticketRepository,
+                never()
+        ).saveAndFlush(
+                any(Ticket.class)
+        );
     }
 
     @Test
@@ -450,6 +552,28 @@ class TicketServiceTest {
                         "FD-000002",
                         userId
                 );
+    }
+
+    @Test
+    void getMyTicketShouldRejectBlankTicketNumber() {
+        ResponseStatusException exception =
+                assertThrows(
+                        ResponseStatusException.class,
+                        () -> ticketService.getMyTicket(
+                                userId,
+                                "   "
+                        )
+                );
+
+        assertEquals(
+                HttpStatus.BAD_REQUEST,
+                exception.getStatusCode()
+        );
+
+        assertEquals(
+                "400 BAD_REQUEST \"Ticket number is required\"",
+                exception.getMessage()
+        );
     }
 
     @Test

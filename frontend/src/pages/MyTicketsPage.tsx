@@ -8,6 +8,7 @@ import { getMyTickets } from '../api/ticket'
 import { useAuth } from '../auth/useAuth'
 import type {
   PageResponse,
+  SlaStatus,
   TicketSummary,
 } from '../types/ticket'
 
@@ -19,6 +20,24 @@ function formatLabel(value: string) {
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString()
+}
+
+function formatSlaStatus(
+  status: SlaStatus,
+) {
+  switch (status) {
+    case 'MET':
+      return 'Met'
+
+    case 'BREACHED':
+      return 'Breached'
+
+    case 'PENDING':
+      return 'Pending'
+
+    case 'UNKNOWN':
+      return 'Unknown'
+  }
 }
 
 export function MyTicketsPage() {
@@ -199,6 +218,34 @@ export function MyTicketsPage() {
                     <p>
                       <strong>Created:</strong>{' '}
                       {formatDate(ticket.createdAt)}
+                    </p>
+
+                    <p>
+                      <strong>Response SLA:</strong>{' '}
+                      {formatSlaStatus(
+                        ticket.responseSlaStatus,
+                      )}
+                    </p>
+
+                    <p>
+                      <strong>Response due:</strong>{' '}
+                      {formatDate(
+                        ticket.responseDueAt,
+                      )}
+                    </p>
+
+                    <p>
+                      <strong>Resolution SLA:</strong>{' '}
+                      {formatSlaStatus(
+                        ticket.resolutionSlaStatus,
+                      )}
+                    </p>
+
+                    <p>
+                      <strong>Resolution due:</strong>{' '}
+                      {formatDate(
+                        ticket.resolutionDueAt,
+                      )}
                     </p>
                   </div>
 

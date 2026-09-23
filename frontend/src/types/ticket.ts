@@ -17,6 +17,12 @@ export type TicketStatus =
   | 'CLOSED'
   | 'CANCELLED'
 
+export type SlaStatus =
+  | 'PENDING'
+  | 'MET'
+  | 'BREACHED'
+  | 'UNKNOWN'
+
 export interface CreateTicketRequest {
   type: TicketType
   title: string
@@ -35,6 +41,12 @@ export interface TicketResponse {
   createdByEmail: string
   createdAt: string
   updatedAt: string
+  responseDueAt: string
+  resolutionDueAt: string
+  firstRespondedAt: string | null
+  resolvedAt: string | null
+  responseSlaStatus: SlaStatus
+  resolutionSlaStatus: SlaStatus
 }
 
 export interface TicketSummary {
@@ -46,6 +58,10 @@ export interface TicketSummary {
   status: TicketStatus
   createdAt: string
   updatedAt: string
+  responseDueAt: string
+  resolutionDueAt: string
+  responseSlaStatus: SlaStatus
+  resolutionSlaStatus: SlaStatus
 }
 
 export interface PageResponse<T> {
@@ -77,6 +93,10 @@ export interface SupportTicketSummary {
   status: TicketStatus
   createdAt: string
   assignedAt: string
+  responseDueAt: string
+  resolutionDueAt: string
+  responseSlaStatus: SlaStatus
+  resolutionSlaStatus: SlaStatus
 }
 
 export interface SupportTicketResponse {
@@ -92,7 +112,12 @@ export interface SupportTicketResponse {
   createdAt: string
   updatedAt: string
   assignedAt: string
+  responseDueAt: string
+  resolutionDueAt: string
+  firstRespondedAt: string | null
   resolvedAt: string | null
+  responseSlaStatus: SlaStatus
+  resolutionSlaStatus: SlaStatus
 }
 
 export interface UpdateTicketStatusRequest {

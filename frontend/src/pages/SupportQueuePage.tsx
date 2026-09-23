@@ -14,6 +14,7 @@ import { useAuth } from '../auth/useAuth'
 
 import type {
   PageResponse,
+  SlaStatus,
   TicketSummary,
 } from '../types/ticket'
 
@@ -25,6 +26,24 @@ function formatLabel(value: string) {
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString()
+}
+
+function formatSlaStatus(
+  status: SlaStatus,
+) {
+  switch (status) {
+    case 'MET':
+      return 'Met'
+
+    case 'BREACHED':
+      return 'Breached'
+
+    case 'PENDING':
+      return 'Pending'
+
+    case 'UNKNOWN':
+      return 'Unknown'
+  }
 }
 
 export function SupportQueuePage() {
@@ -339,6 +358,54 @@ export function SupportQueuePage() {
                         <strong>
                           {formatDate(
                             ticket.createdAt,
+                          )}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>
+                          Response SLA
+                        </span>
+
+                        <strong>
+                          {formatSlaStatus(
+                            ticket.responseSlaStatus,
+                          )}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>
+                          Response due
+                        </span>
+
+                        <strong>
+                          {formatDate(
+                            ticket.responseDueAt,
+                          )}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>
+                          Resolution SLA
+                        </span>
+
+                        <strong>
+                          {formatSlaStatus(
+                            ticket.resolutionSlaStatus,
+                          )}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>
+                          Resolution due
+                        </span>
+
+                        <strong>
+                          {formatDate(
+                            ticket.resolutionDueAt,
                           )}
                         </strong>
                       </div>

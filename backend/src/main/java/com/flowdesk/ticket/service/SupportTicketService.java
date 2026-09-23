@@ -29,6 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
 import java.util.Locale;
 import java.util.UUID;
 
@@ -348,6 +351,11 @@ public class SupportTicketService {
         Ticket ticket =
                 assignment.getTicket();
 
+        OffsetDateTime evaluatedAt =
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
+                );
+
         return new SupportTicketSummaryResponse(
                 ticket.getId(),
                 ticket.getTicketNumber(),
@@ -356,7 +364,15 @@ public class SupportTicketService {
                 ticket.getPriority(),
                 ticket.getStatus(),
                 ticket.getCreatedAt(),
-                assignment.getAssignedAt()
+                assignment.getAssignedAt(),
+                ticket.getResponseDueAt(),
+                ticket.getResolutionDueAt(),
+                ticket.evaluateResponseSla(
+                        evaluatedAt
+                ),
+                ticket.evaluateResolutionSla(
+                        evaluatedAt
+                )
         );
     }
 
@@ -367,6 +383,11 @@ public class SupportTicketService {
 
         Ticket ticket =
                 assignment.getTicket();
+
+        OffsetDateTime evaluatedAt =
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
+                );
 
         return new SupportTicketResponse(
                 ticket.getId(),
@@ -381,7 +402,16 @@ public class SupportTicketService {
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt(),
                 assignment.getAssignedAt(),
-                ticket.getResolvedAt()
+                ticket.getResponseDueAt(),
+                ticket.getResolutionDueAt(),
+                ticket.getFirstRespondedAt(),
+                ticket.getResolvedAt(),
+                ticket.evaluateResponseSla(
+                        evaluatedAt
+                ),
+                ticket.evaluateResolutionSla(
+                        evaluatedAt
+                )
         );
     }
 
