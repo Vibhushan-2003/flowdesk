@@ -113,6 +113,21 @@ public class SecurityConfig {
                         )
                         .permitAll()
 
+                        /*
+                         * Day 19 SLA operations dashboard.
+                         *
+                         * Cross-ticket operational metrics
+                         * are visible only to supervisory roles.
+                         */
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/sla/dashboard"
+                        )
+                        .hasAnyRole(
+                                "TEAM_LEAD",
+                                "ADMIN"
+                        )
+
                         // Support Engineer queue
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -261,8 +276,7 @@ public class SecurityConfig {
     public JwtAuthenticationConverter
             jwtAuthenticationConverter() {
 
-        JwtGrantedAuthoritiesConverter
-                authoritiesConverter =
+        JwtGrantedAuthoritiesConverter authoritiesConverter =
                 new JwtGrantedAuthoritiesConverter();
 
         authoritiesConverter
@@ -275,8 +289,7 @@ public class SecurityConfig {
                         "ROLE_"
                 );
 
-        JwtAuthenticationConverter
-                authenticationConverter =
+        JwtAuthenticationConverter authenticationConverter =
                 new JwtAuthenticationConverter();
 
         authenticationConverter
