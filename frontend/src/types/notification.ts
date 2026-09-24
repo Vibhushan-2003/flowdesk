@@ -1,40 +1,42 @@
 export type NotificationType =
-  | "TICKET_COMMENT_ADDED"
-  | "TICKET_ASSIGNED"
-  | "TICKET_STATUS_CHANGED"
-  | "TICKET_RESOLVED";
+  | 'TICKET_COMMENT_ADDED'
+  | 'TICKET_ASSIGNED'
+  | 'TICKET_STATUS_CHANGED'
+  | 'TICKET_RESOLVED'
+  | 'SLA_RESPONSE_BREACHED'
+  | 'SLA_RESOLUTION_BREACHED'
 
 export interface NotificationResponse {
-  notificationId: string;
-  type: NotificationType;
+  notificationId: string
+  type: NotificationType
 
-  title: string;
-  message: string;
+  title: string
+  message: string
 
-  actorUserId: string | null;
-  actorName: string | null;
+  actorUserId: string | null
+  actorName: string | null
 
-  ticketId: string | null;
-  ticketNumber: string | null;
+  ticketId: string | null
+  ticketNumber: string | null
 
-  read: boolean;
-  readAt: string | null;
-  createdAt: string;
+  read: boolean
+  readAt: string | null
+  createdAt: string
 }
 
 export interface UnreadNotificationCountResponse {
-  unreadCount: number;
+  unreadCount: number
 }
 
 export interface NotificationPageResponse {
-  content: NotificationResponse[];
+  content: NotificationResponse[]
 
-  page: number;
-  size: number;
+  page: number
+  size: number
 
-  totalElements: number;
-  totalPages: number;
+  totalElements: number
+  totalPages: number
 
-  first: boolean;
-  last: boolean;
+  first: boolean
+  last: boolean
 }
