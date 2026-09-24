@@ -3,12 +3,14 @@ package com.flowdesk.sla.repository;
 import com.flowdesk.sla.domain.SlaEvent;
 import com.flowdesk.sla.domain.SlaEventType;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public interface SlaEventRepository
@@ -17,6 +19,16 @@ public interface SlaEventRepository
     boolean existsByTicket_IdAndEventType(
             UUID ticketId,
             SlaEventType eventType
+    );
+
+    @Query("""
+            SELECT slaEvent
+            FROM SlaEvent slaEvent
+            JOIN FETCH slaEvent.ticket
+            ORDER BY slaEvent.occurredAt DESC
+            """)
+    List<SlaEvent> findRecentSlaEvents(
+            Pageable pageable
     );
 
     /*

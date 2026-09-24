@@ -1,6 +1,7 @@
 package com.flowdesk.ticket.repository;
 
 import com.flowdesk.sla.domain.SlaEventType;
+import com.flowdesk.sla.repository.projection.SlaPriorityBreachCount;
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketStatus;
 
@@ -42,6 +43,98 @@ public interface TicketRepository
             TicketStatus status,
             Pageable pageable
     );
+
+    long countByStatusIn(
+            Collection<TicketStatus> statuses
+    );
+
+    @Query("""
+            SELECT COUNT(ticket)
+            FROM Ticket ticket
+            WHERE ticket.firstRespondedAt IS NULL
+              AND ticket.responseDueAt < :evaluatedAt
+              AND ticket.status IN :statuses
+            """)
+    long countCurrentResponseSlaBreaches(
+            @Param("evaluatedAt") OffsetDateTime evaluatedAt,
+            @Param("statuses") Collection<TicketStatus> statuses
+    );
+
+    @Query("""
+            SELECT COUNT(ticket)
+            FROM Ticket ticket
+            WHERE ticket.resolvedAt IS NULL
+              AND ticket.resolutionDueAt < :evaluatedAt
+              AND ticket.status IN :statuses
+            """)
+    long countCurrentResolutionSlaBreaches(
+            @Param("evaluatedAt") OffsetDateTime evaluatedAt,
+            @Param("statuses") Collection<TicketStatus> statuses
+    );
+
+    @Query("""
+            SELECT COUNT(ticket)
+            FROM Ticket ticket
+            WHERE ticket.firstRespondedAt IS NOT NULL
+              AND ticket.responseDueAt IS NOT NULL
+            """)
+    long countKnownResponseSlaSamples();
+
+    @Query("""
+            SELECT COUNT(ticket)
+            FROM Ticket ticket
+            WHERE ticket.firstRespondedAt IS NOT NULL
+              AND ticket.responseDueAt IS NOT NULL
+              AND ticket.firstRespondedAt <= ticket.responseDueAt
+            """)
+    long countMetResponseSlaSamples();
+
+    @Query("""
+            SELECT COUNT(ticket)
+            FROM Ticket ticket
+            WHERE ticket.resolvedAt IS NOT NULL
+              AND ticket.resolutionDueAt IS NOT NULL
+            """)
+    long countKnownResolutionSlaSamples();
+
+    @Query("""
+            SELECT COUNT(ticket)
+            FROM Ticket ticket
+            WHERE ticket.resolvedAt IS NOT NULL
+              AND ticket.resolutionDueAt IS NOT NULL
+              AND ticket.resolvedAt <= ticket.resolutionDueAt
+            """)
+    long countMetResolutionSlaSamples();
+
+    @Query("""
+            SELECT
+                ticket.priority AS priority,
+                COUNT(ticket) AS breachCount
+            FROM Ticket ticket
+            WHERE ticket.status IN :activeStatuses
+              AND (
+                    (
+                        ticket.status IN :responseStatuses
+                        AND ticket.firstRespondedAt IS NULL
+                        AND ticket.responseDueAt < :evaluatedAt
+                    )
+                    OR
+                    (
+                        ticket.resolvedAt IS NULL
+                        AND ticket.resolutionDueAt < :evaluatedAt
+                    )
+              )
+            GROUP BY ticket.priority
+            """)
+    List<SlaPriorityBreachCount>
+            countCurrentSlaBreachesByPriority(
+                    @Param("evaluatedAt")
+                    OffsetDateTime evaluatedAt,
+                    @Param("activeStatuses")
+                    Collection<TicketStatus> activeStatuses,
+                    @Param("responseStatuses")
+                    Collection<TicketStatus> responseStatuses
+            );
 
     @Query("""
             SELECT ticket

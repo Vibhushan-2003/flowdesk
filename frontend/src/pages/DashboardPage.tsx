@@ -16,6 +16,13 @@ export function DashboardPage() {
       'SUPPORT_ENGINEER',
     ) ?? false
 
+  const canViewSlaOperations =
+    user?.roles.some(
+      (role) =>
+        role === 'TEAM_LEAD' ||
+        role === 'ADMIN',
+    ) ?? false
+
   function handleSignOut() {
     signOut()
 
@@ -122,6 +129,35 @@ export function DashboardPage() {
                 }
               >
                 Support queue
+              </button>
+            </div>
+          </article>
+        )}
+
+        {canViewSlaOperations && (
+          <article className="dashboard-workspace-card">
+            <p className="dashboard-card-label">
+              Operations workspace
+            </p>
+
+            <h2>SLA operations</h2>
+
+            <p>
+              Review active SLA exposure,
+              compliance, priority breakdowns,
+              and recent breach history.
+            </p>
+
+            <div className="dashboard-action-buttons">
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    '/sla/dashboard',
+                  )
+                }
+              >
+                Open SLA dashboard
               </button>
             </div>
           </article>

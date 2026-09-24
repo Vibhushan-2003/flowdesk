@@ -7,12 +7,14 @@ import {
 import './App.css'
 
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { RoleProtectedRoute } from './components/RoleProtectedRoute'
 
 import { CreateTicketPage } from './pages/CreateTicketPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyAssignedTicketsPage } from './pages/MyAssignedTicketsPage'
 import { MyTicketsPage } from './pages/MyTicketsPage'
+import { SlaDashboardPage } from './pages/SlaDashboardPage'
 import { SupportQueuePage } from './pages/SupportQueuePage'
 import { SupportTicketDetailsPage } from './pages/SupportTicketDetailsPage'
 import { TicketDetailsPage } from './pages/TicketDetailsPage'
@@ -60,6 +62,22 @@ function App() {
           path="/support/tickets/:ticketNumber"
           element={<SupportTicketDetailsPage />}
         />
+
+        <Route
+          element={
+            <RoleProtectedRoute
+              allowedRoles={[
+                'TEAM_LEAD',
+                'ADMIN',
+              ]}
+            />
+          }
+        >
+          <Route
+            path="/sla/dashboard"
+            element={<SlaDashboardPage />}
+          />
+        </Route>
       </Route>
 
       <Route
