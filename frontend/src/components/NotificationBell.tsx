@@ -485,6 +485,48 @@ function getTicketPath(
     return null
   }
 
+  const encodedTicketNumber =
+    encodeURIComponent(
+      notification.ticketNumber,
+    )
+
+  const isSlaBreachNotification =
+    notification.type ===
+      'SLA_RESPONSE_BREACHED' ||
+    notification.type ===
+      'SLA_RESOLUTION_BREACHED'
+
+  /*
+   * SLA breach notifications are operational
+   * support alerts.
+   *
+   * The assigned support engineer owns the
+   * support ticket detail route.
+   */
+  if (
+    isSupportEngineer &&
+    isSlaBreachNotification
+  ) {
+    return `/support/tickets/${encodedTicketNumber}`
+  }
+
+  /*
+   * Team-lead/admin SLA notifications are useful
+   * escalation signals, but the current support
+   * ticket detail API is ownership-scoped.
+   *
+   * Do not incorrectly send those users to the
+   * employee-owned ticket route.
+   *
+   * A supervisor/admin read-only ticket view can
+   * be added later.
+   */
+  if (
+    isSlaBreachNotification
+  ) {
+    return null
+  }
+
   /*
    * Employee reply notification:
    *
@@ -501,18 +543,14 @@ function getTicketPath(
     notification.title ===
       'New requester reply'
   ) {
-    return `/support/tickets/${encodeURIComponent(
-      notification.ticketNumber,
-    )}`
+    return `/support/tickets/${encodedTicketNumber}`
   }
 
   /*
    * Support replies and status notifications
    * are intended for the employee.
    */
-  return `/tickets/${encodeURIComponent(
-    notification.ticketNumber,
-  )}`
+  return `/tickets/${encodedTicketNumber}`
 }
 
 function formatNotificationTime(
