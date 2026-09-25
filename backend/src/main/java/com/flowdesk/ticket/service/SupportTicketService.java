@@ -1,5 +1,9 @@
 package com.flowdesk.ticket.service;
 
+import com.flowdesk.audit.domain.AuditAction;
+import com.flowdesk.audit.domain.AuditTargetType;
+import com.flowdesk.audit.service.AuditService;
+
 import com.flowdesk.common.dto.PageResponse;
 
 import com.flowdesk.notification.domain.NotificationType;
@@ -33,6 +37,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -44,15 +49,22 @@ public class SupportTicketService {
     private final NotificationService
             notificationService;
 
+    private final AuditService
+            auditService;
+
     public SupportTicketService(
             TicketAssignmentRepository ticketAssignmentRepository,
-            NotificationService notificationService
+            NotificationService notificationService,
+            AuditService auditService
     ) {
         this.ticketAssignmentRepository =
                 ticketAssignmentRepository;
 
         this.notificationService =
                 notificationService;
+
+        this.auditService =
+                auditService;
     }
 
     @Transactional(readOnly = true)
@@ -158,15 +170,11 @@ public class SupportTicketService {
                 assignment.getTicket();
 
         /*
-         * Keep the previous state because an
-         * IN_PROGRESS transition can mean:
+         * Capture the previous state before applying
+         * the transition.
          *
-         * ASSIGNED -> IN_PROGRESS
-         * or
-         * WAITING_FOR_USER -> IN_PROGRESS
-         *
-         * We want different notification messages
-         * for those two situations.
+         * We need this for both notifications and
+         * the immutable audit record.
          */
         TicketStatus previousStatus =
                 ticket.getStatus();
@@ -208,26 +216,43 @@ public class SupportTicketService {
         }
 
         /*
-         * Preserve the existing Day 13 behavior.
-         *
-         * This flushes ticket / assignment changes
-         * before mapping the response so values such
-         * as updatedAt are current.
+         * Flush the ticket / assignment mutation
+         * before recording dependent records.
          */
         ticketAssignmentRepository.flush();
 
         /*
-         * Notify the employee only after the
-         * transition succeeds.
+         * Keep the existing employee notification
+         * behavior.
          *
-         * This still runs inside the SAME transaction.
-         * If notification persistence unexpectedly
-         * fails, the status update also rolls back.
+         * This is still part of the same transaction.
          */
         notifyTicketCreatorAboutStatusChange(
                 assignment,
                 previousStatus,
                 newStatus
+        );
+
+        /*
+         * Record the successful business transition.
+         *
+         * The assigned support engineer is the actor.
+         * Because AuditService uses the default REQUIRED
+         * transaction propagation, this audit insert joins
+         * this same transaction.
+         */
+        auditService.recordUserAction(
+                assignment.getAssignedToUser(),
+                AuditAction.TICKET_STATUS_CHANGED,
+                AuditTargetType.TICKET,
+                ticket.getId(),
+                ticket.getTicketNumber(),
+                Map.of(
+                        "fromStatus",
+                        previousStatus.name(),
+                        "toStatus",
+                        newStatus.name()
+                )
         );
 
         return toResponse(

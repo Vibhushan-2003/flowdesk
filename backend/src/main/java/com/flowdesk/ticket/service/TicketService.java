@@ -1,5 +1,9 @@
 package com.flowdesk.ticket.service;
 
+import com.flowdesk.audit.domain.AuditAction;
+import com.flowdesk.audit.domain.AuditTargetType;
+import com.flowdesk.audit.service.AuditService;
+
 import com.flowdesk.common.dto.PageResponse;
 
 import com.flowdesk.sla.domain.SlaPolicy;
@@ -39,6 +43,7 @@ import java.time.ZoneOffset;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -56,11 +61,15 @@ public class TicketService {
     private final SlaPolicyRepository
             slaPolicyRepository;
 
+    private final AuditService
+            auditService;
+
     public TicketService(
             TicketRepository ticketRepository,
             TicketAssignmentRepository ticketAssignmentRepository,
             UserRepository userRepository,
-            SlaPolicyRepository slaPolicyRepository
+            SlaPolicyRepository slaPolicyRepository,
+            AuditService auditService
     ) {
         this.ticketRepository =
                 ticketRepository;
@@ -73,6 +82,9 @@ public class TicketService {
 
         this.slaPolicyRepository =
                 slaPolicyRepository;
+
+        this.auditService =
+                auditService;
     }
 
     @Transactional
@@ -135,6 +147,22 @@ public class TicketService {
                         .saveAndFlush(
                                 ticket
                         );
+
+        auditService.recordUserAction(
+                creator,
+                AuditAction.TICKET_CREATED,
+                AuditTargetType.TICKET,
+                savedTicket.getId(),
+                savedTicket.getTicketNumber(),
+                Map.of(
+                        "type",
+                        savedTicket.getType().name(),
+                        "priority",
+                        savedTicket.getPriority().name(),
+                        "status",
+                        savedTicket.getStatus().name()
+                )
+        );
 
         return toResponse(
                 savedTicket
@@ -266,6 +294,9 @@ public class TicketService {
             );
         }
 
+        TicketStatus previousStatus =
+                ticket.getStatus();
+
         ticket.markAssigned();
 
         TicketAssignment assignment =
@@ -279,6 +310,20 @@ public class TicketService {
                         .saveAndFlush(
                                 assignment
                         );
+
+        auditService.recordUserAction(
+                engineer,
+                AuditAction.TICKET_CLAIMED,
+                AuditTargetType.TICKET,
+                ticket.getId(),
+                ticket.getTicketNumber(),
+                Map.of(
+                        "fromStatus",
+                        previousStatus.name(),
+                        "toStatus",
+                        ticket.getStatus().name()
+                )
+        );
 
         return new ClaimTicketResponse(
                 savedAssignment.getId(),
