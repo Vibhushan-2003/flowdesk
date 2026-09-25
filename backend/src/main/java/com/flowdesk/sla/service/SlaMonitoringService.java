@@ -1,5 +1,9 @@
 package com.flowdesk.sla.service;
 
+import com.flowdesk.audit.domain.AuditAction;
+import com.flowdesk.audit.domain.AuditTargetType;
+import com.flowdesk.audit.service.AuditService;
+
 import com.flowdesk.notification.domain.NotificationType;
 import com.flowdesk.notification.service.NotificationService;
 
@@ -84,12 +88,16 @@ public class SlaMonitoringService {
     private final NotificationService
             notificationService;
 
+    private final AuditService
+            auditService;
+
     public SlaMonitoringService(
             TicketRepository ticketRepository,
             SlaEventRepository slaEventRepository,
             TicketAssignmentRepository ticketAssignmentRepository,
             UserRepository userRepository,
-            NotificationService notificationService
+            NotificationService notificationService,
+            AuditService auditService
     ) {
         this.ticketRepository =
                 ticketRepository;
@@ -105,6 +113,9 @@ public class SlaMonitoringService {
 
         this.notificationService =
                 notificationService;
+
+        this.auditService =
+                auditService;
     }
 
     @Transactional
@@ -199,9 +210,9 @@ public class SlaMonitoringService {
                         occurredAt,
                         "SLA breach deadline is required"
                 )
-                .withOffsetSameInstant(
-                        ZoneOffset.UTC
-                );
+                        .withOffsetSameInstant(
+                                ZoneOffset.UTC
+                        );
 
         int inserted =
                 slaEventRepository
@@ -212,7 +223,30 @@ public class SlaMonitoringService {
                                 normalizedOccurredAt
                         );
 
+        /*
+         * Only a newly persisted SLA breach gets an
+         * audit entry and escalation.
+         *
+         * If insertIfAbsent returns 0, another run has
+         * already recorded this ticket + breach type.
+         */
         if (inserted == 1) {
+
+            auditService.recordSystemAction(
+                    auditActionFor(
+                            eventType
+                    ),
+                    AuditTargetType.TICKET,
+                    ticketId,
+                    ticket.getTicketNumber(),
+                    Map.of(
+                            "deadline",
+                            normalizedOccurredAt.toString(),
+                            "eventType",
+                            eventType.name()
+                    )
+            );
+
             escalateBreach(
                     ticket,
                     eventType
@@ -319,6 +353,20 @@ public class SlaMonitoringService {
                 userId,
                 user
         );
+    }
+
+    private AuditAction auditActionFor(
+            SlaEventType eventType
+    ) {
+        return switch (eventType) {
+            case RESPONSE_BREACHED ->
+                    AuditAction
+                            .SLA_RESPONSE_BREACHED;
+
+            case RESOLUTION_BREACHED ->
+                    AuditAction
+                            .SLA_RESOLUTION_BREACHED;
+        };
     }
 
     private NotificationType notificationTypeFor(

@@ -114,6 +114,24 @@ public class SecurityConfig {
                         .permitAll()
 
                         /*
+                         * Day 20 immutable audit trail.
+                         *
+                         * Audit history is operationally
+                         * sensitive and is available only
+                         * to administrators.
+                         *
+                         * Protect the whole audit namespace
+                         * so future audit endpoints also
+                         * remain ADMIN-only by default.
+                         */
+                        .requestMatchers(
+                                "/api/audit/**"
+                        )
+                        .hasRole(
+                                "ADMIN"
+                        )
+
+                        /*
                          * Day 19 SLA operations dashboard.
                          *
                          * Cross-ticket operational metrics

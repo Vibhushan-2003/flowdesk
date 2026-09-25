@@ -1,5 +1,9 @@
 package com.flowdesk.ticket.service;
 
+import com.flowdesk.audit.domain.AuditAction;
+import com.flowdesk.audit.domain.AuditTargetType;
+import com.flowdesk.audit.service.AuditService;
+
 import com.flowdesk.common.dto.PageResponse;
 
 import com.flowdesk.notification.domain.NotificationType;
@@ -42,6 +46,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,8 +55,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -68,6 +73,10 @@ class SupportTicketServiceTest {
     @Mock
     private NotificationService
             notificationService;
+
+    @Mock
+    private AuditService
+            auditService;
 
     @InjectMocks
     private SupportTicketService
@@ -86,11 +95,14 @@ class SupportTicketServiceTest {
                 ticketAssignmentRepository
                         .findByAssignedToUser_IdAndReleasedAtIsNull(
                                 eq(supportEngineerId),
-                                any(Pageable.class)
+                                org.mockito.ArgumentMatchers
+                                        .any(Pageable.class)
                         )
         ).thenReturn(
                 new PageImpl<>(
-                        List.of(assignment),
+                        List.of(
+                                assignment
+                        ),
                         PageRequest.of(
                                 0,
                                 10
@@ -107,18 +119,21 @@ class SupportTicketServiceTest {
                                 10
                         );
 
-        assertNotNull(response);
+        assertNotNull(
+                response
+        );
 
         ArgumentCaptor<Pageable> pageableCaptor =
                 ArgumentCaptor.forClass(
                         Pageable.class
                 );
 
-        verify(ticketAssignmentRepository)
-                .findByAssignedToUser_IdAndReleasedAtIsNull(
-                        eq(supportEngineerId),
-                        pageableCaptor.capture()
-                );
+        verify(
+                ticketAssignmentRepository
+        ).findByAssignedToUser_IdAndReleasedAtIsNull(
+                eq(supportEngineerId),
+                pageableCaptor.capture()
+        );
 
         Pageable pageable =
                 pageableCaptor.getValue();
@@ -166,7 +181,9 @@ class SupportTicketServiceTest {
                                 supportEngineerId
                         )
         ).thenReturn(
-                Optional.of(assignment)
+                Optional.of(
+                        assignment
+                )
         );
 
         SupportTicketResponse response =
@@ -186,11 +203,12 @@ class SupportTicketServiceTest {
                 response.status()
         );
 
-        verify(ticketAssignmentRepository)
-                .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
-                        "FD-TEST-001",
-                        supportEngineerId
-                );
+        verify(
+                ticketAssignmentRepository
+        ).findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
+                "FD-TEST-001",
+                supportEngineerId
+        );
     }
 
     @Test
@@ -251,7 +269,9 @@ class SupportTicketServiceTest {
                                 supportEngineerId
                         )
         ).thenReturn(
-                Optional.of(assignment)
+                Optional.of(
+                        assignment
+                )
         );
 
         SupportTicketResponse response =
@@ -273,16 +293,42 @@ class SupportTicketServiceTest {
                 assignment.getReleasedAt()
         );
 
-        verify(notificationService)
-                .createNotification(
-                        employee,
-                        supportEngineer,
-                        ticket,
-                        NotificationType
-                                .TICKET_STATUS_CHANGED,
-                        "Support work started",
-                        "A support engineer started working on FD-TEST-001"
-                );
+        verify(
+                notificationService
+        ).createNotification(
+                employee,
+                supportEngineer,
+                ticket,
+                NotificationType
+                        .TICKET_STATUS_CHANGED,
+                "Support work started",
+                "A support engineer started working on FD-TEST-001"
+        );
+
+        verify(
+                auditService
+        ).recordUserAction(
+                eq(supportEngineer),
+                eq(
+                        AuditAction
+                                .TICKET_STATUS_CHANGED
+                ),
+                eq(
+                        AuditTargetType.TICKET
+                ),
+                isNull(),
+                eq(
+                        "FD-TEST-001"
+                ),
+                eq(
+                        Map.of(
+                                "fromStatus",
+                                "ASSIGNED",
+                                "toStatus",
+                                "IN_PROGRESS"
+                        )
+                )
+        );
     }
 
     @Test
@@ -314,7 +360,9 @@ class SupportTicketServiceTest {
                                 supportEngineerId
                         )
         ).thenReturn(
-                Optional.of(assignment)
+                Optional.of(
+                        assignment
+                )
         );
 
         SupportTicketResponse response =
@@ -336,16 +384,42 @@ class SupportTicketServiceTest {
                 assignment.getReleasedAt()
         );
 
-        verify(notificationService)
-                .createNotification(
-                        employee,
-                        supportEngineer,
-                        ticket,
-                        NotificationType
-                                .TICKET_STATUS_CHANGED,
-                        "Waiting for your response",
-                        "Support is waiting for your response on FD-TEST-001"
-                );
+        verify(
+                notificationService
+        ).createNotification(
+                employee,
+                supportEngineer,
+                ticket,
+                NotificationType
+                        .TICKET_STATUS_CHANGED,
+                "Waiting for your response",
+                "Support is waiting for your response on FD-TEST-001"
+        );
+
+        verify(
+                auditService
+        ).recordUserAction(
+                eq(supportEngineer),
+                eq(
+                        AuditAction
+                                .TICKET_STATUS_CHANGED
+                ),
+                eq(
+                        AuditTargetType.TICKET
+                ),
+                isNull(),
+                eq(
+                        "FD-TEST-001"
+                ),
+                eq(
+                        Map.of(
+                                "fromStatus",
+                                "IN_PROGRESS",
+                                "toStatus",
+                                "WAITING_FOR_USER"
+                        )
+                )
+        );
     }
 
     @Test
@@ -381,7 +455,9 @@ class SupportTicketServiceTest {
                                 supportEngineerId
                         )
         ).thenReturn(
-                Optional.of(assignment)
+                Optional.of(
+                        assignment
+                )
         );
 
         SupportTicketResponse response =
@@ -403,16 +479,42 @@ class SupportTicketServiceTest {
                 assignment.getReleasedAt()
         );
 
-        verify(notificationService)
-                .createNotification(
-                        employee,
-                        supportEngineer,
-                        ticket,
-                        NotificationType
-                                .TICKET_STATUS_CHANGED,
-                        "Work resumed",
-                        "Support resumed work on FD-TEST-001"
-                );
+        verify(
+                notificationService
+        ).createNotification(
+                employee,
+                supportEngineer,
+                ticket,
+                NotificationType
+                        .TICKET_STATUS_CHANGED,
+                "Work resumed",
+                "Support resumed work on FD-TEST-001"
+        );
+
+        verify(
+                auditService
+        ).recordUserAction(
+                eq(supportEngineer),
+                eq(
+                        AuditAction
+                                .TICKET_STATUS_CHANGED
+                ),
+                eq(
+                        AuditTargetType.TICKET
+                ),
+                isNull(),
+                eq(
+                        "FD-TEST-001"
+                ),
+                eq(
+                        Map.of(
+                                "fromStatus",
+                                "WAITING_FOR_USER",
+                                "toStatus",
+                                "IN_PROGRESS"
+                        )
+                )
+        );
     }
 
     @Test
@@ -431,7 +533,9 @@ class SupportTicketServiceTest {
                                 supportEngineerId
                         )
         ).thenReturn(
-                Optional.of(assignment)
+                Optional.of(
+                        assignment
+                )
         );
 
         ResponseStatusException exception =
@@ -464,7 +568,8 @@ class SupportTicketServiceTest {
         );
 
         verifyNoInteractions(
-                notificationService
+                notificationService,
+                auditService
         );
     }
 
@@ -497,7 +602,9 @@ class SupportTicketServiceTest {
                                 supportEngineerId
                         )
         ).thenReturn(
-                Optional.of(assignment)
+                Optional.of(
+                        assignment
+                )
         );
 
         SupportTicketResponse response =
@@ -523,16 +630,42 @@ class SupportTicketServiceTest {
                 assignment.getReleasedAt()
         );
 
-        verify(notificationService)
-                .createNotification(
-                        employee,
-                        supportEngineer,
-                        ticket,
-                        NotificationType
-                                .TICKET_RESOLVED,
-                        "Ticket resolved",
-                        "FD-TEST-001 has been resolved"
-                );
+        verify(
+                notificationService
+        ).createNotification(
+                employee,
+                supportEngineer,
+                ticket,
+                NotificationType
+                        .TICKET_RESOLVED,
+                "Ticket resolved",
+                "FD-TEST-001 has been resolved"
+        );
+
+        verify(
+                auditService
+        ).recordUserAction(
+                eq(supportEngineer),
+                eq(
+                        AuditAction
+                                .TICKET_STATUS_CHANGED
+                ),
+                eq(
+                        AuditTargetType.TICKET
+                ),
+                isNull(),
+                eq(
+                        "FD-TEST-001"
+                ),
+                eq(
+                        Map.of(
+                                "fromStatus",
+                                "IN_PROGRESS",
+                                "toStatus",
+                                "RESOLVED"
+                        )
+                )
+        );
     }
 
     @Test
@@ -551,7 +684,9 @@ class SupportTicketServiceTest {
                                 supportEngineerId
                         )
         ).thenReturn(
-                Optional.of(assignment)
+                Optional.of(
+                        assignment
+                )
         );
 
         ResponseStatusException exception =
@@ -584,7 +719,8 @@ class SupportTicketServiceTest {
         );
 
         verifyNoInteractions(
-                notificationService
+                notificationService,
+                auditService
         );
     }
 

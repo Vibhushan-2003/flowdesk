@@ -1,5 +1,9 @@
 package com.flowdesk.ticket.service;
 
+import com.flowdesk.audit.domain.AuditAction;
+import com.flowdesk.audit.domain.AuditTargetType;
+import com.flowdesk.audit.service.AuditService;
+
 import com.flowdesk.common.dto.PageResponse;
 
 import com.flowdesk.sla.domain.SlaPolicy;
@@ -39,7 +43,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -52,10 +58,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -65,13 +73,17 @@ class TicketServiceTest {
     private TicketRepository ticketRepository;
 
     @Mock
-    private TicketAssignmentRepository ticketAssignmentRepository;
+    private TicketAssignmentRepository
+            ticketAssignmentRepository;
 
     @Mock
     private UserRepository userRepository;
 
     @Mock
     private SlaPolicyRepository slaPolicyRepository;
+
+    @Mock
+    private AuditService auditService;
 
     @Mock
     private SlaPolicy mediumSlaPolicy;
@@ -85,18 +97,22 @@ class TicketServiceTest {
 
     @BeforeEach
     void setUp() {
-        ticketService = new TicketService(
-                ticketRepository,
-                ticketAssignmentRepository,
-                userRepository,
-                slaPolicyRepository
-        );
+        ticketService =
+                new TicketService(
+                        ticketRepository,
+                        ticketAssignmentRepository,
+                        userRepository,
+                        slaPolicyRepository,
+                        auditService
+                );
 
-        userId = UUID.randomUUID();
+        userId =
+                UUID.randomUUID();
     }
 
     @Test
     void createTicketShouldGenerateDefaultsAndPersistTicket() {
+
         CreateTicketRequest request =
                 new CreateTicketRequest(
                         TicketType.INCIDENT,
@@ -104,48 +120,86 @@ class TicketServiceTest {
                         "  Cannot connect to company VPN.  "
                 );
 
-        when(userRepository.findById(userId))
-                .thenReturn(Optional.of(creator));
-
-        when(creator.getId())
-                .thenReturn(userId);
-
-        when(creator.getEmail())
-                .thenReturn("employee@example.com");
-
-        when(ticketRepository.getNextTicketNumberSequenceValue())
-                .thenReturn(3L);
-
         when(
-                slaPolicyRepository.findByPriorityAndActiveTrue(
-                        TicketPriority.MEDIUM
+                userRepository.findById(
+                        userId
                 )
         ).thenReturn(
-                Optional.of(mediumSlaPolicy)
+                Optional.of(
+                        creator
+                )
         );
 
-        when(mediumSlaPolicy.isActive())
-                .thenReturn(true);
+        when(
+                creator.getId()
+        ).thenReturn(
+                userId
+        );
 
-        when(mediumSlaPolicy.getPriority())
-                .thenReturn(TicketPriority.MEDIUM);
+        when(
+                creator.getEmail()
+        ).thenReturn(
+                "employee@example.com"
+        );
 
-        when(mediumSlaPolicy.getResponseMinutes())
-                .thenReturn(60);
+        when(
+                ticketRepository
+                        .getNextTicketNumberSequenceValue()
+        ).thenReturn(
+                3L
+        );
 
-        when(mediumSlaPolicy.getResolutionMinutes())
-                .thenReturn(1440);
+        when(
+                slaPolicyRepository
+                        .findByPriorityAndActiveTrue(
+                                TicketPriority.MEDIUM
+                        )
+        ).thenReturn(
+                Optional.of(
+                        mediumSlaPolicy
+                )
+        );
 
-        when(ticketRepository.saveAndFlush(any(Ticket.class)))
-                .thenAnswer(invocation ->
+        when(
+                mediumSlaPolicy.isActive()
+        ).thenReturn(
+                true
+        );
+
+        when(
+                mediumSlaPolicy.getPriority()
+        ).thenReturn(
+                TicketPriority.MEDIUM
+        );
+
+        when(
+                mediumSlaPolicy.getResponseMinutes()
+        ).thenReturn(
+                60
+        );
+
+        when(
+                mediumSlaPolicy.getResolutionMinutes()
+        ).thenReturn(
+                1440
+        );
+
+        when(
+                ticketRepository
+                        .saveAndFlush(
+                                any(Ticket.class)
+                        )
+        ).thenAnswer(
+                invocation ->
                         invocation.getArgument(0)
-                );
+        );
 
         TicketResponse response =
-                ticketService.createTicket(
-                        userId,
-                        request
-                );
+                ticketService
+                        .createTicket(
+                                userId,
+                                request
+                        );
 
         assertEquals(
                 "FD-000003",
@@ -188,10 +242,15 @@ class TicketServiceTest {
         );
 
         ArgumentCaptor<Ticket> ticketCaptor =
-                ArgumentCaptor.forClass(Ticket.class);
+                ArgumentCaptor.forClass(
+                        Ticket.class
+                );
 
-        verify(ticketRepository)
-                .saveAndFlush(ticketCaptor.capture());
+        verify(
+                ticketRepository
+        ).saveAndFlush(
+                ticketCaptor.capture()
+        );
 
         Ticket savedTicket =
                 ticketCaptor.getValue();
@@ -243,15 +302,57 @@ class TicketServiceTest {
                 TicketPriority.MEDIUM
         );
 
-        verify(userRepository)
-                .findById(userId);
+        verify(
+                userRepository
+        ).findById(
+                userId
+        );
 
-        verify(ticketRepository)
-                .getNextTicketNumberSequenceValue();
+        verify(
+                ticketRepository
+        ).getNextTicketNumberSequenceValue();
+
+        /*
+         * Unit tests do not execute JPA @PrePersist.
+         *
+         * Therefore the in-memory Ticket does not get
+         * its generated UUID here, so targetId is null.
+         *
+         * In the real database flow saveAndFlush()
+         * executes @PrePersist and the audit record
+         * receives the persisted ticket UUID.
+         */
+        verify(
+                auditService
+        ).recordUserAction(
+                eq(creator),
+                eq(
+                        AuditAction
+                                .TICKET_CREATED
+                ),
+                eq(
+                        AuditTargetType.TICKET
+                ),
+                isNull(),
+                eq(
+                        "FD-000003"
+                ),
+                eq(
+                        Map.of(
+                                "type",
+                                "INCIDENT",
+                                "priority",
+                                "MEDIUM",
+                                "status",
+                                "OPEN"
+                        )
+                )
+        );
     }
 
     @Test
     void createTicketShouldFailWhenNoActiveSlaPolicyExists() {
+
         CreateTicketRequest request =
                 new CreateTicketRequest(
                         TicketType.INCIDENT,
@@ -259,25 +360,41 @@ class TicketServiceTest {
                         "Cannot connect to company VPN."
                 );
 
-        when(userRepository.findById(userId))
-                .thenReturn(Optional.of(creator));
-
-        when(ticketRepository.getNextTicketNumberSequenceValue())
-                .thenReturn(4L);
+        when(
+                userRepository.findById(
+                        userId
+                )
+        ).thenReturn(
+                Optional.of(
+                        creator
+                )
+        );
 
         when(
-                slaPolicyRepository.findByPriorityAndActiveTrue(
-                        TicketPriority.MEDIUM
-                )
-        ).thenReturn(Optional.empty());
+                ticketRepository
+                        .getNextTicketNumberSequenceValue()
+        ).thenReturn(
+                4L
+        );
+
+        when(
+                slaPolicyRepository
+                        .findByPriorityAndActiveTrue(
+                                TicketPriority.MEDIUM
+                        )
+        ).thenReturn(
+                Optional.empty()
+        );
 
         IllegalStateException exception =
                 assertThrows(
                         IllegalStateException.class,
-                        () -> ticketService.createTicket(
-                                userId,
-                                request
-                        )
+                        () ->
+                                ticketService
+                                        .createTicket(
+                                                userId,
+                                                request
+                                        )
                 );
 
         assertEquals(
@@ -291,15 +408,26 @@ class TicketServiceTest {
         ).saveAndFlush(
                 any(Ticket.class)
         );
+
+        verifyNoInteractions(
+                auditService
+        );
     }
 
     @Test
     void getMyTicketsShouldReturnPaginatedTicketSummaries() {
-        Ticket newestTicket = mock(Ticket.class);
-        Ticket olderTicket = mock(Ticket.class);
 
-        UUID newestTicketId = UUID.randomUUID();
-        UUID olderTicketId = UUID.randomUUID();
+        Ticket newestTicket =
+                mock(Ticket.class);
+
+        Ticket olderTicket =
+                mock(Ticket.class);
+
+        UUID newestTicketId =
+                UUID.randomUUID();
+
+        UUID olderTicketId =
+                UUID.randomUUID();
 
         OffsetDateTime newestCreatedAt =
                 OffsetDateTime.parse(
@@ -311,81 +439,130 @@ class TicketServiceTest {
                         "2026-09-12T05:00:31Z"
                 );
 
-        when(newestTicket.getId())
-                .thenReturn(newestTicketId);
-
-        when(newestTicket.getTicketNumber())
-                .thenReturn("FD-000002");
-
-        when(newestTicket.getType())
-                .thenReturn(TicketType.SERVICE_REQUEST);
-
-        when(newestTicket.getTitle())
-                .thenReturn(
-                        "Request GitHub repository access"
-                );
-
-        when(newestTicket.getPriority())
-                .thenReturn(TicketPriority.MEDIUM);
-
-        when(newestTicket.getStatus())
-                .thenReturn(TicketStatus.OPEN);
-
-        when(newestTicket.getCreatedAt())
-                .thenReturn(newestCreatedAt);
-
-        when(newestTicket.getUpdatedAt())
-                .thenReturn(newestCreatedAt);
-
-        when(olderTicket.getId())
-                .thenReturn(olderTicketId);
-
-        when(olderTicket.getTicketNumber())
-                .thenReturn("FD-000001");
-
-        when(olderTicket.getType())
-                .thenReturn(TicketType.INCIDENT);
-
-        when(olderTicket.getTitle())
-                .thenReturn("VPN is not working");
-
-        when(olderTicket.getPriority())
-                .thenReturn(TicketPriority.MEDIUM);
-
-        when(olderTicket.getStatus())
-                .thenReturn(TicketStatus.OPEN);
-
-        when(olderTicket.getCreatedAt())
-                .thenReturn(olderCreatedAt);
-
-        when(olderTicket.getUpdatedAt())
-                .thenReturn(olderCreatedAt);
+        when(
+                newestTicket.getId()
+        ).thenReturn(
+                newestTicketId
+        );
 
         when(
-                ticketRepository.findByCreatedByUser_Id(
-                        eq(userId),
-                        any(Pageable.class)
-                )
+                newestTicket.getTicketNumber()
+        ).thenReturn(
+                "FD-000002"
+        );
+
+        when(
+                newestTicket.getType()
+        ).thenReturn(
+                TicketType.SERVICE_REQUEST
+        );
+
+        when(
+                newestTicket.getTitle()
+        ).thenReturn(
+                "Request GitHub repository access"
+        );
+
+        when(
+                newestTicket.getPriority()
+        ).thenReturn(
+                TicketPriority.MEDIUM
+        );
+
+        when(
+                newestTicket.getStatus()
+        ).thenReturn(
+                TicketStatus.OPEN
+        );
+
+        when(
+                newestTicket.getCreatedAt()
+        ).thenReturn(
+                newestCreatedAt
+        );
+
+        when(
+                newestTicket.getUpdatedAt()
+        ).thenReturn(
+                newestCreatedAt
+        );
+
+        when(
+                olderTicket.getId()
+        ).thenReturn(
+                olderTicketId
+        );
+
+        when(
+                olderTicket.getTicketNumber()
+        ).thenReturn(
+                "FD-000001"
+        );
+
+        when(
+                olderTicket.getType()
+        ).thenReturn(
+                TicketType.INCIDENT
+        );
+
+        when(
+                olderTicket.getTitle()
+        ).thenReturn(
+                "VPN is not working"
+        );
+
+        when(
+                olderTicket.getPriority()
+        ).thenReturn(
+                TicketPriority.MEDIUM
+        );
+
+        when(
+                olderTicket.getStatus()
+        ).thenReturn(
+                TicketStatus.OPEN
+        );
+
+        when(
+                olderTicket.getCreatedAt()
+        ).thenReturn(
+                olderCreatedAt
+        );
+
+        when(
+                olderTicket.getUpdatedAt()
+        ).thenReturn(
+                olderCreatedAt
+        );
+
+        when(
+                ticketRepository
+                        .findByCreatedByUser_Id(
+                                eq(userId),
+                                any(Pageable.class)
+                        )
         ).thenReturn(
                 new PageImpl<>(
                         List.of(
                                 newestTicket,
                                 olderTicket
                         ),
-                        org.springframework.data.domain.PageRequest.of(
-                                0,
-                                10
-                        ),
+                        org.springframework.data.domain
+                                .PageRequest.of(
+                                        0,
+                                        10
+                                ),
                         2
                 )
         );
 
         PageResponse<TicketSummaryResponse> response =
-                ticketService.getMyTickets(
-                        userId,
-                        0,
-                        10
-                );
+                ticketService
+                        .getMyTickets(
+                                userId,
+                                0,
+                                10
+                        );
 
         assertEquals(
                 2,
@@ -437,13 +614,16 @@ class TicketServiceTest {
         );
 
         ArgumentCaptor<Pageable> pageableCaptor =
-                ArgumentCaptor.forClass(Pageable.class);
-
-        verify(ticketRepository)
-                .findByCreatedByUser_Id(
-                        eq(userId),
-                        pageableCaptor.capture()
+                ArgumentCaptor.forClass(
+                        Pageable.class
                 );
+
+        verify(
+                ticketRepository
+        ).findByCreatedByUser_Id(
+                eq(userId),
+                pageableCaptor.capture()
+        );
 
         Pageable capturedPageable =
                 pageableCaptor.getValue();
@@ -459,19 +639,25 @@ class TicketServiceTest {
         );
 
         assertEquals(
-                org.springframework.data.domain.Sort.Direction.DESC,
+                org.springframework.data.domain
+                        .Sort.Direction.DESC,
                 capturedPageable
                         .getSort()
-                        .getOrderFor("createdAt")
+                        .getOrderFor(
+                                "createdAt"
+                        )
                         .getDirection()
         );
     }
 
     @Test
     void getMyTicketShouldReturnOwnedTicketAndNormalizeTicketNumber() {
-        Ticket ticket = mock(Ticket.class);
 
-        UUID ticketId = UUID.randomUUID();
+        Ticket ticket =
+                mock(Ticket.class);
+
+        UUID ticketId =
+                UUID.randomUUID();
 
         OffsetDateTime createdAt =
                 OffsetDateTime.parse(
@@ -484,53 +670,90 @@ class TicketServiceTest {
                                 "FD-000002",
                                 userId
                         )
-        ).thenReturn(Optional.of(ticket));
+        ).thenReturn(
+                Optional.of(
+                        ticket
+                )
+        );
 
-        when(ticket.getId())
-                .thenReturn(ticketId);
+        when(
+                ticket.getId()
+        ).thenReturn(
+                ticketId
+        );
 
-        when(ticket.getTicketNumber())
-                .thenReturn("FD-000002");
+        when(
+                ticket.getTicketNumber()
+        ).thenReturn(
+                "FD-000002"
+        );
 
-        when(ticket.getType())
-                .thenReturn(TicketType.SERVICE_REQUEST);
+        when(
+                ticket.getType()
+        ).thenReturn(
+                TicketType.SERVICE_REQUEST
+        );
 
-        when(ticket.getTitle())
-                .thenReturn(
-                        "Request GitHub repository access"
-                );
+        when(
+                ticket.getTitle()
+        ).thenReturn(
+                "Request GitHub repository access"
+        );
 
-        when(ticket.getDescription())
-                .thenReturn(
-                        "I need access to the development repository."
-                );
+        when(
+                ticket.getDescription()
+        ).thenReturn(
+                "I need access to the development repository."
+        );
 
-        when(ticket.getPriority())
-                .thenReturn(TicketPriority.MEDIUM);
+        when(
+                ticket.getPriority()
+        ).thenReturn(
+                TicketPriority.MEDIUM
+        );
 
-        when(ticket.getStatus())
-                .thenReturn(TicketStatus.OPEN);
+        when(
+                ticket.getStatus()
+        ).thenReturn(
+                TicketStatus.OPEN
+        );
 
-        when(ticket.getCreatedByUser())
-                .thenReturn(creator);
+        when(
+                ticket.getCreatedByUser()
+        ).thenReturn(
+                creator
+        );
 
-        when(creator.getId())
-                .thenReturn(userId);
+        when(
+                creator.getId()
+        ).thenReturn(
+                userId
+        );
 
-        when(creator.getEmail())
-                .thenReturn("employee@example.com");
+        when(
+                creator.getEmail()
+        ).thenReturn(
+                "employee@example.com"
+        );
 
-        when(ticket.getCreatedAt())
-                .thenReturn(createdAt);
+        when(
+                ticket.getCreatedAt()
+        ).thenReturn(
+                createdAt
+        );
 
-        when(ticket.getUpdatedAt())
-                .thenReturn(createdAt);
+        when(
+                ticket.getUpdatedAt()
+        ).thenReturn(
+                createdAt
+        );
 
         TicketResponse response =
-                ticketService.getMyTicket(
-                        userId,
-                        "fd-000002"
-                );
+                ticketService
+                        .getMyTicket(
+                                userId,
+                                "fd-000002"
+                        );
 
         assertEquals(
                 "FD-000002",
@@ -547,22 +770,26 @@ class TicketServiceTest {
                 response.createdByUserId()
         );
 
-        verify(ticketRepository)
-                .findByTicketNumberAndCreatedByUser_Id(
-                        "FD-000002",
-                        userId
-                );
+        verify(
+                ticketRepository
+        ).findByTicketNumberAndCreatedByUser_Id(
+                "FD-000002",
+                userId
+        );
     }
 
     @Test
     void getMyTicketShouldRejectBlankTicketNumber() {
+
         ResponseStatusException exception =
                 assertThrows(
                         ResponseStatusException.class,
-                        () -> ticketService.getMyTicket(
-                                userId,
-                                "   "
-                        )
+                        () ->
+                                ticketService
+                                        .getMyTicket(
+                                                userId,
+                                                "   "
+                                        )
                 );
 
         assertEquals(
@@ -578,21 +805,26 @@ class TicketServiceTest {
 
     @Test
     void getMyTicketShouldReturnNotFoundWhenTicketIsNotOwned() {
+
         when(
                 ticketRepository
                         .findByTicketNumberAndCreatedByUser_Id(
                                 "FD-000002",
                                 userId
                         )
-        ).thenReturn(Optional.empty());
+        ).thenReturn(
+                Optional.empty()
+        );
 
         ResponseStatusException exception =
                 assertThrows(
                         ResponseStatusException.class,
-                        () -> ticketService.getMyTicket(
-                                userId,
-                                "FD-000002"
-                        )
+                        () ->
+                                ticketService
+                                        .getMyTicket(
+                                                userId,
+                                                "FD-000002"
+                                        )
                 );
 
         assertEquals(
@@ -600,20 +832,28 @@ class TicketServiceTest {
                 exception.getStatusCode()
         );
 
-        verify(ticketRepository)
-                .findByTicketNumberAndCreatedByUser_Id(
-                        "FD-000002",
-                        userId
-                );
+        verify(
+                ticketRepository
+        ).findByTicketNumberAndCreatedByUser_Id(
+                "FD-000002",
+                userId
+        );
     }
 
     @Test
     void getSupportQueueShouldReturnOpenTicketsOldestFirst() {
-        Ticket olderTicket = mock(Ticket.class);
-        Ticket newerTicket = mock(Ticket.class);
 
-        UUID olderTicketId = UUID.randomUUID();
-        UUID newerTicketId = UUID.randomUUID();
+        Ticket olderTicket =
+                mock(Ticket.class);
+
+        Ticket newerTicket =
+                mock(Ticket.class);
+
+        UUID olderTicketId =
+                UUID.randomUUID();
+
+        UUID newerTicketId =
+                UUID.randomUUID();
 
         OffsetDateTime olderCreatedAt =
                 OffsetDateTime.parse(
@@ -625,80 +865,129 @@ class TicketServiceTest {
                         "2026-09-12T05:20:47Z"
                 );
 
-        when(olderTicket.getId())
-                .thenReturn(olderTicketId);
-
-        when(olderTicket.getTicketNumber())
-                .thenReturn("FD-000001");
-
-        when(olderTicket.getType())
-                .thenReturn(TicketType.INCIDENT);
-
-        when(olderTicket.getTitle())
-                .thenReturn("VPN is not working");
-
-        when(olderTicket.getPriority())
-                .thenReturn(TicketPriority.MEDIUM);
-
-        when(olderTicket.getStatus())
-                .thenReturn(TicketStatus.OPEN);
-
-        when(olderTicket.getCreatedAt())
-                .thenReturn(olderCreatedAt);
-
-        when(olderTicket.getUpdatedAt())
-                .thenReturn(olderCreatedAt);
-
-        when(newerTicket.getId())
-                .thenReturn(newerTicketId);
-
-        when(newerTicket.getTicketNumber())
-                .thenReturn("FD-000002");
-
-        when(newerTicket.getType())
-                .thenReturn(TicketType.SERVICE_REQUEST);
-
-        when(newerTicket.getTitle())
-                .thenReturn(
-                        "Request GitHub repository access"
-                );
-
-        when(newerTicket.getPriority())
-                .thenReturn(TicketPriority.MEDIUM);
-
-        when(newerTicket.getStatus())
-                .thenReturn(TicketStatus.OPEN);
-
-        when(newerTicket.getCreatedAt())
-                .thenReturn(newerCreatedAt);
-
-        when(newerTicket.getUpdatedAt())
-                .thenReturn(newerCreatedAt);
+        when(
+                olderTicket.getId()
+        ).thenReturn(
+                olderTicketId
+        );
 
         when(
-                ticketRepository.findByStatus(
-                        eq(TicketStatus.OPEN),
-                        any(Pageable.class)
-                )
+                olderTicket.getTicketNumber()
+        ).thenReturn(
+                "FD-000001"
+        );
+
+        when(
+                olderTicket.getType()
+        ).thenReturn(
+                TicketType.INCIDENT
+        );
+
+        when(
+                olderTicket.getTitle()
+        ).thenReturn(
+                "VPN is not working"
+        );
+
+        when(
+                olderTicket.getPriority()
+        ).thenReturn(
+                TicketPriority.MEDIUM
+        );
+
+        when(
+                olderTicket.getStatus()
+        ).thenReturn(
+                TicketStatus.OPEN
+        );
+
+        when(
+                olderTicket.getCreatedAt()
+        ).thenReturn(
+                olderCreatedAt
+        );
+
+        when(
+                olderTicket.getUpdatedAt()
+        ).thenReturn(
+                olderCreatedAt
+        );
+
+        when(
+                newerTicket.getId()
+        ).thenReturn(
+                newerTicketId
+        );
+
+        when(
+                newerTicket.getTicketNumber()
+        ).thenReturn(
+                "FD-000002"
+        );
+
+        when(
+                newerTicket.getType()
+        ).thenReturn(
+                TicketType.SERVICE_REQUEST
+        );
+
+        when(
+                newerTicket.getTitle()
+        ).thenReturn(
+                "Request GitHub repository access"
+        );
+
+        when(
+                newerTicket.getPriority()
+        ).thenReturn(
+                TicketPriority.MEDIUM
+        );
+
+        when(
+                newerTicket.getStatus()
+        ).thenReturn(
+                TicketStatus.OPEN
+        );
+
+        when(
+                newerTicket.getCreatedAt()
+        ).thenReturn(
+                newerCreatedAt
+        );
+
+        when(
+                newerTicket.getUpdatedAt()
+        ).thenReturn(
+                newerCreatedAt
+        );
+
+        when(
+                ticketRepository
+                        .findByStatus(
+                                eq(TicketStatus.OPEN),
+                                any(Pageable.class)
+                        )
         ).thenReturn(
                 new PageImpl<>(
                         List.of(
                                 olderTicket,
                                 newerTicket
                         ),
-                        org.springframework.data.domain.PageRequest.of(
-                                0,
-                                10
-                        ),
+                        org.springframework.data.domain
+                                .PageRequest.of(
+                                        0,
+                                        10
+                                ),
                         2
                 )
         );
 
         PageResponse<TicketSummaryResponse> response =
-                ticketService.getSupportQueue(
-                        0,
-                        10
-                );
+                ticketService
+                        .getSupportQueue(
+                                0,
+                                10
+                        );
 
         assertEquals(
                 2,
@@ -720,13 +1009,16 @@ class TicketServiceTest {
         );
 
         ArgumentCaptor<Pageable> pageableCaptor =
-                ArgumentCaptor.forClass(Pageable.class);
-
-        verify(ticketRepository)
-                .findByStatus(
-                        eq(TicketStatus.OPEN),
-                        pageableCaptor.capture()
+                ArgumentCaptor.forClass(
+                        Pageable.class
                 );
+
+        verify(
+                ticketRepository
+        ).findByStatus(
+                eq(TicketStatus.OPEN),
+                pageableCaptor.capture()
+        );
 
         Pageable capturedPageable =
                 pageableCaptor.getValue();
@@ -742,84 +1034,125 @@ class TicketServiceTest {
         );
 
         assertEquals(
-                org.springframework.data.domain.Sort.Direction.ASC,
+                org.springframework.data.domain
+                        .Sort.Direction.ASC,
                 capturedPageable
                         .getSort()
-                        .getOrderFor("createdAt")
+                        .getOrderFor(
+                                "createdAt"
+                        )
                         .getDirection()
         );
     }
 
     @Test
     void claimTicketShouldAssignOpenTicketToSupportEngineer() {
-        User engineer = mock(User.class);
-        Role supportEngineerRole = mock(Role.class);
 
-        UUID engineerId = UUID.randomUUID();
-        UUID assignmentId = UUID.randomUUID();
+        User engineer =
+                mock(User.class);
+
+        Role supportEngineerRole =
+                mock(Role.class);
+
+        UUID engineerId =
+                UUID.randomUUID();
+
+        UUID assignmentId =
+                UUID.randomUUID();
 
         OffsetDateTime assignedAt =
                 OffsetDateTime.parse(
                         "2026-09-14T14:00:00Z"
                 );
 
-        when(userRepository.findById(engineerId))
-                .thenReturn(Optional.of(engineer));
-
-        when(engineer.getRoles())
-                .thenReturn(
-                        Set.of(supportEngineerRole)
-                );
-
-        when(supportEngineerRole.getCode())
-                .thenReturn(
-                        RoleCode.SUPPORT_ENGINEER
-                );
-
-        when(engineer.getId())
-                .thenReturn(engineerId);
-
-        when(engineer.getEmail())
-                .thenReturn(
-                        "engineer@example.com"
-                );
-
-        Ticket ticket = new Ticket(
-                "FD-000001",
-                TicketType.INCIDENT,
-                "VPN is not working",
-                "Cannot connect to company VPN.",
-                creator
+        when(
+                userRepository.findById(
+                        engineerId
+                )
+        ).thenReturn(
+                Optional.of(
+                        engineer
+                )
         );
 
         when(
-                ticketRepository.findByTicketNumberForUpdate(
-                        "FD-000001"
-                )
+                engineer.getRoles()
         ).thenReturn(
-                Optional.of(ticket)
+                Set.of(
+                        supportEngineerRole
+                )
+        );
+
+        when(
+                supportEngineerRole.getCode()
+        ).thenReturn(
+                RoleCode.SUPPORT_ENGINEER
+        );
+
+        when(
+                engineer.getId()
+        ).thenReturn(
+                engineerId
+        );
+
+        when(
+                engineer.getEmail()
+        ).thenReturn(
+                "engineer@example.com"
+        );
+
+        Ticket ticket =
+                new Ticket(
+                        "FD-000001",
+                        TicketType.INCIDENT,
+                        "VPN is not working",
+                        "Cannot connect to company VPN.",
+                        creator
+                );
+
+        when(
+                ticketRepository
+                        .findByTicketNumberForUpdate(
+                                "FD-000001"
+                        )
+        ).thenReturn(
+                Optional.of(
+                        ticket
+                )
         );
 
         TicketAssignment savedAssignment =
                 mock(TicketAssignment.class);
 
-        when(savedAssignment.getId())
-                .thenReturn(assignmentId);
-
-        when(savedAssignment.getAssignedAt())
-                .thenReturn(assignedAt);
+        when(
+                savedAssignment.getId()
+        ).thenReturn(
+                assignmentId
+        );
 
         when(
-                ticketAssignmentRepository.saveAndFlush(
-                        any(TicketAssignment.class)
-                )
-        ).thenReturn(savedAssignment);
+                savedAssignment.getAssignedAt()
+        ).thenReturn(
+                assignedAt
+        );
+
+        when(
+                ticketAssignmentRepository
+                        .saveAndFlush(
+                                any(
+                                        TicketAssignment.class
+                                )
+                        )
+        ).thenReturn(
+                savedAssignment
+        );
 
         ClaimTicketResponse response =
-                ticketService.claimTicket(
-                        engineerId,
-                        "fd-000001"
-                );
+                ticketService
+                        .claimTicket(
+                                engineerId,
+                                "fd-000001"
+                        );
 
         assertEquals(
                 "FD-000001",
@@ -856,20 +1189,23 @@ class TicketServiceTest {
                 ticket.getStatus()
         );
 
-        verify(ticketRepository)
-                .findByTicketNumberForUpdate(
-                        "FD-000001"
-                );
+        verify(
+                ticketRepository
+        ).findByTicketNumberForUpdate(
+                "FD-000001"
+        );
 
-        ArgumentCaptor<TicketAssignment> assignmentCaptor =
+        ArgumentCaptor<TicketAssignment>
+                assignmentCaptor =
                 ArgumentCaptor.forClass(
                         TicketAssignment.class
                 );
 
-        verify(ticketAssignmentRepository)
-                .saveAndFlush(
-                        assignmentCaptor.capture()
-                );
+        verify(
+                ticketAssignmentRepository
+        ).saveAndFlush(
+                assignmentCaptor.capture()
+        );
 
         TicketAssignment createdAssignment =
                 assignmentCaptor.getValue();
@@ -883,47 +1219,98 @@ class TicketServiceTest {
                 engineer,
                 createdAssignment.getAssignedToUser()
         );
+
+        verify(
+                auditService
+        ).recordUserAction(
+                eq(engineer),
+                eq(
+                        AuditAction
+                                .TICKET_CLAIMED
+                ),
+                eq(
+                        AuditTargetType.TICKET
+                ),
+                isNull(),
+                eq(
+                        "FD-000001"
+                ),
+                eq(
+                        Map.of(
+                                "fromStatus",
+                                "OPEN",
+                                "toStatus",
+                                "ASSIGNED"
+                        )
+                )
+        );
     }
 
     @Test
     void claimTicketShouldReturnConflictWhenTicketIsNotOpen() {
-        User engineer = mock(User.class);
-        Role supportEngineerRole = mock(Role.class);
-        Ticket ticket = mock(Ticket.class);
 
-        UUID engineerId = UUID.randomUUID();
+        User engineer =
+                mock(User.class);
 
-        when(userRepository.findById(engineerId))
-                .thenReturn(Optional.of(engineer));
+        Role supportEngineerRole =
+                mock(Role.class);
 
-        when(engineer.getRoles())
-                .thenReturn(
-                        Set.of(supportEngineerRole)
-                );
+        Ticket ticket =
+                mock(Ticket.class);
 
-        when(supportEngineerRole.getCode())
-                .thenReturn(
-                        RoleCode.SUPPORT_ENGINEER
-                );
+        UUID engineerId =
+                UUID.randomUUID();
 
         when(
-                ticketRepository.findByTicketNumberForUpdate(
-                        "FD-000002"
+                userRepository.findById(
+                        engineerId
                 )
         ).thenReturn(
-                Optional.of(ticket)
+                Optional.of(
+                        engineer
+                )
         );
 
-        when(ticket.getStatus())
-                .thenReturn(TicketStatus.ASSIGNED);
+        when(
+                engineer.getRoles()
+        ).thenReturn(
+                Set.of(
+                        supportEngineerRole
+                )
+        );
+
+        when(
+                supportEngineerRole.getCode()
+        ).thenReturn(
+                RoleCode.SUPPORT_ENGINEER
+        );
+
+        when(
+                ticketRepository
+                        .findByTicketNumberForUpdate(
+                                "FD-000002"
+                        )
+        ).thenReturn(
+                Optional.of(
+                        ticket
+                )
+        );
+
+        when(
+                ticket.getStatus()
+        ).thenReturn(
+                TicketStatus.ASSIGNED
+        );
 
         ResponseStatusException exception =
                 assertThrows(
                         ResponseStatusException.class,
-                        () -> ticketService.claimTicket(
-                                engineerId,
-                                "fd-000002"
-                        )
+                        () ->
+                                ticketService
+                                        .claimTicket(
+                                                engineerId,
+                                                "fd-000002"
+                                        )
                 );
 
         assertEquals(
@@ -931,10 +1318,11 @@ class TicketServiceTest {
                 exception.getStatusCode()
         );
 
-        verify(ticketRepository)
-                .findByTicketNumberForUpdate(
-                        "FD-000002"
-                );
+        verify(
+                ticketRepository
+        ).findByTicketNumberForUpdate(
+                "FD-000002"
+        );
 
         verify(
                 ticketAssignmentRepository,
@@ -942,33 +1330,57 @@ class TicketServiceTest {
         ).saveAndFlush(
                 any(TicketAssignment.class)
         );
+
+        verifyNoInteractions(
+                auditService
+        );
     }
 
     @Test
     void claimTicketShouldReturnForbiddenForNonSupportUser() {
-        User employee = mock(User.class);
-        Role employeeRole = mock(Role.class);
 
-        UUID employeeId = UUID.randomUUID();
+        User employee =
+                mock(User.class);
 
-        when(userRepository.findById(employeeId))
-                .thenReturn(Optional.of(employee));
+        Role employeeRole =
+                mock(Role.class);
 
-        when(employee.getRoles())
-                .thenReturn(
-                        Set.of(employeeRole)
-                );
+        UUID employeeId =
+                UUID.randomUUID();
 
-        when(employeeRole.getCode())
-                .thenReturn(RoleCode.EMPLOYEE);
+        when(
+                userRepository.findById(
+                        employeeId
+                )
+        ).thenReturn(
+                Optional.of(
+                        employee
+                )
+        );
+
+        when(
+                employee.getRoles()
+        ).thenReturn(
+                Set.of(
+                        employeeRole
+                )
+        );
+
+        when(
+                employeeRole.getCode()
+        ).thenReturn(
+                RoleCode.EMPLOYEE
+        );
 
         ResponseStatusException exception =
                 assertThrows(
                         ResponseStatusException.class,
-                        () -> ticketService.claimTicket(
-                                employeeId,
-                                "FD-000001"
-                        )
+                        () ->
+                                ticketService
+                                        .claimTicket(
+                                                employeeId,
+                                                "FD-000001"
+                                        )
                 );
 
         assertEquals(
@@ -976,8 +1388,11 @@ class TicketServiceTest {
                 exception.getStatusCode()
         );
 
-        verify(userRepository)
-                .findById(employeeId);
+        verify(
+                userRepository
+        ).findById(
+                employeeId
+        );
 
         verify(
                 ticketRepository,
@@ -991,6 +1406,10 @@ class TicketServiceTest {
                 never()
         ).saveAndFlush(
                 any(TicketAssignment.class)
+        );
+
+        verifyNoInteractions(
+                auditService
         );
     }
 }
