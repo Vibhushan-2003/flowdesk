@@ -9,6 +9,7 @@ import './App.css'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { RoleProtectedRoute } from './components/RoleProtectedRoute'
 
+import { AuditTrailPage } from './pages/AuditTrailPage'
 import { CreateTicketPage } from './pages/CreateTicketPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
@@ -60,7 +61,9 @@ function App() {
 
         <Route
           path="/support/tickets/:ticketNumber"
-          element={<SupportTicketDetailsPage />}
+          element={
+            <SupportTicketDetailsPage />
+          }
         />
 
         <Route
@@ -75,7 +78,26 @@ function App() {
         >
           <Route
             path="/sla/dashboard"
-            element={<SlaDashboardPage />}
+            element={
+              <SlaDashboardPage />
+            }
+          />
+        </Route>
+
+        <Route
+          element={
+            <RoleProtectedRoute
+              allowedRoles={[
+                'ADMIN',
+              ]}
+            />
+          }
+        >
+          <Route
+            path="/audit"
+            element={
+              <AuditTrailPage />
+            }
           />
         </Route>
       </Route>

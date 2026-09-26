@@ -23,6 +23,11 @@ export function DashboardPage() {
         role === 'ADMIN',
     ) ?? false
 
+  const isAdmin =
+    user?.roles.includes(
+      'ADMIN',
+    ) ?? false
+
   function handleSignOut() {
     signOut()
 
@@ -37,7 +42,9 @@ export function DashboardPage() {
             FlowDesk
           </p>
 
-          <h1>Dashboard</h1>
+          <h1>
+            Dashboard
+          </h1>
 
           <p className="dashboard-subtitle">
             Manage your support requests and
@@ -63,7 +70,9 @@ export function DashboardPage() {
             Employee workspace
           </p>
 
-          <h2>IT support</h2>
+          <h2>
+            IT support
+          </h2>
 
           <p>
             Report an incident, request a service,
@@ -75,7 +84,9 @@ export function DashboardPage() {
             <button
               type="button"
               onClick={() =>
-                navigate('/tickets/new')
+                navigate(
+                  '/tickets/new',
+                )
               }
             >
               Create ticket
@@ -85,7 +96,9 @@ export function DashboardPage() {
               type="button"
               className="dashboard-secondary-button"
               onClick={() =>
-                navigate('/tickets')
+                navigate(
+                  '/tickets',
+                )
               }
             >
               My tickets
@@ -99,7 +112,9 @@ export function DashboardPage() {
               Support workspace
             </p>
 
-            <h2>Engineer operations</h2>
+            <h2>
+              Engineer operations
+            </h2>
 
             <p>
               Claim incoming tickets and manage the
@@ -140,7 +155,9 @@ export function DashboardPage() {
               Operations workspace
             </p>
 
-            <h2>SLA operations</h2>
+            <h2>
+              SLA operations
+            </h2>
 
             <p>
               Review active SLA exposure,
@@ -162,6 +179,37 @@ export function DashboardPage() {
             </div>
           </article>
         )}
+
+        {isAdmin && (
+          <article className="dashboard-workspace-card">
+            <p className="dashboard-card-label">
+              Governance workspace
+            </p>
+
+            <h2>
+              Audit trail
+            </h2>
+
+            <p>
+              Review immutable records of important
+              user actions, system events, ticket
+              changes, and SLA breaches.
+            </p>
+
+            <div className="dashboard-action-buttons">
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    '/audit',
+                  )
+                }
+              >
+                Open audit trail
+              </button>
+            </div>
+          </article>
+        )}
       </section>
 
       <section className="user-card">
@@ -171,7 +219,9 @@ export function DashboardPage() {
               Account
             </p>
 
-            <h2>Your profile</h2>
+            <h2>
+              Your profile
+            </h2>
           </div>
 
           <span className="account-status">
@@ -181,7 +231,9 @@ export function DashboardPage() {
 
         <div className="account-details-grid">
           <div>
-            <span>Email</span>
+            <span>
+              Email
+            </span>
 
             <strong>
               {user?.email}
@@ -189,7 +241,9 @@ export function DashboardPage() {
           </div>
 
           <div>
-            <span>User ID</span>
+            <span>
+              User ID
+            </span>
 
             <strong>
               {user?.userId}
@@ -197,10 +251,14 @@ export function DashboardPage() {
           </div>
 
           <div>
-            <span>Roles</span>
+            <span>
+              Roles
+            </span>
 
             <strong>
-              {user?.roles.join(', ')}
+              {user?.roles.join(
+                ', ',
+              )}
             </strong>
           </div>
         </div>
