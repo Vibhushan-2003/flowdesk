@@ -2,6 +2,7 @@ package com.flowdesk.ticket.domain;
 
 import com.flowdesk.sla.domain.SlaPolicy;
 import com.flowdesk.sla.domain.SlaStatus;
+
 import com.flowdesk.user.domain.User;
 
 import org.junit.jupiter.api.Test;
@@ -172,7 +173,7 @@ class TicketTest {
     @Test
     void responseSlaShouldBeMetWhenSupportStartsBeforeDeadline() {
         Ticket ticket =
-                createAssignedTicket();
+                createTicket();
 
         OffsetDateTime startedAt =
                 OffsetDateTime.now()
@@ -182,6 +183,8 @@ class TicketTest {
                 createMediumSlaPolicy(),
                 startedAt
         );
+
+        ticket.markAssigned();
 
         ticket.transitionSupportStatus(
                 TicketStatus.IN_PROGRESS
@@ -198,7 +201,7 @@ class TicketTest {
     @Test
     void responseSlaShouldBeBreachedWhenSupportStartsAfterDeadline() {
         Ticket ticket =
-                createAssignedTicket();
+                createTicket();
 
         OffsetDateTime startedAt =
                 OffsetDateTime.now()
@@ -208,6 +211,8 @@ class TicketTest {
                 createMediumSlaPolicy(),
                 startedAt
         );
+
+        ticket.markAssigned();
 
         ticket.transitionSupportStatus(
                 TicketStatus.IN_PROGRESS

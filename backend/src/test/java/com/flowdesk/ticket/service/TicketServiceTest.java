@@ -66,6 +66,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.flowdesk.approval.repository.ApprovalRequestRepository;
+
 @ExtendWith(MockitoExtension.class)
 class TicketServiceTest {
 
@@ -95,16 +97,21 @@ class TicketServiceTest {
 
     private UUID userId;
 
+    @Mock
+private ApprovalRequestRepository
+        approvalRequestRepository;
+
     @BeforeEach
     void setUp() {
         ticketService =
-                new TicketService(
-                        ticketRepository,
-                        ticketAssignmentRepository,
-                        userRepository,
-                        slaPolicyRepository,
-                        auditService
-                );
+        new TicketService(
+                ticketRepository,
+                ticketAssignmentRepository,
+                userRepository,
+                slaPolicyRepository,
+                approvalRequestRepository,
+                auditService
+        );
 
         userId =
                 UUID.randomUUID();

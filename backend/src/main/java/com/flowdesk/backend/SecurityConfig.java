@@ -172,6 +172,14 @@ public class SecurityConfig {
                                 "SUPPORT_ENGINEER"
                         )
 
+                        .requestMatchers(
+                        "/api/approvals/**"
+                        )
+                        .hasAnyRole(
+                                "TEAM_LEAD",
+                                "ADMIN"
+                        )
+
                         // Everything else requires JWT
                         .anyRequest()
                         .authenticated()

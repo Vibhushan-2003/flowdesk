@@ -2,6 +2,7 @@ package com.flowdesk.ticket.domain;
 
 import com.flowdesk.sla.domain.SlaPolicy;
 import com.flowdesk.sla.domain.SlaStatus;
+
 import com.flowdesk.user.domain.User;
 
 import jakarta.persistence.Column;
@@ -18,6 +19,7 @@ import jakarta.persistence.Table;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+
 import java.util.Objects;
 import java.util.UUID;
 
@@ -40,18 +42,30 @@ public class Ticket {
     @Column(nullable = false, length = 30)
     private TicketType type;
 
-    @Column(nullable = false, length = 200)
+    @Column(
+            nullable = false,
+            length = 200
+    )
     private String title;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(
+            nullable = false,
+            columnDefinition = "TEXT"
+    )
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(
+            nullable = false,
+            length = 20
+    )
     private TicketPriority priority;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(
+            nullable = false,
+            length = 30
+    )
     private TicketStatus status;
 
     @ManyToOne(
@@ -103,27 +117,47 @@ public class Ticket {
             String description,
             User createdByUser
     ) {
-        this.ticketNumber = ticketNumber;
-        this.type = type;
-        this.title = title;
-        this.description = description;
-        this.createdByUser = createdByUser;
-        this.priority = TicketPriority.MEDIUM;
-        this.status = TicketStatus.OPEN;
+        this.ticketNumber =
+                ticketNumber;
+
+        this.type =
+                type;
+
+        this.title =
+                title;
+
+        this.description =
+                description;
+
+        this.createdByUser =
+                createdByUser;
+
+        this.priority =
+                TicketPriority.MEDIUM;
+
+        this.status =
+                initialStatusFor(
+                        type
+                );
     }
 
     @PrePersist
     void onCreate() {
         if (id == null) {
-            id = UUID.randomUUID();
+            id =
+                    UUID.randomUUID();
         }
 
         if (priority == null) {
-            priority = TicketPriority.MEDIUM;
+            priority =
+                    TicketPriority.MEDIUM;
         }
 
         if (status == null) {
-            status = TicketStatus.OPEN;
+            status =
+                    initialStatusFor(
+                            type
+                    );
         }
 
         OffsetDateTime now =
@@ -131,8 +165,11 @@ public class Ticket {
                         ZoneOffset.UTC
                 );
 
-        createdAt = now;
-        updatedAt = now;
+        createdAt =
+                now;
+
+        updatedAt =
+                now;
     }
 
     @PreUpdate
@@ -141,6 +178,51 @@ public class Ticket {
                 OffsetDateTime.now(
                         ZoneOffset.UTC
                 );
+    }
+
+    private TicketStatus initialStatusFor(
+            TicketType ticketType
+    ) {
+        if (ticketType
+                == TicketType.SERVICE_REQUEST) {
+
+            return TicketStatus
+                    .PENDING_APPROVAL;
+        }
+
+        return TicketStatus.OPEN;
+    }
+
+    public void approveServiceRequest() {
+        validatePendingServiceRequest();
+
+        status =
+                TicketStatus.OPEN;
+    }
+
+    public void rejectServiceRequest() {
+        validatePendingServiceRequest();
+
+        status =
+                TicketStatus.CANCELLED;
+    }
+
+    private void validatePendingServiceRequest() {
+        if (type
+                != TicketType.SERVICE_REQUEST) {
+
+            throw new IllegalStateException(
+                    "Only service requests use the approval workflow"
+            );
+        }
+
+        if (status
+                != TicketStatus.PENDING_APPROVAL) {
+
+            throw new IllegalStateException(
+                    "Service request is not pending approval"
+            );
+        }
     }
 
     public void applySlaPolicy(
@@ -156,6 +238,14 @@ public class Ticket {
                 slaStartedAt,
                 "SLA start time is required"
         );
+
+        if (status
+                != TicketStatus.OPEN) {
+
+            throw new IllegalStateException(
+                    "SLA can only start when ticket is open"
+            );
+        }
 
         if (this.slaPolicy != null
                 || responseDueAt != null
@@ -205,13 +295,16 @@ public class Ticket {
     }
 
     public void markAssigned() {
-        if (status != TicketStatus.OPEN) {
+        if (status
+                != TicketStatus.OPEN) {
+
             throw new IllegalStateException(
                     "Only open tickets can be assigned"
             );
         }
 
-        status = TicketStatus.ASSIGNED;
+        status =
+                TicketStatus.ASSIGNED;
     }
 
     public void transitionSupportStatus(
@@ -225,6 +318,7 @@ public class Ticket {
 
         boolean validTransition =
                 switch (status) {
+
                     case ASSIGNED ->
                             newStatus
                                     == TicketStatus.IN_PROGRESS;
@@ -239,7 +333,8 @@ public class Ticket {
                             newStatus
                                     == TicketStatus.IN_PROGRESS;
 
-                    default -> false;
+                    default ->
+                            false;
                 };
 
         if (!validTransition) {
@@ -251,7 +346,8 @@ public class Ticket {
             );
         }
 
-        status = newStatus;
+        status =
+                newStatus;
 
         OffsetDateTime now =
                 OffsetDateTime.now(
@@ -262,13 +358,15 @@ public class Ticket {
                 == TicketStatus.IN_PROGRESS
                 && firstRespondedAt == null) {
 
-            firstRespondedAt = now;
+            firstRespondedAt =
+                    now;
         }
 
         if (newStatus
                 == TicketStatus.RESOLVED) {
 
-            resolvedAt = now;
+            resolvedAt =
+                    now;
         }
     }
 
@@ -278,21 +376,23 @@ public class Ticket {
         boolean responseAlreadyOccurredButTimestampUnknown =
                 firstRespondedAt == null
                         && switch (status) {
-                            case IN_PROGRESS,
-                                    WAITING_FOR_USER,
-                                    RESOLVED,
-                                    CLOSED,
-                                    CANCELLED -> true;
 
-                            default -> false;
-                        };
+                    case IN_PROGRESS,
+                            WAITING_FOR_USER,
+                            RESOLVED,
+                            CLOSED,
+                            CANCELLED ->
+                            true;
+
+                    default ->
+                            false;
+                };
 
         return evaluateSla(
                 responseDueAt,
                 firstRespondedAt,
                 evaluatedAt,
-                responseAlreadyOccurredButTimestampUnknown,
-                "Response SLA deadline is not configured"
+                responseAlreadyOccurredButTimestampUnknown
         );
     }
 
@@ -302,19 +402,21 @@ public class Ticket {
         boolean resolutionAlreadyOccurredButTimestampUnknown =
                 resolvedAt == null
                         && switch (status) {
-                            case RESOLVED,
-                                    CLOSED,
-                                    CANCELLED -> true;
 
-                            default -> false;
-                        };
+                    case RESOLVED,
+                            CLOSED,
+                            CANCELLED ->
+                            true;
+
+                    default ->
+                            false;
+                };
 
         return evaluateSla(
                 resolutionDueAt,
                 resolvedAt,
                 evaluatedAt,
-                resolutionAlreadyOccurredButTimestampUnknown,
-                "Resolution SLA deadline is not configured"
+                resolutionAlreadyOccurredButTimestampUnknown
         );
     }
 
@@ -322,8 +424,7 @@ public class Ticket {
             OffsetDateTime dueAt,
             OffsetDateTime completedAt,
             OffsetDateTime evaluatedAt,
-            boolean completionTimestampUnknown,
-            String missingDeadlineMessage
+            boolean completionTimestampUnknown
     ) {
         Objects.requireNonNull(
                 evaluatedAt,
@@ -331,13 +432,14 @@ public class Ticket {
         );
 
         if (dueAt == null) {
-            throw new IllegalStateException(
-                    missingDeadlineMessage
-            );
+            return SlaStatus.UNKNOWN;
         }
 
         if (completedAt != null) {
-            return completedAt.isAfter(dueAt)
+            return completedAt
+                    .isAfter(
+                            dueAt
+                    )
                     ? SlaStatus.BREACHED
                     : SlaStatus.MET;
         }
@@ -346,7 +448,10 @@ public class Ticket {
             return SlaStatus.UNKNOWN;
         }
 
-        return evaluatedAt.isAfter(dueAt)
+        return evaluatedAt
+                .isAfter(
+                        dueAt
+                )
                 ? SlaStatus.BREACHED
                 : SlaStatus.PENDING;
     }
