@@ -2,10 +2,12 @@ import {
   useEffect,
   useState,
 } from 'react'
+
 import { useNavigate } from 'react-router-dom'
 
 import { getMyTickets } from '../api/ticket'
 import { useAuth } from '../auth/useAuth'
+
 import type {
   PageResponse,
   SlaStatus,
@@ -14,12 +16,34 @@ import type {
 
 const PAGE_SIZE = 10
 
-function formatLabel(value: string) {
-  return value.replaceAll('_', ' ')
+function formatLabel(
+  value: string,
+) {
+  return value.replaceAll(
+    '_',
+    ' ',
+  )
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleString()
+function formatDate(
+  value: string | null,
+) {
+  if (!value) {
+    return 'Not started'
+  }
+
+  const date =
+    new Date(value)
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return value
+  }
+
+  return date.toLocaleString()
 }
 
 function formatSlaStatus(
@@ -41,19 +65,39 @@ function formatSlaStatus(
 }
 
 export function MyTicketsPage() {
-  const { accessToken } = useAuth()
-  const navigate = useNavigate()
+  const { accessToken } =
+    useAuth()
 
-  const [page, setPage] = useState(0)
+  const navigate =
+    useNavigate()
 
-  const [ticketPage, setTicketPage] =
-    useState<PageResponse<TicketSummary> | null>(null)
+  const [
+    page,
+    setPage,
+  ] =
+    useState(0)
 
-  const [isLoading, setIsLoading] =
+  const [
+    ticketPage,
+    setTicketPage,
+  ] =
+    useState<PageResponse<TicketSummary> | null>(
+      null,
+    )
+
+  const [
+    isLoading,
+    setIsLoading,
+  ] =
     useState(true)
 
-  const [error, setError] =
-    useState<string | null>(null)
+  const [
+    error,
+    setError,
+  ] =
+    useState<string | null>(
+      null,
+    )
 
   useEffect(() => {
     let cancelled = false
@@ -61,7 +105,10 @@ export function MyTicketsPage() {
     async function loadTickets() {
       if (!accessToken) {
         if (!cancelled) {
-          setError('Your session is no longer valid')
+          setError(
+            'Your session is no longer valid',
+          )
+
           setIsLoading(false)
         }
 
@@ -72,24 +119,33 @@ export function MyTicketsPage() {
       setError(null)
 
       try {
-        const response = await getMyTickets(
-          accessToken,
-          page,
-          PAGE_SIZE,
-        )
+        const response =
+          await getMyTickets(
+            accessToken,
+            page,
+            PAGE_SIZE,
+          )
 
         if (!cancelled) {
-          setTicketPage(response)
+          setTicketPage(
+            response,
+          )
         }
       } catch (caughtError) {
         if (cancelled) {
           return
         }
 
-        if (caughtError instanceof Error) {
-          setError(caughtError.message)
+        if (
+          caughtError instanceof Error
+        ) {
+          setError(
+            caughtError.message,
+          )
         } else {
-          setError('Unable to load tickets')
+          setError(
+            'Unable to load tickets',
+          )
         }
       } finally {
         if (!cancelled) {
@@ -103,14 +159,22 @@ export function MyTicketsPage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, page])
+  }, [
+    accessToken,
+    page,
+  ])
 
   return (
     <main className="tickets-page">
       <header className="tickets-header">
         <div>
-          <p className="eyebrow">FlowDesk</p>
-          <h1>My tickets</h1>
+          <p className="eyebrow">
+            FlowDesk
+          </p>
+
+          <h1>
+            My tickets
+          </h1>
 
           <p>
             View and track the IT support tickets
@@ -121,14 +185,22 @@ export function MyTicketsPage() {
         <div className="tickets-header-actions">
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
+            onClick={() =>
+              navigate(
+                '/dashboard',
+              )
+            }
           >
             Dashboard
           </button>
 
           <button
             type="button"
-            onClick={() => navigate('/tickets/new')}
+            onClick={() =>
+              navigate(
+                '/tickets/new',
+              )
+            }
           >
             Create ticket
           </button>
@@ -136,7 +208,9 @@ export function MyTicketsPage() {
       </header>
 
       {isLoading && (
-        <p>Loading tickets...</p>
+        <p>
+          Loading tickets...
+        </p>
       )}
 
       {error && (
@@ -153,7 +227,9 @@ export function MyTicketsPage() {
         ticketPage &&
         ticketPage.content.length === 0 && (
           <section className="empty-state">
-            <h2>No tickets yet</h2>
+            <h2>
+              No tickets yet
+            </h2>
 
             <p>
               You have not created any support
@@ -163,7 +239,9 @@ export function MyTicketsPage() {
             <button
               type="button"
               onClick={() =>
-                navigate('/tickets/new')
+                navigate(
+                  '/tickets/new',
+                )
               }
             >
               Create your first ticket
@@ -177,90 +255,116 @@ export function MyTicketsPage() {
         ticketPage.content.length > 0 && (
           <>
             <section className="tickets-list">
-              {ticketPage.content.map((ticket) => (
-                <article
-                  className="ticket-list-card"
-                  key={ticket.id}
-                >
-                  <div className="ticket-list-heading">
-                    <div>
-                      <button
-                        type="button"
-                        className="ticket-number-link"
-                        onClick={() =>
-                          navigate(
-                            `/tickets/${ticket.ticketNumber}`,
-                          )
-                        }
-                      >
-                        {ticket.ticketNumber}
-                      </button>
+              {ticketPage.content.map(
+                (ticket) => (
+                  <article
+                    className="ticket-list-card"
+                    key={ticket.id}
+                  >
+                    <div className="ticket-list-heading">
+                      <div>
+                        <button
+                          type="button"
+                          className="ticket-number-link"
+                          onClick={() =>
+                            navigate(
+                              `/tickets/${ticket.ticketNumber}`,
+                            )
+                          }
+                        >
+                          {
+                            ticket.ticketNumber
+                          }
+                        </button>
 
-                      <h2>{ticket.title}</h2>
+                        <h2>
+                          {ticket.title}
+                        </h2>
+                      </div>
+
+                      <span className="ticket-status">
+                        {formatLabel(
+                          ticket.status,
+                        )}
+                      </span>
                     </div>
 
-                    <span className="ticket-status">
-                      {formatLabel(ticket.status)}
-                    </span>
-                  </div>
+                    <div className="ticket-list-meta">
+                      <p>
+                        <strong>
+                          Type:
+                        </strong>{' '}
+                        {formatLabel(
+                          ticket.type,
+                        )}
+                      </p>
 
-                  <div className="ticket-list-meta">
-                    <p>
-                      <strong>Type:</strong>{' '}
-                      {formatLabel(ticket.type)}
-                    </p>
+                      <p>
+                        <strong>
+                          Priority:
+                        </strong>{' '}
+                        {ticket.priority}
+                      </p>
 
-                    <p>
-                      <strong>Priority:</strong>{' '}
-                      {ticket.priority}
-                    </p>
+                      <p>
+                        <strong>
+                          Created:
+                        </strong>{' '}
+                        {formatDate(
+                          ticket.createdAt,
+                        )}
+                      </p>
 
-                    <p>
-                      <strong>Created:</strong>{' '}
-                      {formatDate(ticket.createdAt)}
-                    </p>
+                      <p>
+                        <strong>
+                          Response SLA:
+                        </strong>{' '}
+                        {formatSlaStatus(
+                          ticket.responseSlaStatus,
+                        )}
+                      </p>
 
-                    <p>
-                      <strong>Response SLA:</strong>{' '}
-                      {formatSlaStatus(
-                        ticket.responseSlaStatus,
-                      )}
-                    </p>
+                      <p>
+                        <strong>
+                          Response due:
+                        </strong>{' '}
+                        {formatDate(
+                          ticket.responseDueAt,
+                        )}
+                      </p>
 
-                    <p>
-                      <strong>Response due:</strong>{' '}
-                      {formatDate(
-                        ticket.responseDueAt,
-                      )}
-                    </p>
+                      <p>
+                        <strong>
+                          Resolution SLA:
+                        </strong>{' '}
+                        {formatSlaStatus(
+                          ticket.resolutionSlaStatus,
+                        )}
+                      </p>
 
-                    <p>
-                      <strong>Resolution SLA:</strong>{' '}
-                      {formatSlaStatus(
-                        ticket.resolutionSlaStatus,
-                      )}
-                    </p>
+                      <p>
+                        <strong>
+                          Resolution due:
+                        </strong>{' '}
+                        {formatDate(
+                          ticket.resolutionDueAt,
+                        )}
+                      </p>
+                    </div>
 
-                    <p>
-                      <strong>Resolution due:</strong>{' '}
-                      {formatDate(
-                        ticket.resolutionDueAt,
-                      )}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigate(
-                        `/tickets/${ticket.ticketNumber}`,
-                      )
-                    }
-                  >
-                    View ticket
-                  </button>
-                </article>
-              ))}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/tickets/${ticket.ticketNumber}`,
+                        )
+                      }
+                    >
+                      View ticket
+                    </button>
+                  </article>
+                ),
+              )}
             </section>
 
             <nav
@@ -269,10 +373,16 @@ export function MyTicketsPage() {
             >
               <button
                 type="button"
-                disabled={ticketPage.first}
+                disabled={
+                  ticketPage.first
+                }
                 onClick={() =>
-                  setPage((currentPage) =>
-                    Math.max(0, currentPage - 1),
+                  setPage(
+                    (currentPage) =>
+                      Math.max(
+                        0,
+                        currentPage - 1,
+                      ),
                   )
                 }
               >
@@ -280,13 +390,17 @@ export function MyTicketsPage() {
               </button>
 
               <span>
-                Page {ticketPage.page + 1} of{' '}
+                Page{' '}
+                {ticketPage.page + 1}{' '}
+                of{' '}
                 {ticketPage.totalPages}
               </span>
 
               <button
                 type="button"
-                disabled={ticketPage.last}
+                disabled={
+                  ticketPage.last
+                }
                 onClick={() =>
                   setPage(
                     (currentPage) =>
@@ -301,7 +415,10 @@ export function MyTicketsPage() {
             <p>
               Total tickets:{' '}
               <strong>
-                {ticketPage.totalElements}
+                {
+                  ticketPage
+                    .totalElements
+                }
               </strong>
             </p>
           </>

@@ -8,9 +8,13 @@ export type AuditAction =
   | 'TICKET_STATUS_CHANGED'
   | 'SLA_RESPONSE_BREACHED'
   | 'SLA_RESOLUTION_BREACHED'
+  | 'APPROVAL_REQUESTED'
+  | 'APPROVAL_APPROVED'
+  | 'APPROVAL_REJECTED'
 
 export type AuditTargetType =
   | 'TICKET'
+  | 'APPROVAL'
 
 export interface AuditEvent {
   id: string

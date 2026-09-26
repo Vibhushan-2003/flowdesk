@@ -24,10 +24,26 @@ function formatLabel(value: string) {
   return value.replaceAll('_', ' ')
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleString()
-}
+function formatDate(
+  value: string | null,
+) {
+  if (!value) {
+    return 'Not started'
+  }
 
+  const date =
+    new Date(value)
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return value
+  }
+
+  return date.toLocaleString()
+}
 function formatSlaStatus(
   status: SlaStatus,
 ) {

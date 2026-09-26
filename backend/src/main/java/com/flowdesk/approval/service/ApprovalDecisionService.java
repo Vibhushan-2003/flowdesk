@@ -153,6 +153,7 @@ public class ApprovalDecisionService {
             UUID approvalId,
             String note
     ) {
+
         User approver =
                 getApprover(
                         authenticatedUserId
@@ -167,9 +168,10 @@ public class ApprovalDecisionService {
         Ticket ticket =
                 approval.getTicket();
 
-        if (ticket.getStatus()
-                != TicketStatus.PENDING_APPROVAL) {
-
+        if (
+                ticket.getStatus()
+                        != TicketStatus.PENDING_APPROVAL
+        ) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Ticket is no longer pending approval"
@@ -254,6 +256,7 @@ public class ApprovalDecisionService {
             UUID approvalId,
             String reason
     ) {
+
         User approver =
                 getApprover(
                         authenticatedUserId
@@ -268,9 +271,10 @@ public class ApprovalDecisionService {
         Ticket ticket =
                 approval.getTicket();
 
-        if (ticket.getStatus()
-                != TicketStatus.PENDING_APPROVAL) {
-
+        if (
+                ticket.getStatus()
+                        != TicketStatus.PENDING_APPROVAL
+        ) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Ticket is no longer pending approval"
@@ -350,9 +354,10 @@ public class ApprovalDecisionService {
                                         )
                         );
 
-        if (approval.getStatus()
-                != ApprovalStatus.PENDING) {
-
+        if (
+                approval.getStatus()
+                        != ApprovalStatus.PENDING
+        ) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Approval request has already been decided"
@@ -364,11 +369,12 @@ public class ApprovalDecisionService {
                         .getRequestedByUser()
                         .getId();
 
-        if (requesterId != null
-                && requesterId.equals(
-                        approver.getId()
-                )) {
-
+        if (
+                requesterId != null
+                        && requesterId.equals(
+                                approver.getId()
+                        )
+        ) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Requester cannot decide their own approval request"
@@ -381,6 +387,7 @@ public class ApprovalDecisionService {
     private User getApprover(
             UUID authenticatedUserId
     ) {
+
         User user =
                 userRepository
                         .findById(
@@ -418,6 +425,7 @@ public class ApprovalDecisionService {
             int page,
             int size
     ) {
+
         if (page < 0) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -425,9 +433,10 @@ public class ApprovalDecisionService {
             );
         }
 
-        if (size < 1
-                || size > MAX_PAGE_SIZE) {
-
+        if (
+                size < 1
+                        || size > MAX_PAGE_SIZE
+        ) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Size must be between 1 and 100"
@@ -438,6 +447,7 @@ public class ApprovalDecisionService {
     private ApprovalResponse toResponse(
             ApprovalRequest approval
     ) {
+
         Ticket ticket =
                 approval.getTicket();
 
@@ -450,6 +460,10 @@ public class ApprovalDecisionService {
                 ticket.getId(),
 
                 ticket.getTicketNumber(),
+
+                ticket.getTitle(),
+
+                ticket.getDescription(),
 
                 ticket.getType(),
 

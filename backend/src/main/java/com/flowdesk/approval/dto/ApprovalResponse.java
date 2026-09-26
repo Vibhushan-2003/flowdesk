@@ -18,6 +18,10 @@ public record ApprovalResponse(
 
         String ticketNumber,
 
+        String ticketTitle,
+
+        String ticketDescription,
+
         TicketType ticketType,
 
         TicketPriority priority,
