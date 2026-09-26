@@ -202,118 +202,118 @@ export function AuditTrailPage() {
 
       {!isLoading &&
         error && (
-        <section className="user-card">
-          <p className="notification-error">
-            {error}
-          </p>
-        </section>
-      )}
+          <section className="user-card">
+            <p className="notification-error">
+              {error}
+            </p>
+          </section>
+        )}
 
       {!isLoading &&
         !error &&
         auditPage && (
-        <>
-          <section className="user-card">
-            <div className="account-card-heading">
-              <div>
-                <p className="dashboard-card-label">
-                  Immutable history
-                </p>
+          <>
+            <section className="user-card">
+              <div className="account-card-heading">
+                <div>
+                  <p className="dashboard-card-label">
+                    Immutable history
+                  </p>
 
-                <h2>
-                  Recent audit events
-                </h2>
+                  <h2>
+                    Recent audit events
+                  </h2>
+                </div>
+
+                <span className="account-status">
+                  {
+                    auditPage
+                      .totalElements
+                  }{' '}
+                  events
+                </span>
               </div>
 
-              <span className="account-status">
-                {
-                  auditPage
-                    .totalElements
-                }{' '}
-                events
-              </span>
-            </div>
+              {auditPage
+                .content
+                .length === 0 ? (
+                <div className="empty-state">
+                  <h2>
+                    No audit events yet
+                  </h2>
+
+                  <p>
+                    Business activity will appear
+                    here after audited actions are
+                    recorded.
+                  </p>
+                </div>
+              ) : (
+                <div className="dashboard-workspace-grid">
+                  {auditPage
+                    .content
+                    .map(
+                      (event) => (
+                        <AuditEventCard
+                          key={
+                            event.id
+                          }
+                          event={
+                            event
+                          }
+                        />
+                      ),
+                    )}
+                </div>
+              )}
+            </section>
 
             {auditPage
-              .content
-              .length === 0 ? (
-              <div className="empty-state">
-                <h2>
-                  No audit events yet
-                </h2>
+              .totalPages > 1 && (
+              <nav
+                className="pagination"
+                aria-label="Audit history pagination"
+              >
+                <button
+                  type="button"
+                  disabled={
+                    auditPage.first
+                  }
+                  onClick={
+                    handlePreviousPage
+                  }
+                >
+                  Previous
+                </button>
 
-                <p>
-                  Business activity will appear
-                  here after audited actions are
-                  recorded.
-                </p>
-              </div>
-            ) : (
-              <div className="dashboard-workspace-grid">
-                {auditPage
-                  .content
-                  .map(
-                    (event) => (
-                      <AuditEventCard
-                        key={
-                          event.id
-                        }
-                        event={
-                          event
-                        }
-                      />
-                    ),
-                  )}
-              </div>
+                <span>
+                  Page{' '}
+                  {
+                    auditPage.page +
+                    1
+                  }{' '}
+                  of{' '}
+                  {
+                    auditPage
+                      .totalPages
+                  }
+                </span>
+
+                <button
+                  type="button"
+                  disabled={
+                    auditPage.last
+                  }
+                  onClick={
+                    handleNextPage
+                  }
+                >
+                  Next
+                </button>
+              </nav>
             )}
-          </section>
-
-          {auditPage
-            .totalPages > 1 && (
-            <nav
-              className="pagination"
-              aria-label="Audit history pagination"
-            >
-              <button
-                type="button"
-                disabled={
-                  auditPage.first
-                }
-                onClick={
-                  handlePreviousPage
-                }
-              >
-                Previous
-              </button>
-
-              <span>
-                Page{' '}
-                {
-                  auditPage.page +
-                  1
-                }{' '}
-                of{' '}
-                {
-                  auditPage
-                    .totalPages
-                }
-              </span>
-
-              <button
-                type="button"
-                disabled={
-                  auditPage.last
-                }
-                onClick={
-                  handleNextPage
-                }
-              >
-                Next
-              </button>
-            </nav>
-          )}
-        </>
-      )}
+          </>
+        )}
     </main>
   )
 }
@@ -502,6 +502,74 @@ function AuditMetadata({
     )
   }
 
+  if (
+    event.action ===
+      'APPROVAL_REQUESTED'
+  ) {
+    return (
+      <div className="account-details-grid">
+        <MetadataValue
+          label="Approval status"
+          value={getStringMetadata(
+            event,
+            'approvalStatus',
+          )}
+        />
+
+        <MetadataValue
+          label="Ticket status"
+          value={getStringMetadata(
+            event,
+            'ticketStatus',
+          )}
+        />
+
+        <MetadataValue
+          label="Ticket"
+          value={getStringMetadata(
+            event,
+            'ticketNumber',
+          )}
+        />
+      </div>
+    )
+  }
+
+  if (
+    event.action ===
+      'APPROVAL_APPROVED' ||
+    event.action ===
+      'APPROVAL_REJECTED'
+  ) {
+    return (
+      <div className="account-details-grid">
+        <MetadataValue
+          label="Approval status"
+          value={getStringMetadata(
+            event,
+            'approvalStatus',
+          )}
+        />
+
+        <MetadataValue
+          label="From"
+          value={getStringMetadata(
+            event,
+            'fromTicketStatus',
+          )}
+        />
+
+        <MetadataValue
+          label="To"
+          value={getStringMetadata(
+            event,
+            'toTicketStatus',
+          )}
+        />
+      </div>
+    )
+  }
+
   return null
 }
 
@@ -561,6 +629,15 @@ function getActionLabel(
 
     case 'SLA_RESOLUTION_BREACHED':
       return 'Resolution SLA breached'
+
+    case 'APPROVAL_REQUESTED':
+      return 'Approval requested'
+
+    case 'APPROVAL_APPROVED':
+      return 'Approval approved'
+
+    case 'APPROVAL_REJECTED':
+      return 'Approval rejected'
   }
 }
 
@@ -603,6 +680,49 @@ function getActionDescription(
 
     case 'SLA_RESOLUTION_BREACHED':
       return `${reference} missed its resolution SLA deadline.`
+
+    case 'APPROVAL_REQUESTED':
+      return `${reference} was submitted for approval.`
+
+    case 'APPROVAL_APPROVED': {
+      const fromStatus =
+        getStringMetadata(
+          event,
+          'fromTicketStatus',
+        )
+
+      const toStatus =
+        getStringMetadata(
+          event,
+          'toTicketStatus',
+        )
+
+      return `${reference} was approved and moved from ${formatLabel(
+        fromStatus,
+      )} to ${formatLabel(
+        toStatus,
+      )}.`
+    }
+
+    case 'APPROVAL_REJECTED': {
+      const fromStatus =
+        getStringMetadata(
+          event,
+          'fromTicketStatus',
+        )
+
+      const toStatus =
+        getStringMetadata(
+          event,
+          'toTicketStatus',
+        )
+
+      return `${reference} was rejected and moved from ${formatLabel(
+        fromStatus,
+      )} to ${formatLabel(
+        toStatus,
+      )}.`
+    }
   }
 }
 
@@ -645,7 +765,7 @@ function formatOptionalDate(
 ) {
   if (
     value ===
-    'Not available'
+      'Not available'
   ) {
     return value
   }

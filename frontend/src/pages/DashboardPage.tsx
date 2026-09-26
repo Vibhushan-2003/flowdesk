@@ -16,7 +16,7 @@ export function DashboardPage() {
       'SUPPORT_ENGINEER',
     ) ?? false
 
-  const canViewSlaOperations =
+  const canViewOperations =
     user?.roles.some(
       (role) =>
         role === 'TEAM_LEAD' ||
@@ -149,7 +149,38 @@ export function DashboardPage() {
           </article>
         )}
 
-        {canViewSlaOperations && (
+        {canViewOperations && (
+          <article className="dashboard-workspace-card">
+            <p className="dashboard-card-label">
+              Approval workspace
+            </p>
+
+            <h2>
+              Service request approvals
+            </h2>
+
+            <p>
+              Review pending service requests and
+              approve or reject them before they
+              enter the support workflow.
+            </p>
+
+            <div className="dashboard-action-buttons">
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    '/approvals',
+                  )
+                }
+              >
+                Open approval inbox
+              </button>
+            </div>
+          </article>
+        )}
+
+        {canViewOperations && (
           <article className="dashboard-workspace-card">
             <p className="dashboard-card-label">
               Operations workspace
@@ -193,7 +224,7 @@ export function DashboardPage() {
             <p>
               Review immutable records of important
               user actions, system events, ticket
-              changes, and SLA breaches.
+              changes, approvals, and SLA breaches.
             </p>
 
             <div className="dashboard-action-buttons">

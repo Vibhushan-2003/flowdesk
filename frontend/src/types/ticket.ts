@@ -9,6 +9,7 @@ export type TicketPriority =
   | 'CRITICAL'
 
 export type TicketStatus =
+  | 'PENDING_APPROVAL'
   | 'OPEN'
   | 'ASSIGNED'
   | 'IN_PROGRESS'
@@ -41,8 +42,8 @@ export interface TicketResponse {
   createdByEmail: string
   createdAt: string
   updatedAt: string
-  responseDueAt: string
-  resolutionDueAt: string
+  responseDueAt: string | null
+  resolutionDueAt: string | null
   firstRespondedAt: string | null
   resolvedAt: string | null
   responseSlaStatus: SlaStatus
@@ -58,8 +59,8 @@ export interface TicketSummary {
   status: TicketStatus
   createdAt: string
   updatedAt: string
-  responseDueAt: string
-  resolutionDueAt: string
+  responseDueAt: string | null
+  resolutionDueAt: string | null
   responseSlaStatus: SlaStatus
   resolutionSlaStatus: SlaStatus
 }

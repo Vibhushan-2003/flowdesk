@@ -9,6 +9,7 @@ import './App.css'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { RoleProtectedRoute } from './components/RoleProtectedRoute'
 
+import { ApprovalInboxPage } from './pages/ApprovalInboxPage'
 import { AuditTrailPage } from './pages/AuditTrailPage'
 import { CreateTicketPage } from './pages/CreateTicketPage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -76,6 +77,13 @@ function App() {
             />
           }
         >
+          <Route
+            path="/approvals"
+            element={
+              <ApprovalInboxPage />
+            }
+          />
+
           <Route
             path="/sla/dashboard"
             element={
