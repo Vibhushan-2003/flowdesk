@@ -1,5 +1,8 @@
 package com.flowdesk.ticket.service;
 
+import com.flowdesk.approval.domain.ApprovalRequest;
+import com.flowdesk.approval.repository.ApprovalRequestRepository;
+
 import com.flowdesk.audit.domain.AuditAction;
 import com.flowdesk.audit.domain.AuditTargetType;
 import com.flowdesk.audit.service.AuditService;
@@ -12,6 +15,7 @@ import com.flowdesk.sla.repository.SlaPolicyRepository;
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
 import com.flowdesk.ticket.domain.TicketStatus;
+import com.flowdesk.ticket.domain.TicketType;
 
 import com.flowdesk.ticket.dto.ClaimTicketResponse;
 import com.flowdesk.ticket.dto.CreateTicketRequest;
@@ -61,6 +65,9 @@ public class TicketService {
     private final SlaPolicyRepository
             slaPolicyRepository;
 
+    private final ApprovalRequestRepository
+            approvalRequestRepository;
+
     private final AuditService
             auditService;
 
@@ -69,6 +76,7 @@ public class TicketService {
             TicketAssignmentRepository ticketAssignmentRepository,
             UserRepository userRepository,
             SlaPolicyRepository slaPolicyRepository,
+            ApprovalRequestRepository approvalRequestRepository,
             AuditService auditService
     ) {
         this.ticketRepository =
@@ -82,6 +90,9 @@ public class TicketService {
 
         this.slaPolicyRepository =
                 slaPolicyRepository;
+
+        this.approvalRequestRepository =
+                approvalRequestRepository;
 
         this.auditService =
                 auditService;
@@ -122,25 +133,16 @@ public class TicketService {
                         creator
                 );
 
-        SlaPolicy slaPolicy =
-                slaPolicyRepository
-                        .findByPriorityAndActiveTrue(
-                                ticket.getPriority()
-                        )
-                        .orElseThrow(
-                                () ->
-                                        new IllegalStateException(
-                                                "No active SLA policy configured for priority "
-                                                        + ticket.getPriority()
-                                        )
-                        );
+        if (ticket.getType()
+                == TicketType.INCIDENT) {
 
-        ticket.applySlaPolicy(
-                slaPolicy,
-                OffsetDateTime.now(
-                        ZoneOffset.UTC
-                )
-        );
+            applyActiveSlaPolicy(
+                    ticket,
+                    OffsetDateTime.now(
+                            ZoneOffset.UTC
+                    )
+            );
+        }
 
         Ticket savedTicket =
                 ticketRepository
@@ -164,8 +166,81 @@ public class TicketService {
                 )
         );
 
+        if (savedTicket.getType()
+                == TicketType.SERVICE_REQUEST) {
+
+            createApprovalRequest(
+                    savedTicket,
+                    creator
+            );
+        }
+
         return toResponse(
                 savedTicket
+        );
+    }
+
+    private void createApprovalRequest(
+            Ticket ticket,
+            User requester
+    ) {
+        ApprovalRequest approvalRequest =
+                new ApprovalRequest(
+                        ticket,
+                        requester,
+                        OffsetDateTime.now(
+                                ZoneOffset.UTC
+                        )
+                );
+
+        ApprovalRequest savedApproval =
+                approvalRequestRepository
+                        .saveAndFlush(
+                                approvalRequest
+                        );
+
+        auditService.recordUserAction(
+                requester,
+                AuditAction.APPROVAL_REQUESTED,
+                AuditTargetType.APPROVAL,
+                savedApproval.getId(),
+                ticket.getTicketNumber(),
+                Map.of(
+                        "approvalStatus",
+                        savedApproval
+                                .getStatus()
+                                .name(),
+                        "ticketStatus",
+                        ticket
+                                .getStatus()
+                                .name(),
+                        "ticketNumber",
+                        ticket
+                                .getTicketNumber()
+                )
+        );
+    }
+
+    private void applyActiveSlaPolicy(
+            Ticket ticket,
+            OffsetDateTime slaStartedAt
+    ) {
+        SlaPolicy slaPolicy =
+                slaPolicyRepository
+                        .findByPriorityAndActiveTrue(
+                                ticket.getPriority()
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "No active SLA policy configured for priority "
+                                                        + ticket.getPriority()
+                                        )
+                        );
+
+        ticket.applySlaPolicy(
+                slaPolicy,
+                slaStartedAt
         );
     }
 
