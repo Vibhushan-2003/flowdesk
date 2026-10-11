@@ -104,8 +104,6 @@ export function NotificationBell() {
   }, [accessToken])
 
   /*
-   * Day 16:
-   *
    * Establish one authenticated STOMP connection
    * while the logged-in user has this component
    * mounted.
@@ -159,9 +157,11 @@ export function NotificationBell() {
           /*
            * Do not guess the unread total.
            *
-           * Ask PostgreSQL-backed REST API for the
-           * authoritative value. This avoids count
-           * drift after reconnects or multiple tabs.
+           * Ask the PostgreSQL-backed REST API for
+           * the authoritative value.
+           *
+           * This avoids unread-count drift after
+           * reconnects or when multiple tabs exist.
            */
           getUnreadNotificationCount(
             accessToken,
@@ -176,10 +176,10 @@ export function NotificationBell() {
             .catch(() => {
               /*
                * Real-time delivery already updated
-               * the notification list.
+               * the visible notification list.
                *
-               * A later refresh will reconcile the
-               * unread count if this call fails.
+               * A later refresh can reconcile the
+               * unread count.
                */
             })
         },
@@ -304,7 +304,7 @@ export function NotificationBell() {
       setIsOpen(false)
 
       const ticketPath =
-        getTicketPath(
+        getNotificationPath(
           updatedNotification,
           isSupportEngineer,
         )
@@ -474,11 +474,25 @@ export function NotificationBell() {
   )
 }
 
-function getTicketPath(
+function getNotificationPath(
   notification:
     NotificationResponse,
   isSupportEngineer: boolean,
 ) {
+  /*
+   * Approval-request notifications are intended
+   * for TEAM_LEAD / ADMIN users.
+   *
+   * Open the approval inbox where the decision
+   * can actually be made.
+   */
+  if (
+    notification.type ===
+    'APPROVAL_REQUESTED'
+  ) {
+    return '/approvals'
+  }
+
   if (
     !notification.ticketNumber
   ) {
@@ -490,6 +504,22 @@ function getTicketPath(
       notification.ticketNumber,
     )
 
+  /*
+   * Approval decision notifications are sent
+   * to the requester.
+   *
+   * They should open the requester's normal
+   * ticket detail page.
+   */
+  if (
+    notification.type ===
+      'APPROVAL_APPROVED' ||
+    notification.type ===
+      'APPROVAL_REJECTED'
+  ) {
+    return `/tickets/${encodedTicketNumber}`
+  }
+
   const isSlaBreachNotification =
     notification.type ===
       'SLA_RESPONSE_BREACHED' ||
@@ -497,11 +527,9 @@ function getTicketPath(
       'SLA_RESOLUTION_BREACHED'
 
   /*
-   * SLA breach notifications are operational
-   * support alerts.
-   *
-   * The assigned support engineer owns the
-   * support ticket detail route.
+   * SLA breach notifications received by an
+   * assigned support engineer should open the
+   * support ticket workspace.
    */
   if (
     isSupportEngineer &&
@@ -511,15 +539,11 @@ function getTicketPath(
   }
 
   /*
-   * Team-lead/admin SLA notifications are useful
-   * escalation signals, but the current support
-   * ticket detail API is ownership-scoped.
+   * TEAM_LEAD / ADMIN can receive SLA escalation
+   * notifications too.
    *
-   * Do not incorrectly send those users to the
-   * employee-owned ticket route.
-   *
-   * A supervisor/admin read-only ticket view can
-   * be added later.
+   * They currently do not have an ownership-safe
+   * ticket-detail route for those notifications.
    */
   if (
     isSlaBreachNotification
@@ -528,13 +552,9 @@ function getTicketPath(
   }
 
   /*
-   * Employee reply notification:
-   *
-   * employee
-   *   → sends comment
-   *   → support engineer receives notification
-   *
-   * Therefore open the support workspace.
+   * When an employee replies to a ticket,
+   * the assigned support engineer should open
+   * the support workspace.
    */
   if (
     isSupportEngineer &&
@@ -547,8 +567,8 @@ function getTicketPath(
   }
 
   /*
-   * Support replies and status notifications
-   * are intended for the employee.
+   * Other requester-facing ticket notifications
+   * open the normal employee ticket page.
    */
   return `/tickets/${encodedTicketNumber}`
 }

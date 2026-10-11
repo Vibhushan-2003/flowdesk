@@ -1,28 +1,24 @@
 package com.flowdesk.ticket.service;
 
+import com.flowdesk.approval.repository.ApprovalRequestRepository;
+import com.flowdesk.approval.service.ApprovalNotificationService;
 import com.flowdesk.audit.domain.AuditAction;
 import com.flowdesk.audit.domain.AuditTargetType;
 import com.flowdesk.audit.service.AuditService;
-
 import com.flowdesk.common.dto.PageResponse;
-
 import com.flowdesk.sla.domain.SlaPolicy;
 import com.flowdesk.sla.repository.SlaPolicyRepository;
-
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
 import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketStatus;
 import com.flowdesk.ticket.domain.TicketType;
-
 import com.flowdesk.ticket.dto.ClaimTicketResponse;
 import com.flowdesk.ticket.dto.CreateTicketRequest;
 import com.flowdesk.ticket.dto.TicketResponse;
 import com.flowdesk.ticket.dto.TicketSummaryResponse;
-
 import com.flowdesk.ticket.repository.TicketAssignmentRepository;
 import com.flowdesk.ticket.repository.TicketRepository;
-
 import com.flowdesk.user.domain.Role;
 import com.flowdesk.user.domain.RoleCode;
 import com.flowdesk.user.domain.User;
@@ -43,7 +39,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -66,8 +61,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.flowdesk.approval.repository.ApprovalRequestRepository;
-
 @ExtendWith(MockitoExtension.class)
 class TicketServiceTest {
 
@@ -75,14 +68,19 @@ class TicketServiceTest {
     private TicketRepository ticketRepository;
 
     @Mock
-    private TicketAssignmentRepository
-            ticketAssignmentRepository;
+    private TicketAssignmentRepository ticketAssignmentRepository;
 
     @Mock
     private UserRepository userRepository;
 
     @Mock
     private SlaPolicyRepository slaPolicyRepository;
+
+    @Mock
+    private ApprovalRequestRepository approvalRequestRepository;
+
+    @Mock
+    private ApprovalNotificationService approvalNotificationService;
 
     @Mock
     private AuditService auditService;
@@ -97,21 +95,19 @@ class TicketServiceTest {
 
     private UUID userId;
 
-    @Mock
-private ApprovalRequestRepository
-        approvalRequestRepository;
-
     @BeforeEach
     void setUp() {
+
         ticketService =
-        new TicketService(
-                ticketRepository,
-                ticketAssignmentRepository,
-                userRepository,
-                slaPolicyRepository,
-                approvalRequestRepository,
-                auditService
-        );
+                new TicketService(
+                        ticketRepository,
+                        ticketAssignmentRepository,
+                        userRepository,
+                        slaPolicyRepository,
+                        approvalRequestRepository,
+                        approvalNotificationService,
+                        auditService
+                );
 
         userId =
                 UUID.randomUUID();

@@ -3,6 +3,7 @@ package com.flowdesk.ticket.service;
 import com.flowdesk.approval.domain.ApprovalRequest;
 import com.flowdesk.approval.domain.ApprovalStatus;
 import com.flowdesk.approval.repository.ApprovalRequestRepository;
+import com.flowdesk.approval.service.ApprovalNotificationService;
 
 import com.flowdesk.audit.domain.AuditAction;
 import com.flowdesk.audit.domain.AuditTargetType;
@@ -71,6 +72,10 @@ class TicketServiceApprovalCreationTest {
             approvalRequestRepository;
 
     @Mock
+    private ApprovalNotificationService
+            approvalNotificationService;
+
+    @Mock
     private AuditService
             auditService;
 
@@ -90,6 +95,7 @@ class TicketServiceApprovalCreationTest {
                         userRepository,
                         slaPolicyRepository,
                         approvalRequestRepository,
+                        approvalNotificationService,
                         auditService
                 );
 
@@ -116,15 +122,17 @@ class TicketServiceApprovalCreationTest {
                 )
         );
 
-        when(creator.getId())
-                .thenReturn(
-                        userId
-                );
+        when(
+                creator.getId()
+        ).thenReturn(
+                userId
+        );
 
-        when(creator.getEmail())
-                .thenReturn(
-                        "employee@example.com"
-                );
+        when(
+                creator.getEmail()
+        ).thenReturn(
+                "employee@example.com"
+        );
 
         when(
                 ticketRepository
@@ -134,18 +142,20 @@ class TicketServiceApprovalCreationTest {
         );
 
         when(
-                ticketRepository.saveAndFlush(
-                        any(Ticket.class)
-                )
+                ticketRepository
+                        .saveAndFlush(
+                                any(Ticket.class)
+                        )
         ).thenAnswer(
                 invocation ->
                         invocation.getArgument(0)
         );
 
         when(
-                approvalRequestRepository.saveAndFlush(
-                        any(ApprovalRequest.class)
-                )
+                approvalRequestRepository
+                        .saveAndFlush(
+                                any(ApprovalRequest.class)
+                        )
         ).thenAnswer(
                 invocation ->
                         invocation.getArgument(0)
@@ -185,10 +195,11 @@ class TicketServiceApprovalCreationTest {
                         Ticket.class
                 );
 
-        verify(ticketRepository)
-                .saveAndFlush(
-                        ticketCaptor.capture()
-                );
+        verify(
+                ticketRepository
+        ).saveAndFlush(
+                ticketCaptor.capture()
+        );
 
         Ticket savedTicket =
                 ticketCaptor.getValue();
@@ -244,36 +255,45 @@ class TicketServiceApprovalCreationTest {
                 slaPolicyRepository
         );
 
-        verify(auditService)
-                .recordUserAction(
-                        eq(creator),
-                        eq(
-                                AuditAction
-                                        .TICKET_CREATED
-                        ),
-                        eq(
-                                AuditTargetType
-                                        .TICKET
-                        ),
-                        nullable(UUID.class),
-                        eq("FD-000021"),
-                        anyMap()
-                );
+        verify(
+                auditService
+        ).recordUserAction(
+                eq(creator),
+                eq(
+                        AuditAction
+                                .TICKET_CREATED
+                ),
+                eq(
+                        AuditTargetType
+                                .TICKET
+                ),
+                nullable(UUID.class),
+                eq("FD-000021"),
+                anyMap()
+        );
 
-        verify(auditService)
-                .recordUserAction(
-                        eq(creator),
-                        eq(
-                                AuditAction
-                                        .APPROVAL_REQUESTED
-                        ),
-                        eq(
-                                AuditTargetType
-                                        .APPROVAL
-                        ),
-                        nullable(UUID.class),
-                        eq("FD-000021"),
-                        anyMap()
-                );
+        verify(
+                auditService
+        ).recordUserAction(
+                eq(creator),
+                eq(
+                        AuditAction
+                                .APPROVAL_REQUESTED
+                ),
+                eq(
+                        AuditTargetType
+                                .APPROVAL
+                ),
+                nullable(UUID.class),
+                eq("FD-000021"),
+                anyMap()
+        );
+
+        verify(
+                approvalNotificationService
+        ).notifyApprovalRequested(
+                savedTicket,
+                creator
+        );
     }
 }

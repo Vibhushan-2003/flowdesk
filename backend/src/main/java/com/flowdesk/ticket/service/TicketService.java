@@ -2,6 +2,7 @@ package com.flowdesk.ticket.service;
 
 import com.flowdesk.approval.domain.ApprovalRequest;
 import com.flowdesk.approval.repository.ApprovalRequestRepository;
+import com.flowdesk.approval.service.ApprovalNotificationService;
 
 import com.flowdesk.audit.domain.AuditAction;
 import com.flowdesk.audit.domain.AuditTargetType;
@@ -68,6 +69,9 @@ public class TicketService {
     private final ApprovalRequestRepository
             approvalRequestRepository;
 
+    private final ApprovalNotificationService
+            approvalNotificationService;
+
     private final AuditService
             auditService;
 
@@ -77,6 +81,7 @@ public class TicketService {
             UserRepository userRepository,
             SlaPolicyRepository slaPolicyRepository,
             ApprovalRequestRepository approvalRequestRepository,
+            ApprovalNotificationService approvalNotificationService,
             AuditService auditService
     ) {
         this.ticketRepository =
@@ -93,6 +98,9 @@ public class TicketService {
 
         this.approvalRequestRepository =
                 approvalRequestRepository;
+
+        this.approvalNotificationService =
+                approvalNotificationService;
 
         this.auditService =
                 auditService;
@@ -219,6 +227,12 @@ public class TicketService {
                                 .getTicketNumber()
                 )
         );
+
+        approvalNotificationService
+                .notifyApprovalRequested(
+                        ticket,
+                        requester
+                );
     }
 
     private void applyActiveSlaPolicy(
