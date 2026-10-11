@@ -71,6 +71,9 @@ public class ApprovalDecisionService {
     private final SlaPolicyRepository
             slaPolicyRepository;
 
+    private final ApprovalNotificationService
+            approvalNotificationService;
+
     private final AuditService
             auditService;
 
@@ -79,6 +82,7 @@ public class ApprovalDecisionService {
             TicketRepository ticketRepository,
             UserRepository userRepository,
             SlaPolicyRepository slaPolicyRepository,
+            ApprovalNotificationService approvalNotificationService,
             AuditService auditService
     ) {
         this.approvalRequestRepository =
@@ -92,6 +96,9 @@ public class ApprovalDecisionService {
 
         this.slaPolicyRepository =
                 slaPolicyRepository;
+
+        this.approvalNotificationService =
+                approvalNotificationService;
 
         this.auditService =
                 auditService;
@@ -238,12 +245,21 @@ public class ApprovalDecisionService {
                         previousTicketStatus
                                 .name(),
                         "toTicketStatus",
-                        ticket.getStatus()
+                        ticket
+                                .getStatus()
                                 .name(),
                         "ticketNumber",
                         ticket.getTicketNumber()
                 )
         );
+
+        approvalNotificationService
+                .notifyApprovalApproved(
+                        ticket,
+                        savedApproval
+                                .getRequestedByUser(),
+                        approver
+                );
 
         return toResponse(
                 savedApproval
@@ -323,12 +339,21 @@ public class ApprovalDecisionService {
                         previousTicketStatus
                                 .name(),
                         "toTicketStatus",
-                        ticket.getStatus()
+                        ticket
+                                .getStatus()
                                 .name(),
                         "ticketNumber",
                         ticket.getTicketNumber()
                 )
         );
+
+        approvalNotificationService
+                .notifyApprovalRejected(
+                        ticket,
+                        savedApproval
+                                .getRequestedByUser(),
+                        approver
+                );
 
         return toResponse(
                 savedApproval

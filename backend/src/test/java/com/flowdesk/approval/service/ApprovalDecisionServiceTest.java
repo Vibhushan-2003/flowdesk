@@ -88,6 +88,10 @@ class ApprovalDecisionServiceTest {
             slaPolicyRepository;
 
     @Mock
+    private ApprovalNotificationService
+            approvalNotificationService;
+
+    @Mock
     private AuditService
             auditService;
 
@@ -104,6 +108,7 @@ class ApprovalDecisionServiceTest {
                         ticketRepository,
                         userRepository,
                         slaPolicyRepository,
+                        approvalNotificationService,
                         auditService
                 );
     }
@@ -235,21 +240,30 @@ class ApprovalDecisionServiceTest {
                 ).toMinutes()
         );
 
-        verify(auditService)
-                .recordUserAction(
-                        eq(approver),
-                        eq(
-                                AuditAction
-                                        .APPROVAL_APPROVED
-                        ),
-                        eq(
-                                AuditTargetType
-                                        .APPROVAL
-                        ),
-                        nullable(UUID.class),
-                        eq("FD-000030"),
-                        anyMap()
-                );
+        verify(
+                auditService
+        ).recordUserAction(
+                eq(approver),
+                eq(
+                        AuditAction
+                                .APPROVAL_APPROVED
+                ),
+                eq(
+                        AuditTargetType
+                                .APPROVAL
+                ),
+                nullable(UUID.class),
+                eq("FD-000030"),
+                anyMap()
+        );
+
+        verify(
+                approvalNotificationService
+        ).notifyApprovalApproved(
+                ticket,
+                requester,
+                approver
+        );
     }
 
     @Test
@@ -367,21 +381,30 @@ class ApprovalDecisionServiceTest {
                 slaPolicyRepository
         );
 
-        verify(auditService)
-                .recordUserAction(
-                        eq(admin),
-                        eq(
-                                AuditAction
-                                        .APPROVAL_REJECTED
-                        ),
-                        eq(
-                                AuditTargetType
-                                        .APPROVAL
-                        ),
-                        nullable(UUID.class),
-                        eq("FD-000031"),
-                        anyMap()
-                );
+        verify(
+                auditService
+        ).recordUserAction(
+                eq(admin),
+                eq(
+                        AuditAction
+                                .APPROVAL_REJECTED
+                ),
+                eq(
+                        AuditTargetType
+                                .APPROVAL
+                ),
+                nullable(UUID.class),
+                eq("FD-000031"),
+                anyMap()
+        );
+
+        verify(
+                approvalNotificationService
+        ).notifyApprovalRejected(
+                ticket,
+                requester,
+                admin
+        );
     }
 
     @Test
@@ -428,6 +451,10 @@ class ApprovalDecisionServiceTest {
 
         verifyNoInteractions(
                 slaPolicyRepository
+        );
+
+        verifyNoInteractions(
+                approvalNotificationService
         );
 
         verifyNoInteractions(
@@ -514,6 +541,10 @@ class ApprovalDecisionServiceTest {
 
         verifyNoInteractions(
                 slaPolicyRepository
+        );
+
+        verifyNoInteractions(
+                approvalNotificationService
         );
 
         verifyNoInteractions(
@@ -629,6 +660,10 @@ class ApprovalDecisionServiceTest {
 
         verifyNoInteractions(
                 slaPolicyRepository
+        );
+
+        verifyNoInteractions(
+                approvalNotificationService
         );
     }
 
@@ -756,34 +791,34 @@ class ApprovalDecisionServiceTest {
     }
 
     private User user(
-        UUID id,
-        String email
-) {
-    User user =
-            org.mockito.Mockito.mock(
-                    User.class
-            );
+            UUID id,
+            String email
+    ) {
+        User user =
+                org.mockito.Mockito.mock(
+                        User.class
+                );
 
-    org.mockito.Mockito
-            .lenient()
-            .when(
-                    user.getId()
-            )
-            .thenReturn(
-                    id
-            );
+        org.mockito.Mockito
+                .lenient()
+                .when(
+                        user.getId()
+                )
+                .thenReturn(
+                        id
+                );
 
-    org.mockito.Mockito
-            .lenient()
-            .when(
-                    user.getEmail()
-            )
-            .thenReturn(
-                    email
-            );
+        org.mockito.Mockito
+                .lenient()
+                .when(
+                        user.getEmail()
+                )
+                .thenReturn(
+                        email
+                );
 
-    return user;
-}
+        return user;
+    }
 
     private User approver(
             UUID id,
@@ -801,17 +836,19 @@ class ApprovalDecisionServiceTest {
                         Role.class
                 );
 
-        when(role.getCode())
-                .thenReturn(
-                        roleCode
-                );
+        when(
+                role.getCode()
+        ).thenReturn(
+                roleCode
+        );
 
-        when(user.getRoles())
-                .thenReturn(
-                        Set.of(
-                                role
-                        )
-                );
+        when(
+                user.getRoles()
+        ).thenReturn(
+                Set.of(
+                        role
+                )
+        );
 
         return user;
     }

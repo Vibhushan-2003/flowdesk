@@ -122,6 +122,13 @@ function isNotificationResponse(
       'TICKET_ASSIGNED',
       'TICKET_STATUS_CHANGED',
       'TICKET_RESOLVED',
+
+      'APPROVAL_REQUESTED',
+      'APPROVAL_APPROVED',
+      'APPROVAL_REJECTED',
+
+      'SLA_RESPONSE_BREACHED',
+      'SLA_RESOLUTION_BREACHED',
     ]
 
   return (
