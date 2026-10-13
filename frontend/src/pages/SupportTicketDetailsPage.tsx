@@ -18,6 +18,8 @@ import {
 
 import { useAuth } from '../auth/useAuth'
 
+import { AiTriageCard } from '../components/AiTriageCard'
+
 import type {
   SlaStatus,
   SupportTicketResponse,
@@ -195,7 +197,10 @@ export function SupportTicketDetailsPage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, ticketNumber])
+  }, [
+    accessToken,
+    ticketNumber,
+  ])
 
   async function handleStatusChange(
     nextStatus: TicketStatus,
@@ -441,6 +446,18 @@ export function SupportTicketDetailsPage() {
                   {ticket.description}
                 </p>
               </section>
+
+              {!isConversationReadOnly && (
+                <AiTriageCard
+                  accessToken={accessToken}
+                  ticketNumber={
+                    ticket.ticketNumber
+                  }
+                  currentPriority={
+                    ticket.priority
+                  }
+                />
+              )}
 
               <section className="support-detail-grid">
                 <div>
