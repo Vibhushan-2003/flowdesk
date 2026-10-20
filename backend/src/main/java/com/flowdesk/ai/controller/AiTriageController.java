@@ -1,7 +1,9 @@
 package com.flowdesk.ai.controller;
 
+import com.flowdesk.ai.dto.AiTriageApplicationResponse;
 import com.flowdesk.ai.dto.AiTriageResponse;
 
+import com.flowdesk.ai.service.AiTriageApplicationService;
 import com.flowdesk.ai.service.AiTriageService;
 
 import org.springframework.http.HttpStatus;
@@ -28,11 +30,18 @@ public class AiTriageController {
     private final AiTriageService
             aiTriageService;
 
+    private final AiTriageApplicationService
+            aiTriageApplicationService;
+
     public AiTriageController(
-            AiTriageService aiTriageService
+            AiTriageService aiTriageService,
+            AiTriageApplicationService aiTriageApplicationService
     ) {
         this.aiTriageService =
                 aiTriageService;
+
+        this.aiTriageApplicationService =
+                aiTriageApplicationService;
     }
 
     @PostMapping
@@ -78,6 +87,30 @@ public class AiTriageController {
         AiTriageResponse response =
                 aiTriageService
                         .getRecommendation(
+                                authenticatedUserId,
+                                ticketNumber
+                        );
+
+        return ResponseEntity.ok(
+                response
+        );
+    }
+
+    @PostMapping("/apply")
+    public ResponseEntity<AiTriageApplicationResponse>
+            applyRecommendation(
+                    @AuthenticationPrincipal Jwt jwt,
+                    @PathVariable String ticketNumber
+            ) {
+
+        UUID authenticatedUserId =
+                UUID.fromString(
+                        jwt.getSubject()
+                );
+
+        AiTriageApplicationResponse response =
+                aiTriageApplicationService
+                        .applyRecommendation(
                                 authenticatedUserId,
                                 ticketNumber
                         );

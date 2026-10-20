@@ -5,6 +5,7 @@ import {
 
 import {
   AiTriageApiError,
+  applyAiTriageRecommendation,
   generateAiTriageRecommendation,
   getAiTriageRecommendation,
 } from '../api/aiTriage'
@@ -15,6 +16,7 @@ import type {
 
 import type {
   TicketPriority,
+  TicketStatus,
 } from '../types/ticket'
 
 import './AiTriageCard.css'
@@ -23,6 +25,8 @@ interface AiTriageCardProps {
   accessToken: string | null
   ticketNumber: string
   currentPriority: TicketPriority
+  ticketStatus: TicketStatus
+  onApplied: () => Promise<void>
 }
 
 function formatConfidence(
@@ -49,6 +53,8 @@ export function AiTriageCard({
   accessToken,
   ticketNumber,
   currentPriority,
+  ticketStatus,
+  onApplied,
 }: AiTriageCardProps) {
   const [
     recommendation,
@@ -67,6 +73,18 @@ export function AiTriageCard({
   const [
     isGenerating,
     setIsGenerating,
+  ] =
+    useState(false)
+
+  const [
+    isApplying,
+    setIsApplying,
+  ] =
+    useState(false)
+
+  const [
+    isConfirmingApply,
+    setIsConfirmingApply,
   ] =
     useState(false)
 
@@ -165,14 +183,6 @@ export function AiTriageCard({
         response,
       )
     } catch (caughtError) {
-      /*
-       * A 409 may happen if another request
-       * generated the recommendation first.
-       *
-       * Instead of showing a confusing error,
-       * retrieve the recommendation that now
-       * exists.
-       */
       if (
         caughtError instanceof AiTriageApiError &&
         caughtError.status === 409
@@ -193,8 +203,8 @@ export function AiTriageCard({
           }
         } catch {
           /*
-           * Fall through to the normal
-           * controlled error below.
+           * Fall through to the controlled
+           * error handling below.
            */
         }
       }
@@ -215,6 +225,84 @@ export function AiTriageCard({
     }
   }
 
+  async function handleApply() {
+    if (
+      !accessToken ||
+      !recommendation
+    ) {
+      setError(
+        'Your session is no longer valid',
+      )
+
+      return
+    }
+
+    setIsApplying(true)
+    setError(null)
+
+    try {
+      const response =
+        await applyAiTriageRecommendation(
+          accessToken,
+          ticketNumber,
+        )
+
+      /*
+       * Immediately update the recommendation
+       * state so the Apply action disappears even
+       * before the parent ticket finishes reloading.
+       */
+      setRecommendation(
+        (currentRecommendation) => {
+          if (!currentRecommendation) {
+            return currentRecommendation
+          }
+
+          return {
+            ...currentRecommendation,
+            applied: true,
+            appliedByUserId:
+              response.appliedByUserId,
+            appliedAt:
+              response.appliedAt,
+          }
+        },
+      )
+
+      setIsConfirmingApply(false)
+
+      try {
+        await onApplied()
+      } catch {
+        setError(
+          'The AI recommendation was applied, but the ticket view could not refresh automatically. Reload the page to see the latest priority and SLA.',
+        )
+      }
+    } catch (caughtError) {
+      if (
+        caughtError instanceof Error
+      ) {
+        setError(
+          caughtError.message,
+        )
+      } else {
+        setError(
+          'Unable to apply the AI recommendation',
+        )
+      }
+    } finally {
+      setIsApplying(false)
+    }
+  }
+
+  const canApply =
+    ticketStatus === 'ASSIGNED'
+
+  const priorityWouldChange =
+    recommendation !== null &&
+    recommendation.suggestedPriority !==
+      currentPriority
+
   return (
     <section
       className="ai-triage-card"
@@ -228,7 +316,7 @@ export function AiTriageCard({
             </span>
 
             <span className="ai-triage-advisory-label">
-              Decision support only
+              Human decision required
             </span>
           </div>
 
@@ -245,14 +333,14 @@ export function AiTriageCard({
 
       <div className="ai-triage-notice">
         <strong>
-          Advisory only
+          Human-in-the-loop
         </strong>
 
         <p>
-          FlowDesk will not automatically change
-          this ticket&apos;s priority or SLA.
-          The support engineer remains responsible
-          for the final decision.
+          FlowDesk never applies the AI
+          recommendation automatically. A support
+          engineer must explicitly approve it
+          before work starts.
         </p>
       </div>
 
@@ -355,18 +443,154 @@ export function AiTriageCard({
             </p>
           </div>
 
-          <div className="ai-triage-safety-message">
-            <strong>
-              No automatic change was made
-            </strong>
+          {recommendation.applied ? (
+            <div className="ai-triage-applied-message">
+              <strong>
+                Recommendation applied by a
+                support engineer
+              </strong>
 
-            <p>
-              Ticket priority remains{' '}
-              <b>{currentPriority}</b>.
-              This recommendation is stored for
-              reference only.
-            </p>
-          </div>
+              <p>
+                The human decision was recorded
+                {recommendation.appliedAt
+                  ? ` on ${formatDate(
+                      recommendation.appliedAt,
+                    )}`
+                  : ''}
+                . The ticket priority is now{' '}
+                <b>{currentPriority}</b>.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="ai-triage-safety-message">
+                <strong>
+                  No automatic change was made
+                </strong>
+
+                <p>
+                  Ticket priority is currently{' '}
+                  <b>{currentPriority}</b>.
+                  Applying this recommendation
+                  requires your explicit
+                  confirmation.
+                </p>
+              </div>
+
+              {!canApply && (
+                <div className="ai-triage-locked-message">
+                  <strong>
+                    Recommendation can no longer
+                    be applied
+                  </strong>
+
+                  <p>
+                    Priority can only be changed
+                    while the ticket is assigned
+                    and before support work starts.
+                  </p>
+                </div>
+              )}
+
+              {canApply &&
+                !isConfirmingApply && (
+                  <div className="ai-triage-apply-row">
+                    <div>
+                      <strong>
+                        Ready for your decision?
+                      </strong>
+
+                      <p>
+                        Review the recommendation
+                        before applying it.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="ai-triage-apply-button"
+                      disabled={isApplying}
+                      onClick={() => {
+                        setError(null)
+                        setIsConfirmingApply(
+                          true,
+                        )
+                      }}
+                    >
+                      Apply AI suggestion
+                    </button>
+                  </div>
+                )}
+
+              {canApply &&
+                isConfirmingApply && (
+                  <div className="ai-triage-confirmation">
+                    <strong>
+                      Confirm human decision
+                    </strong>
+
+                    {priorityWouldChange ? (
+                      <p>
+                        Change priority from{' '}
+                        <b>
+                          {currentPriority}
+                        </b>{' '}
+                        to{' '}
+                        <b>
+                          {
+                            recommendation
+                              .suggestedPriority
+                          }
+                        </b>
+                        ? SLA deadlines will be
+                        recalculated from the
+                        original SLA start time.
+                      </p>
+                    ) : (
+                      <p>
+                        The AI suggestion already
+                        matches the current{' '}
+                        <b>
+                          {currentPriority}
+                        </b>{' '}
+                        priority. Accepting it will
+                        record your decision
+                        without recalculating the
+                        SLA.
+                      </p>
+                    )}
+
+                    <div className="ai-triage-confirmation-actions">
+                      <button
+                        type="button"
+                        className="ai-triage-cancel-button"
+                        disabled={isApplying}
+                        onClick={() =>
+                          setIsConfirmingApply(
+                            false,
+                          )
+                        }
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="button"
+                        className="ai-triage-confirm-button"
+                        disabled={isApplying}
+                        onClick={() =>
+                          void handleApply()
+                        }
+                      >
+                        {isApplying
+                          ? 'Applying...'
+                          : 'Confirm and apply'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+            </>
+          )}
 
           <footer className="ai-triage-meta">
             <span>
@@ -400,7 +624,7 @@ export function AiTriageCard({
           role="alert"
         >
           <strong>
-            AI triage unavailable
+            AI triage notice
           </strong>
 
           <p>

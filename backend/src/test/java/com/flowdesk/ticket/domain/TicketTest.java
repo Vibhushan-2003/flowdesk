@@ -138,6 +138,177 @@ class TicketTest {
     }
 
     @Test
+    void assignedTicketCanChangePriorityWithoutResettingSlaStart() {
+        Ticket ticket =
+                createTicket();
+
+        OffsetDateTime originalSlaStart =
+                OffsetDateTime.parse(
+                        "2026-10-13T04:00:00Z"
+                );
+
+        ticket.applySlaPolicy(
+                createMediumSlaPolicy(),
+                originalSlaStart
+        );
+
+        ticket.markAssigned();
+
+        SlaPolicy highPolicy =
+                new SlaPolicy(
+                        TicketPriority.HIGH,
+                        30,
+                        480
+                );
+
+        ticket.applyPriorityAndRecalculateSla(
+                TicketPriority.HIGH,
+                highPolicy
+        );
+
+        assertEquals(
+                TicketPriority.HIGH,
+                ticket.getPriority()
+        );
+
+        assertSame(
+                highPolicy,
+                ticket.getSlaPolicy()
+        );
+
+        assertEquals(
+                originalSlaStart.plusMinutes(30),
+                ticket.getResponseDueAt()
+        );
+
+        assertEquals(
+                originalSlaStart.plusMinutes(480),
+                ticket.getResolutionDueAt()
+        );
+    }
+
+    @Test
+    void priorityChangeIsRejectedAfterSupportWorkStarts() {
+        Ticket ticket =
+                createTicket();
+
+        ticket.applySlaPolicy(
+                createMediumSlaPolicy(),
+                OffsetDateTime.parse(
+                        "2026-10-13T04:00:00Z"
+                )
+        );
+
+        ticket.markAssigned();
+
+        ticket.transitionSupportStatus(
+                TicketStatus.IN_PROGRESS
+        );
+
+        SlaPolicy highPolicy =
+                new SlaPolicy(
+                        TicketPriority.HIGH,
+                        30,
+                        480
+                );
+
+        IllegalStateException exception =
+                assertThrows(
+                        IllegalStateException.class,
+                        () ->
+                                ticket.applyPriorityAndRecalculateSla(
+                                        TicketPriority.HIGH,
+                                        highPolicy
+                                )
+                );
+
+        assertEquals(
+                "Ticket priority can only be changed while assigned",
+                exception.getMessage()
+        );
+
+        assertEquals(
+                TicketPriority.MEDIUM,
+                ticket.getPriority()
+        );
+    }
+
+    @Test
+    void priorityChangeRejectsMismatchedSlaPolicy() {
+        Ticket ticket =
+                createTicket();
+
+        ticket.applySlaPolicy(
+                createMediumSlaPolicy(),
+                OffsetDateTime.parse(
+                        "2026-10-13T04:00:00Z"
+                )
+        );
+
+        ticket.markAssigned();
+
+        SlaPolicy criticalPolicy =
+                new SlaPolicy(
+                        TicketPriority.CRITICAL,
+                        15,
+                        240
+                );
+
+        IllegalArgumentException exception =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                ticket.applyPriorityAndRecalculateSla(
+                                        TicketPriority.HIGH,
+                                        criticalPolicy
+                                )
+                );
+
+        assertEquals(
+                "SLA policy priority does not match new ticket priority",
+                exception.getMessage()
+        );
+
+        assertEquals(
+                TicketPriority.MEDIUM,
+                ticket.getPriority()
+        );
+    }
+
+    @Test
+    void priorityChangeRequiresExistingSlaSnapshot() {
+        Ticket ticket =
+                createAssignedTicket();
+
+        SlaPolicy highPolicy =
+                new SlaPolicy(
+                        TicketPriority.HIGH,
+                        30,
+                        480
+                );
+
+        IllegalStateException exception =
+                assertThrows(
+                        IllegalStateException.class,
+                        () ->
+                                ticket.applyPriorityAndRecalculateSla(
+                                        TicketPriority.HIGH,
+                                        highPolicy
+                                )
+                );
+
+        assertEquals(
+                "Ticket SLA is not initialized",
+                exception.getMessage()
+        );
+
+        assertEquals(
+                TicketPriority.MEDIUM,
+                ticket.getPriority()
+        );
+    }
+
+    @Test
     void pendingSlaShouldRemainPendingBeforeDeadlines() {
         Ticket ticket =
                 createTicket();

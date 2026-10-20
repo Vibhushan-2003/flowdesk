@@ -1,4 +1,6 @@
-import type { TicketPriority } from './ticket'
+import type {
+  TicketPriority,
+} from './ticket'
 
 export interface AiTriageRecommendationResponse {
   recommendationId: string
@@ -12,4 +14,21 @@ export interface AiTriageRecommendationResponse {
   promptVersion: string
   generatedByUserId: string
   createdAt: string
+  applied: boolean
+  appliedByUserId: string | null
+  appliedAt: string | null
+}
+
+export interface AiTriageApplicationResponse {
+  recommendationId: string
+  ticketId: string
+  ticketNumber: string
+  previousPriority: TicketPriority
+  appliedPriority: TicketPriority
+  previousResponseDueAt: string
+  responseDueAt: string
+  previousResolutionDueAt: string
+  resolutionDueAt: string
+  appliedByUserId: string
+  appliedAt: string
 }

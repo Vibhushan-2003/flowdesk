@@ -318,10 +318,15 @@ public class AiTriagePersistenceService {
                 recommendation
                         .getGeneratedByUser();
 
+        User appliedBy =
+                recommendation
+                        .getAppliedByUser();
+
         return new AiTriageResponse(
                 recommendation.getId(),
 
                 ticket.getId(),
+
                 ticket.getTicketNumber(),
 
                 recommendation
@@ -345,7 +350,17 @@ public class AiTriagePersistenceService {
                 generatedBy.getId(),
 
                 recommendation
-                        .getCreatedAt()
+                        .getCreatedAt(),
+
+                recommendation
+                        .isApplied(),
+
+                appliedBy == null
+                        ? null
+                        : appliedBy.getId(),
+
+                recommendation
+                        .getAppliedAt()
         );
     }
 }

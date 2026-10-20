@@ -202,6 +202,28 @@ export function SupportTicketDetailsPage() {
     ticketNumber,
   ])
 
+  async function handleAiTriageApplied() {
+    if (!accessToken || !ticketNumber) {
+      throw new Error(
+        'Your session is no longer valid',
+      )
+    }
+
+    const refreshedTicket =
+      await getSupportTicket(
+        accessToken,
+        ticketNumber,
+      )
+
+    setTicket(
+      refreshedTicket,
+    )
+
+    setSuccessMessage(
+      `AI recommendation applied. Ticket priority is now ${refreshedTicket.priority}.`,
+    )
+  }
+
   async function handleStatusChange(
     nextStatus: TicketStatus,
   ) {
@@ -455,6 +477,12 @@ export function SupportTicketDetailsPage() {
                   }
                   currentPriority={
                     ticket.priority
+                  }
+                  ticketStatus={
+                    ticket.status
+                  }
+                  onApplied={
+                    handleAiTriageApplied
                   }
                 />
               )}

@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './config'
 
 import type {
+  AiTriageApplicationResponse,
   AiTriageRecommendationResponse,
 } from '../types/aiTriage'
 
@@ -34,16 +35,6 @@ export async function getAiTriageRecommendation(
     },
   )
 
-  /*
-   * Day 25 uses 404 both when there is no stored
-   * recommendation and when the support engineer
-   * no longer owns the ticket.
-   *
-   * The parent support page already verifies ticket
-   * ownership before this component is displayed,
-   * so an initial 404 here means there is no
-   * recommendation to show yet.
-   */
   if (response.status === 404) {
     return null
   }
@@ -134,5 +125,61 @@ export async function generateAiTriageRecommendation(
 
   return response.json() as Promise<
     AiTriageRecommendationResponse
+  >
+}
+
+export async function applyAiTriageRecommendation(
+  accessToken: string,
+  ticketNumber: string,
+): Promise<AiTriageApplicationResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/support/tickets/${encodeURIComponent(
+      ticketNumber,
+    )}/ai-triage/apply`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  )
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new AiTriageApiError(
+        'Your session is no longer valid',
+        response.status,
+      )
+    }
+
+    if (response.status === 403) {
+      throw new AiTriageApiError(
+        'You do not have permission to apply AI triage',
+        response.status,
+      )
+    }
+
+    if (response.status === 404) {
+      throw new AiTriageApiError(
+        'The ticket or AI recommendation is no longer available',
+        response.status,
+      )
+    }
+
+    if (response.status === 409) {
+      throw new AiTriageApiError(
+        'The AI recommendation cannot be applied from the ticket current state',
+        response.status,
+      )
+    }
+
+    throw new AiTriageApiError(
+      'Unable to apply the AI recommendation. Please try again.',
+      response.status,
+    )
+  }
+
+  return response.json() as Promise<
+    AiTriageApplicationResponse
   >
 }
