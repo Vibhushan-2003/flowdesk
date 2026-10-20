@@ -13,7 +13,10 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static org.mockito.Mockito.mock;
 
@@ -89,6 +92,119 @@ class AiTriageRecommendationTest {
                 ),
                 recommendation.getCreatedAt()
         );
+
+        assertFalse(
+                recommendation.isApplied()
+        );
+    }
+
+    @Test
+    void recommendationCanBeMarkedApplied() {
+
+        AiTriageRecommendation recommendation =
+                createRecommendation();
+
+        User applyingEngineer =
+                mock(User.class);
+
+        OffsetDateTime appliedAt =
+                OffsetDateTime.parse(
+                        "2026-10-13T14:00:00+05:30"
+                );
+
+        recommendation.markApplied(
+                applyingEngineer,
+                appliedAt
+        );
+
+        assertTrue(
+                recommendation.isApplied()
+        );
+
+        assertSame(
+                applyingEngineer,
+                recommendation.getAppliedByUser()
+        );
+
+        assertEquals(
+                appliedAt.withOffsetSameInstant(
+                        ZoneOffset.UTC
+                ),
+                recommendation.getAppliedAt()
+        );
+    }
+
+    @Test
+    void recommendationCannotBeAppliedTwice() {
+
+        AiTriageRecommendation recommendation =
+                createRecommendation();
+
+        recommendation.markApplied(
+                mock(User.class),
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
+                )
+        );
+
+        IllegalStateException exception =
+                assertThrows(
+                        IllegalStateException.class,
+                        () ->
+                                recommendation.markApplied(
+                                        mock(User.class),
+                                        OffsetDateTime.now(
+                                                ZoneOffset.UTC
+                                        )
+                                )
+                );
+
+        assertEquals(
+                "AI triage recommendation has already been applied",
+                exception.getMessage()
+        );
+    }
+
+    @Test
+    void applyingUserIsRequired() {
+
+        AiTriageRecommendation recommendation =
+                createRecommendation();
+
+        assertThrows(
+                NullPointerException.class,
+                () ->
+                        recommendation.markApplied(
+                                null,
+                                OffsetDateTime.now(
+                                        ZoneOffset.UTC
+                                )
+                        )
+        );
+
+        assertFalse(
+                recommendation.isApplied()
+        );
+    }
+
+    @Test
+    void appliedTimeIsRequired() {
+
+        AiTriageRecommendation recommendation =
+                createRecommendation();
+
+        assertThrows(
+                NullPointerException.class,
+                () ->
+                        recommendation.markApplied(
+                                mock(User.class),
+                                null
+                        )
+        );
+
+        assertFalse(
+                recommendation.isApplied()
+        );
     }
 
     @Test
@@ -160,6 +276,26 @@ class AiTriageRecommendationTest {
                                         ZoneOffset.UTC
                                 )
                         )
+        );
+    }
+
+    private AiTriageRecommendation
+            createRecommendation() {
+
+        return new AiTriageRecommendation(
+                mock(Ticket.class),
+                mock(User.class),
+                TicketPriority.HIGH,
+                new BigDecimal(
+                        "0.9000"
+                ),
+                "Business-critical work is blocked.",
+                "GOOGLE_GEMINI",
+                "gemini-3.1-flash-lite",
+                "triage-v1",
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
+                )
         );
     }
 }

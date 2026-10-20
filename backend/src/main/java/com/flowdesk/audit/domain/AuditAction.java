@@ -18,5 +18,7 @@ public enum AuditAction {
 
     SLA_RESOLUTION_BREACHED,
 
-    AI_TRIAGE_GENERATED
+    AI_TRIAGE_GENERATED,
+
+    AI_TRIAGE_APPLIED
 }

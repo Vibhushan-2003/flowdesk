@@ -294,6 +294,144 @@ public class Ticket {
                         );
     }
 
+    public void applyPriorityAndRecalculateSla(
+            TicketPriority newPriority,
+            SlaPolicy newSlaPolicy
+    ) {
+        Objects.requireNonNull(
+                newPriority,
+                "New ticket priority is required"
+        );
+
+        Objects.requireNonNull(
+                newSlaPolicy,
+                "New SLA policy is required"
+        );
+
+        /*
+         * Day 26 intentionally allows AI-assisted
+         * priority application only before support work
+         * begins.
+         *
+         * Once the ticket moves to IN_PROGRESS, changing
+         * the SLA target would rewrite historical response
+         * performance.
+         */
+        if (status
+                != TicketStatus.ASSIGNED) {
+
+            throw new IllegalStateException(
+                    "Ticket priority can only be changed while assigned"
+            );
+        }
+
+        /*
+         * An assigned ticket should already have its SLA
+         * snapshot.
+         *
+         * Incidents receive it at creation.
+         * Service requests receive it after approval.
+         */
+        if (slaPolicy == null
+                || responseDueAt == null
+                || resolutionDueAt == null) {
+
+            throw new IllegalStateException(
+                    "Ticket SLA is not initialized"
+            );
+        }
+
+        if (!newSlaPolicy.isActive()) {
+            throw new IllegalArgumentException(
+                    "SLA policy must be active"
+            );
+        }
+
+        if (newSlaPolicy.getPriority()
+                != newPriority) {
+
+            throw new IllegalArgumentException(
+                    "SLA policy priority does not match new ticket priority"
+            );
+        }
+
+        /*
+         * Preserve the ORIGINAL SLA start time.
+         *
+         * We do not reset the SLA clock when priority
+         * changes.
+         *
+         * Example:
+         *
+         * Original MEDIUM:
+         * start     = 10:00
+         * response  = 11:00
+         *
+         * If HIGH response time is 30 minutes,
+         * the new deadline becomes 10:30,
+         * NOT "current time + 30 minutes".
+         */
+        OffsetDateTime responseSlaStartedAt =
+                responseDueAt
+                        .minusMinutes(
+                                slaPolicy
+                                        .getResponseMinutes()
+                        );
+
+        OffsetDateTime resolutionSlaStartedAt =
+                resolutionDueAt
+                        .minusMinutes(
+                                slaPolicy
+                                        .getResolutionMinutes()
+                        );
+
+        /*
+         * Both existing deadlines must represent the same
+         * original SLA start.
+         *
+         * If they do not, the ticket already contains an
+         * inconsistent SLA snapshot and we must not silently
+         * overwrite it.
+         */
+        if (!responseSlaStartedAt
+                .toInstant()
+                .equals(
+                        resolutionSlaStartedAt
+                                .toInstant()
+                )) {
+
+            throw new IllegalStateException(
+                    "Existing SLA deadlines are inconsistent"
+            );
+        }
+
+        OffsetDateTime preservedSlaStart =
+                responseSlaStartedAt
+                        .withOffsetSameInstant(
+                                ZoneOffset.UTC
+                        );
+
+        priority =
+                newPriority;
+
+        slaPolicy =
+                newSlaPolicy;
+
+        responseDueAt =
+                preservedSlaStart
+                        .plusMinutes(
+                                newSlaPolicy
+                                        .getResponseMinutes()
+                        );
+
+        resolutionDueAt =
+                preservedSlaStart
+                        .plusMinutes(
+                                newSlaPolicy
+                                        .getResolutionMinutes()
+                        );
+    }
+
     public void markAssigned() {
         if (status
                 != TicketStatus.OPEN) {

@@ -116,6 +116,13 @@ public class AiTriageRecommendation {
     )
     private OffsetDateTime createdAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "applied_by_user_id")
+    private User appliedByUser;
+
+    @Column(name = "applied_at")
+    private OffsetDateTime appliedAt;
+
     protected AiTriageRecommendation() {
     }
 
@@ -185,9 +192,10 @@ public class AiTriageRecommendation {
                 Objects.requireNonNull(
                         createdAt,
                         "Created time is required"
-                ).withOffsetSameInstant(
-                        ZoneOffset.UTC
-                );
+                )
+                        .withOffsetSameInstant(
+                                ZoneOffset.UTC
+                        );
     }
 
     @PrePersist
@@ -203,6 +211,41 @@ public class AiTriageRecommendation {
                             ZoneOffset.UTC
                     );
         }
+    }
+
+    public void markApplied(
+            User appliedByUser,
+            OffsetDateTime appliedAt
+    ) {
+        Objects.requireNonNull(
+                appliedByUser,
+                "Applying user is required"
+        );
+
+        Objects.requireNonNull(
+                appliedAt,
+                "Applied time is required"
+        );
+
+        if (isApplied()) {
+            throw new IllegalStateException(
+                    "AI triage recommendation has already been applied"
+            );
+        }
+
+        this.appliedByUser =
+                appliedByUser;
+
+        this.appliedAt =
+                appliedAt
+                        .withOffsetSameInstant(
+                                ZoneOffset.UTC
+                        );
+    }
+
+    public boolean isApplied() {
+        return appliedByUser != null
+                || appliedAt != null;
     }
 
     private BigDecimal normalizeConfidence(
@@ -302,5 +345,13 @@ public class AiTriageRecommendation {
 
     public OffsetDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public User getAppliedByUser() {
+        return appliedByUser;
+    }
+
+    public OffsetDateTime getAppliedAt() {
+        return appliedAt;
     }
 }

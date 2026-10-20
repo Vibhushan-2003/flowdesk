@@ -311,3 +311,163 @@
     display: none;
   }
 }
+.ai-triage-apply-row {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 22px 20px;
+  padding: 16px;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  background: #f8faff;
+}
+
+.ai-triage-apply-row strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #1f2937;
+  font-size: 0.88rem;
+}
+
+.ai-triage-apply-row p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.84rem;
+}
+
+.ai-triage-apply-button,
+.ai-triage-confirm-button {
+  flex-shrink: 0;
+  padding: 10px 15px;
+  border: 0;
+  border-radius: 9px;
+  background: #4f46e5;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.ai-triage-apply-button:hover:not(:disabled),
+.ai-triage-confirm-button:hover:not(:disabled) {
+  background: #4338ca;
+}
+
+.ai-triage-apply-button:disabled,
+.ai-triage-confirm-button:disabled,
+.ai-triage-cancel-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ai-triage-confirmation {
+  margin: 0 22px 20px;
+  padding: 16px;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  background: #fffbeb;
+}
+
+.ai-triage-confirmation > strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #92400e;
+  font-size: 0.9rem;
+}
+
+.ai-triage-confirmation > p {
+  margin: 0;
+  color: #78350f;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.ai-triage-confirmation-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.ai-triage-cancel-button {
+  padding: 9px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.ai-triage-cancel-button:hover:not(:disabled) {
+  background: #f9fafb;
+}
+
+.ai-triage-applied-message {
+  margin: 0 22px 20px;
+  padding: 14px 16px;
+  border: 1px solid #bbf7d0;
+  border-left: 4px solid #16a34a;
+  border-radius: 8px;
+  background: #f0fdf4;
+}
+
+.ai-triage-applied-message strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #166534;
+  font-size: 0.86rem;
+}
+
+.ai-triage-applied-message p {
+  margin: 0;
+  color: #15803d;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.ai-triage-locked-message {
+  margin: 0 22px 20px;
+  padding: 14px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.ai-triage-locked-message strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #374151;
+  font-size: 0.86rem;
+}
+
+.ai-triage-locked-message p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 700px) {
+  .ai-triage-apply-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ai-triage-apply-button {
+    width: 100%;
+  }
+
+  .ai-triage-confirmation-actions {
+    flex-direction: column-reverse;
+  }
+
+  .ai-triage-confirm-button,
+  .ai-triage-cancel-button {
+    width: 100%;
+  }
+}

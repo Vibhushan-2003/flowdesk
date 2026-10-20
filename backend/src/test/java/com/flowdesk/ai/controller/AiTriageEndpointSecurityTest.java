@@ -1,6 +1,9 @@
 package com.flowdesk.ai.controller;
 
+import com.flowdesk.ai.dto.AiTriageApplicationResponse;
 import com.flowdesk.ai.dto.AiTriageResponse;
+
+import com.flowdesk.ai.service.AiTriageApplicationService;
 import com.flowdesk.ai.service.AiTriageService;
 
 import com.flowdesk.ticket.domain.TicketPriority;
@@ -46,6 +49,10 @@ class AiTriageEndpointSecurityTest {
     private AiTriageService
             aiTriageService;
 
+    @MockitoBean
+    private AiTriageApplicationService
+            aiTriageApplicationService;
+
     @Test
     void unauthenticatedUserCannotGetAiTriage()
             throws Exception {
@@ -66,6 +73,19 @@ class AiTriageEndpointSecurityTest {
         mockMvc.perform(
                 post(
                         "/api/support/tickets/FD-000024/ai-triage"
+                )
+        ).andExpect(
+                status().isUnauthorized()
+        );
+    }
+
+    @Test
+    void unauthenticatedUserCannotApplyAiTriage()
+            throws Exception {
+
+        mockMvc.perform(
+                post(
+                        "/api/support/tickets/FD-000024/ai-triage/apply"
                 )
         ).andExpect(
                 status().isUnauthorized()
@@ -111,6 +131,35 @@ class AiTriageEndpointSecurityTest {
         mockMvc.perform(
                 post(
                         "/api/support/tickets/FD-000024/ai-triage"
+                )
+                        .with(
+                                jwt()
+                                        .jwt(jwt ->
+                                                jwt.subject(
+                                                        userId.toString()
+                                                )
+                                        )
+                                        .authorities(
+                                                new SimpleGrantedAuthority(
+                                                        "ROLE_EMPLOYEE"
+                                                )
+                                        )
+                        )
+        ).andExpect(
+                status().isForbidden()
+        );
+    }
+
+    @Test
+    void employeeCannotApplyAiTriage()
+            throws Exception {
+
+        UUID userId =
+                UUID.randomUUID();
+
+        mockMvc.perform(
+                post(
+                        "/api/support/tickets/FD-000024/ai-triage/apply"
                 )
                         .with(
                                 jwt()
@@ -193,6 +242,13 @@ class AiTriageEndpointSecurityTest {
                         ).value(
                                 "GOOGLE_GEMINI"
                         )
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.applied"
+                        ).value(
+                                false
+                        )
                 );
 
         verify(
@@ -266,11 +322,98 @@ class AiTriageEndpointSecurityTest {
                         ).value(
                                 0.95
                         )
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.applied"
+                        ).value(
+                                false
+                        )
                 );
 
         verify(
                 aiTriageService
         ).generateRecommendation(
+                userId,
+                "FD-000024"
+        );
+    }
+
+    @Test
+    void supportEngineerCanApplyAiTriage()
+            throws Exception {
+
+        UUID userId =
+                UUID.randomUUID();
+
+        AiTriageApplicationResponse response =
+                createApplicationResponse(
+                        userId
+                );
+
+        when(
+                aiTriageApplicationService
+                        .applyRecommendation(
+                                userId,
+                                "FD-000024"
+                        )
+        ).thenReturn(
+                response
+        );
+
+        mockMvc.perform(
+                post(
+                        "/api/support/tickets/FD-000024/ai-triage/apply"
+                )
+                        .with(
+                                jwt()
+                                        .jwt(jwt ->
+                                                jwt.subject(
+                                                        userId.toString()
+                                                )
+                                        )
+                                        .authorities(
+                                                new SimpleGrantedAuthority(
+                                                        "ROLE_SUPPORT_ENGINEER"
+                                                )
+                                        )
+                        )
+        )
+                .andExpect(
+                        status().isOk()
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.ticketNumber"
+                        ).value(
+                                "FD-000024"
+                        )
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.previousPriority"
+                        ).value(
+                                "MEDIUM"
+                        )
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.appliedPriority"
+                        ).value(
+                                "HIGH"
+                        )
+                )
+                .andExpect(
+                        jsonPath(
+                                "$.appliedByUserId"
+                        ).value(
+                                userId.toString()
+                        )
+                );
+
+        verify(
+                aiTriageApplicationService
+        ).applyRecommendation(
                 userId,
                 "FD-000024"
         );
@@ -295,6 +438,36 @@ class AiTriageEndpointSecurityTest {
                 generatedByUserId,
                 OffsetDateTime.parse(
                         "2026-10-13T05:01:00Z"
+                )
+        );
+    }
+
+    private AiTriageApplicationResponse
+            createApplicationResponse(
+                    UUID appliedByUserId
+            ) {
+
+        return new AiTriageApplicationResponse(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "FD-000024",
+                TicketPriority.MEDIUM,
+                TicketPriority.HIGH,
+                OffsetDateTime.parse(
+                        "2026-10-13T05:00:00Z"
+                ),
+                OffsetDateTime.parse(
+                        "2026-10-13T04:30:00Z"
+                ),
+                OffsetDateTime.parse(
+                        "2026-10-14T04:00:00Z"
+                ),
+                OffsetDateTime.parse(
+                        "2026-10-13T12:00:00Z"
+                ),
+                appliedByUserId,
+                OffsetDateTime.parse(
+                        "2026-10-13T08:45:00Z"
                 )
         );
     }

@@ -1,12 +1,16 @@
 package com.flowdesk.ai.controller;
 
+import com.flowdesk.ai.dto.AiTriageApplicationResponse;
 import com.flowdesk.ai.dto.AiTriageResponse;
+
+import com.flowdesk.ai.service.AiTriageApplicationService;
 import com.flowdesk.ai.service.AiTriageService;
 
 import com.flowdesk.ticket.domain.TicketPriority;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.mockito.Mock;
@@ -37,6 +41,10 @@ class AiTriageControllerTest {
     private AiTriageService
             aiTriageService;
 
+    @Mock
+    private AiTriageApplicationService
+            aiTriageApplicationService;
+
     private AiTriageController controller;
 
     private UUID userId;
@@ -48,7 +56,8 @@ class AiTriageControllerTest {
 
         controller =
                 new AiTriageController(
-                        aiTriageService
+                        aiTriageService,
+                        aiTriageApplicationService
                 );
 
         userId =
@@ -145,6 +154,83 @@ class AiTriageControllerTest {
         verify(
                 aiTriageService
         ).getRecommendation(
+                userId,
+                "FD-000024"
+        );
+    }
+
+    @Test
+    void applyRecommendationDelegatesAuthenticatedUserAndTicket() {
+
+        OffsetDateTime previousResponseDueAt =
+                OffsetDateTime.parse(
+                        "2026-10-13T05:00:00Z"
+                );
+
+        OffsetDateTime newResponseDueAt =
+                OffsetDateTime.parse(
+                        "2026-10-13T04:30:00Z"
+                );
+
+        OffsetDateTime previousResolutionDueAt =
+                OffsetDateTime.parse(
+                        "2026-10-14T04:00:00Z"
+                );
+
+        OffsetDateTime newResolutionDueAt =
+                OffsetDateTime.parse(
+                        "2026-10-13T12:00:00Z"
+                );
+
+        AiTriageApplicationResponse
+                applicationResponse =
+                new AiTriageApplicationResponse(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        "FD-000024",
+                        TicketPriority.MEDIUM,
+                        TicketPriority.HIGH,
+                        previousResponseDueAt,
+                        newResponseDueAt,
+                        previousResolutionDueAt,
+                        newResolutionDueAt,
+                        userId,
+                        OffsetDateTime.parse(
+                                "2026-10-13T08:45:00Z"
+                        )
+                );
+
+        when(
+                aiTriageApplicationService
+                        .applyRecommendation(
+                                userId,
+                                "FD-000024"
+                        )
+        ).thenReturn(
+                applicationResponse
+        );
+
+        ResponseEntity<AiTriageApplicationResponse>
+                response =
+                controller
+                        .applyRecommendation(
+                                jwt,
+                                "FD-000024"
+                        );
+
+        assertEquals(
+                HttpStatus.OK,
+                response.getStatusCode()
+        );
+
+        assertSame(
+                applicationResponse,
+                response.getBody()
+        );
+
+        verify(
+                aiTriageApplicationService
+        ).applyRecommendation(
                 userId,
                 "FD-000024"
         );
