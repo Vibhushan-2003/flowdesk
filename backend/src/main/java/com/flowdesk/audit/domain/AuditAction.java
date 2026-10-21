@@ -20,5 +20,7 @@ public enum AuditAction {
 
     AI_TRIAGE_GENERATED,
 
-    AI_TRIAGE_APPLIED
+    AI_TRIAGE_APPLIED,
+
+    AI_REPLY_DRAFT_GENERATED
 }

@@ -3,7 +3,9 @@ import {
   Outlet,
 } from 'react-router-dom'
 
-import { useAuth } from '../auth/useAuth'
+import {
+  useAuth,
+} from '../auth/useAuth'
 
 interface RoleProtectedRouteProps {
   allowedRoles: string[]
@@ -14,8 +16,22 @@ export function RoleProtectedRoute({
 }: RoleProtectedRouteProps) {
   const {
     isAuthenticated,
+    isAuthLoading,
     user,
-  } = useAuth()
+  } =
+    useAuth()
+
+  if (isAuthLoading) {
+    return (
+      <main className="support-loading-state">
+        <div className="support-loading-dot" />
+
+        <p>
+          Restoring your session...
+        </p>
+      </main>
+    )
+  }
 
   if (!isAuthenticated) {
     return (
