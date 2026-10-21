@@ -10,6 +10,10 @@ import {
 } from 'react-router-dom'
 
 import {
+  generateAiReplyDraft,
+} from '../api/aiReplyDraft'
+
+import {
   addSupportTicketComment,
   getSupportTicket,
   getSupportTicketComments,
@@ -112,10 +116,28 @@ export function SupportTicketDetailsPage() {
   const [isSendingComment, setIsSendingComment] =
     useState(false)
 
+  const [
+    isGeneratingReplyDraft,
+    setIsGeneratingReplyDraft,
+  ] =
+    useState(false)
+
   const [error, setError] =
     useState<string | null>(null)
 
   const [commentError, setCommentError] =
+    useState<string | null>(null)
+
+  const [
+    aiReplyDraftError,
+    setAiReplyDraftError,
+  ] =
+    useState<string | null>(null)
+
+  const [
+    aiReplyDraftNotice,
+    setAiReplyDraftNotice,
+  ] =
     useState<string | null>(null)
 
   const [successMessage, setSuccessMessage] =
@@ -269,6 +291,67 @@ export function SupportTicketDetailsPage() {
     }
   }
 
+  async function handleGenerateAiReplyDraft() {
+    if (!accessToken || !ticketNumber) {
+      setAiReplyDraftError(
+        'Your session is no longer valid',
+      )
+
+      return
+    }
+
+    /*
+     * Never overwrite something that the engineer
+     * has already typed or edited.
+     */
+    if (commentBody.trim()) {
+      setAiReplyDraftError(
+        'Clear the current message before generating a new AI draft',
+      )
+
+      return
+    }
+
+    setIsGeneratingReplyDraft(true)
+    setAiReplyDraftError(null)
+    setAiReplyDraftNotice(null)
+    setCommentError(null)
+
+    try {
+      const response =
+        await generateAiReplyDraft(
+          accessToken,
+          ticketNumber,
+        )
+
+      /*
+       * The AI result only fills the normal editable
+       * message textarea.
+       *
+       * This does NOT send or persist a comment.
+       */
+      setCommentBody(
+        response.draft,
+      )
+
+      setAiReplyDraftNotice(
+        `AI draft generated with ${response.model}. Review and edit it before sending.`,
+      )
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setAiReplyDraftError(
+          caughtError.message,
+        )
+      } else {
+        setAiReplyDraftError(
+          'Unable to generate AI reply draft',
+        )
+      }
+    } finally {
+      setIsGeneratingReplyDraft(false)
+    }
+  }
+
   async function handleSendComment(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -320,6 +403,8 @@ export function SupportTicketDetailsPage() {
       ])
 
       setCommentBody('')
+      setAiReplyDraftNotice(null)
+      setAiReplyDraftError(null)
     } catch (caughtError) {
       if (caughtError instanceof Error) {
         setCommentError(
@@ -339,6 +424,11 @@ export function SupportTicketDetailsPage() {
     ticket?.status === 'RESOLVED' ||
     ticket?.status === 'CLOSED' ||
     ticket?.status === 'CANCELLED'
+
+  const hasDraftableMessage =
+    Boolean(
+      commentBody.trim(),
+    )
 
   return (
     <main className="support-ticket-details-page">
@@ -866,6 +956,46 @@ export function SupportTicketDetailsPage() {
                   Message requester
                 </label>
 
+                <div className="ticket-comment-form-footer">
+                  <span>
+                    AI can prepare an editable draft.
+                    It is never sent automatically.
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={
+                      isGeneratingReplyDraft ||
+                      isSendingComment ||
+                      hasDraftableMessage
+                    }
+                    onClick={() =>
+                      void handleGenerateAiReplyDraft()
+                    }
+                  >
+                    {isGeneratingReplyDraft
+                      ? 'Drafting...'
+                      : 'Draft reply with AI'}
+                  </button>
+                </div>
+
+                {aiReplyDraftNotice && (
+                  <p
+                    aria-live="polite"
+                  >
+                    {aiReplyDraftNotice}
+                  </p>
+                )}
+
+                {aiReplyDraftError && (
+                  <p
+                    className="form-error"
+                    role="alert"
+                  >
+                    {aiReplyDraftError}
+                  </p>
+                )}
+
                 <textarea
                   id="support-comment-body"
                   value={commentBody}
@@ -873,7 +1003,8 @@ export function SupportTicketDetailsPage() {
                   rows={4}
                   placeholder="Ask a question or send an update..."
                   disabled={
-                    isSendingComment
+                    isSendingComment ||
+                    isGeneratingReplyDraft
                   }
                   onChange={(event) => {
                     setCommentBody(
@@ -882,6 +1013,12 @@ export function SupportTicketDetailsPage() {
 
                     if (commentError) {
                       setCommentError(
+                        null,
+                      )
+                    }
+
+                    if (aiReplyDraftError) {
+                      setAiReplyDraftError(
                         null,
                       )
                     }
@@ -899,6 +1036,7 @@ export function SupportTicketDetailsPage() {
                     className="primary-button"
                     disabled={
                       isSendingComment ||
+                      isGeneratingReplyDraft ||
                       !commentBody.trim()
                     }
                   >
