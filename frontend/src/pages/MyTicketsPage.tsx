@@ -1,22 +1,13 @@
 
-import {
-  type FormEvent,
-  useEffect,
-  useState,
-} from 'react'
-
+import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import {
   getMyTickets,
   type TicketListFilters,
 } from '../api/ticket'
-
 import { useAuth } from '../auth/useAuth'
-
-
-import '../styles/ticket-filters.css'
-
+import { TicketListOverview } from '../components/TicketListOverview'
 
 import type {
   PageResponse,
@@ -26,24 +17,18 @@ import type {
   TicketSummary,
 } from '../types/ticket'
 
+import '../styles/ticket-filters.css'
+import '../styles/ticket-list-overview.css'
+
 const PAGE_SIZE = 10
 
 const STATUSES: TicketStatus[] = [
-  'PENDING_APPROVAL',
-  'OPEN',
-  'ASSIGNED',
-  'IN_PROGRESS',
-  'WAITING_FOR_USER',
-  'RESOLVED',
-  'CLOSED',
-  'CANCELLED',
+  'PENDING_APPROVAL', 'OPEN', 'ASSIGNED', 'IN_PROGRESS',
+  'WAITING_FOR_USER', 'RESOLVED', 'CLOSED', 'CANCELLED',
 ]
 
 const PRIORITIES: TicketPriority[] = [
-  'LOW',
-  'MEDIUM',
-  'HIGH',
-  'CRITICAL',
+  'LOW', 'MEDIUM', 'HIGH', 'CRITICAL',
 ]
 
 const DEFAULT_FILTERS: TicketListFilters = {
@@ -58,29 +43,19 @@ function formatLabel(value: string) {
 }
 
 function formatDate(value: string | null) {
-  if (!value) {
-    return 'Not started'
-  }
-
+  if (!value) return 'Not started'
   const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return date.toLocaleString()
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString()
 }
 
 function formatSlaStatus(status: SlaStatus) {
   switch (status) {
-    case 'MET':
-      return 'Met'
-    case 'BREACHED':
-      return 'Breached'
-    case 'PENDING':
-      return 'Pending'
-    case 'UNKNOWN':
-      return 'Unknown'
+    case 'MET': return 'Met'
+    case 'BREACHED': return 'Breached'
+    case 'PENDING': return 'Pending'
+    case 'UNKNOWN': return 'Unknown'
   }
 }
 
@@ -89,15 +64,11 @@ export function MyTicketsPage() {
   const navigate = useNavigate()
 
   const [page, setPage] = useState(0)
-
   const [searchText, setSearchText] = useState('')
-
   const [selectedStatus, setSelectedStatus] =
     useState<TicketStatus | ''>('')
-
   const [selectedPriority, setSelectedPriority] =
     useState<TicketPriority | ''>('')
-
   const [selectedSort, setSelectedSort] =
     useState<'newest' | 'oldest'>('newest')
 
@@ -105,22 +76,15 @@ export function MyTicketsPage() {
     useState<TicketListFilters>(DEFAULT_FILTERS)
 
   const [ticketPage, setTicketPage] =
-    useState<PageResponse<TicketSummary> | null>(
-      null,
-    )
+    useState<PageResponse<TicketSummary> | null>(null)
 
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshVersion, setRefreshVersion] = useState(0)
 
-  const [error, setError] =
-    useState<string | null>(null)
-
-  function applyFilters(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-
     setPage(0)
-
     setAppliedFilters({
       search: searchText.trim(),
       status: selectedStatus,
@@ -134,9 +98,12 @@ export function MyTicketsPage() {
     setSelectedStatus('')
     setSelectedPriority('')
     setSelectedSort('newest')
-
     setPage(0)
     setAppliedFilters({ ...DEFAULT_FILTERS })
+  }
+
+  function refreshTickets() {
+    setRefreshVersion((version) => version + 1)
   }
 
   useEffect(() => {
@@ -145,13 +112,10 @@ export function MyTicketsPage() {
     async function loadTickets() {
       if (!accessToken) {
         if (!cancelled) {
-          setError(
-            'Your session is no longer valid',
-          )
-
+          setTicketPage(null)
+          setError('Your session is no longer valid')
           setIsLoading(false)
         }
-
         return
       }
 
@@ -170,19 +134,16 @@ export function MyTicketsPage() {
           setTicketPage(response)
         }
       } catch (caughtError) {
-        if (cancelled) {
-          return
-        }
-
-        if (caughtError instanceof Error) {
-          setError(caughtError.message)
-        } else {
-          setError('Unable to load tickets')
+        if (!cancelled) {
+          setTicketPage(null)
+          setError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : 'Unable to load tickets',
+          )
         }
       } finally {
-        if (!cancelled) {
-          setIsLoading(false)
-        }
+        if (!cancelled) setIsLoading(false)
       }
     }
 
@@ -191,11 +152,7 @@ export function MyTicketsPage() {
     return () => {
       cancelled = true
     }
-  }, [
-    accessToken,
-    page,
-    appliedFilters,
-  ])
+  }, [accessToken, page, appliedFilters, refreshVersion])
 
   const hasFilters = Boolean(
     appliedFilters.search ||
@@ -207,12 +164,8 @@ export function MyTicketsPage() {
     <main className="tickets-page">
       <header className="tickets-header">
         <div>
-          <p className="eyebrow">
-            FlowDesk
-          </p>
-
+          <p className="eyebrow">FlowDesk</p>
           <h1>My tickets</h1>
-
           <p>
             View and track the IT support tickets
             you have created.
@@ -226,7 +179,6 @@ export function MyTicketsPage() {
           >
             Dashboard
           </button>
-
           <button
             type="button"
             onClick={() => navigate('/tickets/new')}
@@ -239,13 +191,6 @@ export function MyTicketsPage() {
       <form
         onSubmit={applyFilters}
         aria-label="Ticket filters"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 12,
-          alignItems: 'end',
-          margin: '20px 0',
-        }}
       >
         <label>
           Search title or ticket number
@@ -271,12 +216,8 @@ export function MyTicketsPage() {
             }
           >
             <option value="">All statuses</option>
-
             {STATUSES.map((status) => (
-              <option
-                key={status}
-                value={status}
-              >
+              <option key={status} value={status}>
                 {formatLabel(status)}
               </option>
             ))}
@@ -294,12 +235,8 @@ export function MyTicketsPage() {
             }
           >
             <option value="">All priorities</option>
-
             {PRIORITIES.map((priority) => (
-              <option
-                key={priority}
-                value={priority}
-              >
+              <option key={priority} value={priority}>
                 {priority}
               </option>
             ))}
@@ -316,36 +253,33 @@ export function MyTicketsPage() {
               )
             }
           >
-            <option value="newest">
-              Newest first
-            </option>
-            <option value="oldest">
-              Oldest first
-            </option>
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
           </select>
         </label>
 
-        <button type="submit">
-          Apply filters
-        </button>
-
-        <button
-          type="button"
-          onClick={resetFilters}
-        >
+        <button type="submit">Apply filters</button>
+        <button type="button" onClick={resetFilters}>
           Clear
         </button>
       </form>
 
-      {isLoading && (
-        <p>Loading tickets...</p>
-      )}
+      <TicketListOverview
+        filters={appliedFilters}
+        totalElements={
+          error ? null : ticketPage?.totalElements ?? null
+        }
+        visibleCount={
+          error ? 0 : ticketPage?.content.length ?? 0
+        }
+        isLoading={isLoading}
+        onRefresh={refreshTickets}
+      />
+
+      {isLoading && <p>Loading tickets...</p>}
 
       {error && (
-        <p
-          className="form-error"
-          role="alert"
-        >
+        <p className="form-error" role="alert">
           {error}
         </p>
       )}
@@ -360,22 +294,18 @@ export function MyTicketsPage() {
                 ? 'No matching tickets'
                 : 'No tickets yet'}
             </h2>
-
             <p>
               {hasFilters
                 ? 'Try changing your search or filters.'
                 : 'You have not created any support tickets.'}
             </p>
-
             <button
               type="button"
-              onClick={() => {
-                if (hasFilters) {
-                  resetFilters()
-                } else {
-                  navigate('/tickets/new')
-                }
-              }}
+              onClick={() =>
+                hasFilters
+                  ? resetFilters()
+                  : navigate('/tickets/new')
+              }
             >
               {hasFilters
                 ? 'Clear filters'
@@ -408,10 +338,8 @@ export function MyTicketsPage() {
                       >
                         {ticket.ticketNumber}
                       </button>
-
                       <h2>{ticket.title}</h2>
                     </div>
-
                     <span className="ticket-status">
                       {formatLabel(ticket.status)}
                     </span>
@@ -422,36 +350,26 @@ export function MyTicketsPage() {
                       <strong>Type:</strong>{' '}
                       {formatLabel(ticket.type)}
                     </p>
-
                     <p>
                       <strong>Priority:</strong>{' '}
                       {ticket.priority}
                     </p>
-
                     <p>
                       <strong>Created:</strong>{' '}
                       {formatDate(ticket.createdAt)}
                     </p>
-
                     <p>
                       <strong>Response SLA:</strong>{' '}
-                      {formatSlaStatus(
-                        ticket.responseSlaStatus,
-                      )}
+                      {formatSlaStatus(ticket.responseSlaStatus)}
                     </p>
-
                     <p>
                       <strong>Response due:</strong>{' '}
                       {formatDate(ticket.responseDueAt)}
                     </p>
-
                     <p>
                       <strong>Resolution SLA:</strong>{' '}
-                      {formatSlaStatus(
-                        ticket.resolutionSlaStatus,
-                      )}
+                      {formatSlaStatus(ticket.resolutionSlaStatus)}
                     </p>
-
                     <p>
                       <strong>Resolution due:</strong>{' '}
                       {formatDate(ticket.resolutionDueAt)}
@@ -480,26 +398,22 @@ export function MyTicketsPage() {
                 type="button"
                 disabled={ticketPage.first}
                 onClick={() =>
-                  setPage((currentPage) =>
-                    Math.max(0, currentPage - 1),
+                  setPage((current) =>
+                    Math.max(0, current - 1),
                   )
                 }
               >
                 Previous
               </button>
-
               <span>
                 Page {ticketPage.page + 1} of{' '}
                 {ticketPage.totalPages}
               </span>
-
               <button
                 type="button"
                 disabled={ticketPage.last}
                 onClick={() =>
-                  setPage((currentPage) =>
-                    currentPage + 1,
-                  )
+                  setPage((current) => current + 1)
                 }
               >
                 Next
@@ -508,9 +422,7 @@ export function MyTicketsPage() {
 
             <p>
               Total tickets:{' '}
-              <strong>
-                {ticketPage.totalElements}
-              </strong>
+              <strong>{ticketPage.totalElements}</strong>
             </p>
           </>
         )}
