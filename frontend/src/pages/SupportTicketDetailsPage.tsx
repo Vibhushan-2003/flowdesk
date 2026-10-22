@@ -28,6 +28,7 @@ import {
 import { useAuth } from '../auth/useAuth'
 
 import { AiTriageCard } from '../components/AiTriageCard'
+import { AiSupportCopilotCard } from '../components/AiSupportCopilotCard'
 
 import type {
   SlaStatus,
@@ -768,6 +769,14 @@ export function SupportTicketDetailsPage() {
                   onApplied={
                     handleAiTriageApplied
                   }
+                />
+              )}
+
+              {!isConversationReadOnly && (
+                <AiSupportCopilotCard
+                  key={ticket.ticketNumber}
+                  accessToken={accessToken}
+                  ticketNumber={ticket.ticketNumber}
                 />
               )}
 

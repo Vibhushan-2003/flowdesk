@@ -1,0 +1,77 @@
+
+.ai-copilot-card {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  border: 1px solid var(--border-color, #dbe2ea);
+  border-radius: 0.9rem;
+  background: var(--surface-color, #fff);
+}
+
+.ai-copilot-heading,
+.ai-copilot-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ai-copilot-heading h3 {
+  margin: 0.25rem 0;
+}
+
+.ai-copilot-readonly {
+  border-radius: 100px;
+  padding: 0.3rem 0.7rem;
+  background: #eaf4ef;
+  color: #205b42;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.ai-copilot-help,
+.ai-copilot-model,
+.ai-copilot-sources {
+  font-size: 0.9rem;
+  color: var(--text-muted, #526273);
+  line-height: 1.6;
+}
+
+.ai-copilot-card form {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.ai-copilot-card textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 5.5rem;
+  padding: 0.8rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+  resize: vertical;
+}
+
+.ai-copilot-actions {
+  flex-wrap: wrap;
+}
+
+.ai-copilot-answer {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border-radius: 0.7rem;
+  background: #f4f7fb;
+  color: #172033;
+}
+
+.ai-copilot-answer h4 {
+  margin: 0 0 0.5rem;
+}
+
+.ai-copilot-answer-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
