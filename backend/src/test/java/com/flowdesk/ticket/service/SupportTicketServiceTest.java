@@ -17,6 +17,7 @@ import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketStatus;
 import com.flowdesk.ticket.domain.TicketType;
 
+import com.flowdesk.ticket.dto.ResolveTicketRequest;
 import com.flowdesk.ticket.dto.SupportTicketResponse;
 import com.flowdesk.ticket.dto.SupportTicketSummaryResponse;
 import com.flowdesk.ticket.dto.UpdateTicketStatusRequest;
@@ -547,7 +548,7 @@ class SupportTicketServiceTest {
                                                 supportEngineerId,
                                                 "FD-TEST-001",
                                                 new UpdateTicketStatusRequest(
-                                                        TicketStatus.RESOLVED
+                                                        TicketStatus.WAITING_FOR_USER
                                                 )
                                         )
                 );
@@ -574,7 +575,73 @@ class SupportTicketServiceTest {
     }
 
     @Test
-    void resolvingTicketReleasesActiveAssignment() {
+    void genericStatusEndpointCannotResolveTicket() {
+
+        UUID supportEngineerId =
+                UUID.randomUUID();
+
+        TicketAssignment assignment =
+                createAssignedTicketAssignment();
+
+        assignment.getTicket()
+                .transitionSupportStatus(
+                        TicketStatus.IN_PROGRESS
+                );
+
+        when(
+                ticketAssignmentRepository
+                        .findActiveAssignmentForUpdate(
+                                "FD-TEST-001",
+                                supportEngineerId
+                        )
+        ).thenReturn(
+                Optional.of(
+                        assignment
+                )
+        );
+
+        ResponseStatusException exception =
+                assertThrows(
+                        ResponseStatusException.class,
+                        () ->
+                                supportTicketService
+                                        .updateStatus(
+                                                supportEngineerId,
+                                                "FD-TEST-001",
+                                                new UpdateTicketStatusRequest(
+                                                        TicketStatus.RESOLVED
+                                                )
+                                        )
+                );
+
+        assertEquals(
+                HttpStatus.BAD_REQUEST,
+                exception.getStatusCode()
+        );
+
+        assertEquals(
+                "400 BAD_REQUEST \"Use the resolve endpoint to resolve a ticket\"",
+                exception.getMessage()
+        );
+
+        assertEquals(
+                TicketStatus.IN_PROGRESS,
+                assignment.getTicket()
+                        .getStatus()
+        );
+
+        assertNull(
+                assignment.getReleasedAt()
+        );
+
+        verifyNoInteractions(
+                notificationService,
+                auditService
+        );
+    }
+
+    @Test
+    void inProgressTicketCanBeResolvedWithSummary() {
 
         UUID supportEngineerId =
                 UUID.randomUUID();
@@ -609,11 +676,11 @@ class SupportTicketServiceTest {
 
         SupportTicketResponse response =
                 supportTicketService
-                        .updateStatus(
+                        .resolveTicket(
                                 supportEngineerId,
                                 "FD-TEST-001",
-                                new UpdateTicketStatusRequest(
-                                        TicketStatus.RESOLVED
+                                new ResolveTicketRequest(
+                                        "  Restarted the printer service and restored connectivity.  "
                                 )
                         );
 
@@ -624,6 +691,16 @@ class SupportTicketServiceTest {
 
         assertNotNull(
                 response.resolvedAt()
+        );
+
+        assertEquals(
+                "Restarted the printer service and restored connectivity.",
+                response.resolutionSummary()
+        );
+
+        assertEquals(
+                "Restarted the printer service and restored connectivity.",
+                ticket.getResolutionSummary()
         );
 
         assertNotNull(
@@ -665,6 +742,164 @@ class SupportTicketServiceTest {
                                 "RESOLVED"
                         )
                 )
+        );
+    }
+
+    @Test
+    void blankResolutionSummaryReturnsBadRequest() {
+
+        UUID supportEngineerId =
+                UUID.randomUUID();
+
+        TicketAssignment assignment =
+                createAssignedTicketAssignment();
+
+        assignment.getTicket()
+                .transitionSupportStatus(
+                        TicketStatus.IN_PROGRESS
+                );
+
+        when(
+                ticketAssignmentRepository
+                        .findActiveAssignmentForUpdate(
+                                "FD-TEST-001",
+                                supportEngineerId
+                        )
+        ).thenReturn(
+                Optional.of(
+                        assignment
+                )
+        );
+
+        ResponseStatusException exception =
+                assertThrows(
+                        ResponseStatusException.class,
+                        () ->
+                                supportTicketService
+                                        .resolveTicket(
+                                                supportEngineerId,
+                                                "FD-TEST-001",
+                                                new ResolveTicketRequest(
+                                                        "   "
+                                                )
+                                        )
+                );
+
+        assertEquals(
+                HttpStatus.BAD_REQUEST,
+                exception.getStatusCode()
+        );
+
+        assertEquals(
+                TicketStatus.IN_PROGRESS,
+                assignment.getTicket()
+                        .getStatus()
+        );
+
+        assertNull(
+                assignment.getReleasedAt()
+        );
+
+        verifyNoInteractions(
+                notificationService,
+                auditService
+        );
+    }
+
+    @Test
+    void ticketCannotBeResolvedUnlessInProgress() {
+
+        UUID supportEngineerId =
+                UUID.randomUUID();
+
+        TicketAssignment assignment =
+                createAssignedTicketAssignment();
+
+        when(
+                ticketAssignmentRepository
+                        .findActiveAssignmentForUpdate(
+                                "FD-TEST-001",
+                                supportEngineerId
+                        )
+        ).thenReturn(
+                Optional.of(
+                        assignment
+                )
+        );
+
+        ResponseStatusException exception =
+                assertThrows(
+                        ResponseStatusException.class,
+                        () ->
+                                supportTicketService
+                                        .resolveTicket(
+                                                supportEngineerId,
+                                                "FD-TEST-001",
+                                                new ResolveTicketRequest(
+                                                        "Resolved"
+                                                )
+                                        )
+                );
+
+        assertEquals(
+                HttpStatus.CONFLICT,
+                exception.getStatusCode()
+        );
+
+        assertEquals(
+                TicketStatus.ASSIGNED,
+                assignment.getTicket()
+                        .getStatus()
+        );
+
+        assertNull(
+                assignment.getReleasedAt()
+        );
+
+        verifyNoInteractions(
+                notificationService,
+                auditService
+        );
+    }
+
+    @Test
+    void engineerCannotResolveTicketWithoutActiveOwnership() {
+
+        UUID supportEngineerId =
+                UUID.randomUUID();
+
+        when(
+                ticketAssignmentRepository
+                        .findActiveAssignmentForUpdate(
+                                "FD-TEST-001",
+                                supportEngineerId
+                        )
+        ).thenReturn(
+                Optional.empty()
+        );
+
+        ResponseStatusException exception =
+                assertThrows(
+                        ResponseStatusException.class,
+                        () ->
+                                supportTicketService
+                                        .resolveTicket(
+                                                supportEngineerId,
+                                                "FD-TEST-001",
+                                                new ResolveTicketRequest(
+                                                        "Resolved"
+                                                )
+                                        )
+                );
+
+        assertEquals(
+                HttpStatus.NOT_FOUND,
+                exception.getStatusCode()
+        );
+
+        verifyNoInteractions(
+                notificationService,
+                auditService
         );
     }
 

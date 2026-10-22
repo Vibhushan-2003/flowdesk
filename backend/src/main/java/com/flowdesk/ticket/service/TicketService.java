@@ -527,6 +527,7 @@ public class TicketService {
                 ticket.getResolutionDueAt(),
                 ticket.getFirstRespondedAt(),
                 ticket.getResolvedAt(),
+                ticket.getResolutionSummary(),
                 ticket.evaluateResponseSla(
                         evaluatedAt
                 ),

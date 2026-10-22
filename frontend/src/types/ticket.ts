@@ -46,6 +46,7 @@ export interface TicketResponse {
   resolutionDueAt: string | null
   firstRespondedAt: string | null
   resolvedAt: string | null
+  resolutionSummary: string | null
   responseSlaStatus: SlaStatus
   resolutionSlaStatus: SlaStatus
 }
@@ -117,12 +118,17 @@ export interface SupportTicketResponse {
   resolutionDueAt: string
   firstRespondedAt: string | null
   resolvedAt: string | null
+  resolutionSummary: string | null
   responseSlaStatus: SlaStatus
   resolutionSlaStatus: SlaStatus
 }
 
 export interface UpdateTicketStatusRequest {
   status: TicketStatus
+}
+
+export interface ResolveTicketRequest {
+  resolutionSummary: string
 }
 
 export interface CreateTicketCommentRequest {

@@ -13,6 +13,7 @@ import java.time.OffsetDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -466,17 +467,22 @@ class TicketTest {
     }
 
     @Test
-    void inProgressTicketCanBeResolved() {
+    void inProgressTicketCanBeResolvedWithSummary() {
         Ticket ticket =
                 createInProgressTicket();
 
-        ticket.transitionSupportStatus(
-                TicketStatus.RESOLVED
+        ticket.resolve(
+                "  Reset the requester access permissions.  "
         );
 
         assertEquals(
                 TicketStatus.RESOLVED,
                 ticket.getStatus()
+        );
+
+        assertEquals(
+                "Reset the requester access permissions.",
+                ticket.getResolutionSummary()
         );
 
         assertNotNull(
@@ -485,9 +491,74 @@ class TicketTest {
     }
 
     @Test
-    void assignedTicketCannotJumpDirectlyToResolved() {
+    void resolutionRequiresSummary() {
         Ticket ticket =
-                createAssignedTicket();
+                createInProgressTicket();
+
+        IllegalArgumentException exception =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                ticket.resolve(
+                                        "   "
+                                )
+                );
+
+        assertEquals(
+                "Resolution summary is required",
+                exception.getMessage()
+        );
+
+        assertEquals(
+                TicketStatus.IN_PROGRESS,
+                ticket.getStatus()
+        );
+
+        assertNull(
+                ticket.getResolutionSummary()
+        );
+
+        assertNull(
+                ticket.getResolvedAt()
+        );
+    }
+
+    @Test
+    void resolutionSummaryCannotExceedMaximumLength() {
+        Ticket ticket =
+                createInProgressTicket();
+
+        String oversizedSummary =
+                "a".repeat(4001);
+
+        IllegalArgumentException exception =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                ticket.resolve(
+                                        oversizedSummary
+                                )
+                );
+
+        assertEquals(
+                "Resolution summary must not exceed 4000 characters",
+                exception.getMessage()
+        );
+
+        assertEquals(
+                TicketStatus.IN_PROGRESS,
+                ticket.getStatus()
+        );
+
+        assertNull(
+                ticket.getResolutionSummary()
+        );
+    }
+
+    @Test
+    void genericStatusTransitionCannotResolveTicket() {
+        Ticket ticket =
+                createInProgressTicket();
 
         IllegalStateException exception =
                 assertThrows(
@@ -500,7 +571,36 @@ class TicketTest {
 
         assertEquals(
                 "Invalid ticket status transition: "
-                        + "ASSIGNED -> RESOLVED",
+                        + "IN_PROGRESS -> RESOLVED",
+                exception.getMessage()
+        );
+
+        assertEquals(
+                TicketStatus.IN_PROGRESS,
+                ticket.getStatus()
+        );
+
+        assertNull(
+                ticket.getResolutionSummary()
+        );
+    }
+
+    @Test
+    void assignedTicketCannotBeResolved() {
+        Ticket ticket =
+                createAssignedTicket();
+
+        IllegalStateException exception =
+                assertThrows(
+                        IllegalStateException.class,
+                        () ->
+                                ticket.resolve(
+                                        "Resolved"
+                                )
+                );
+
+        assertEquals(
+                "Ticket can only be resolved while in progress",
                 exception.getMessage()
         );
 
@@ -519,12 +619,18 @@ class TicketTest {
                 TicketStatus.WAITING_FOR_USER
         );
 
-        assertThrows(
-                IllegalStateException.class,
-                () ->
-                        ticket.transitionSupportStatus(
-                                TicketStatus.RESOLVED
-                        )
+        IllegalStateException exception =
+                assertThrows(
+                        IllegalStateException.class,
+                        () ->
+                                ticket.resolve(
+                                        "Resolved"
+                                )
+                );
+
+        assertEquals(
+                "Ticket can only be resolved while in progress",
+                exception.getMessage()
         );
 
         assertEquals(

@@ -5,6 +5,7 @@ import type {
   CreateTicketCommentRequest,
   CreateTicketRequest,
   PageResponse,
+  ResolveTicketRequest,
   SupportTicketResponse,
   SupportTicketSummary,
   TicketCommentResponse,
@@ -556,6 +557,70 @@ export async function updateSupportTicketStatus(
 
     throw new Error(
       'Unable to update ticket status. Please try again.',
+    )
+  }
+
+  return response.json() as Promise<
+    SupportTicketResponse
+  >
+}
+
+export async function resolveSupportTicket(
+  accessToken: string,
+  ticketNumber: string,
+  resolutionSummary: string,
+): Promise<SupportTicketResponse> {
+  const request: ResolveTicketRequest = {
+    resolutionSummary,
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/support/tickets/${encodeURIComponent(
+      ticketNumber,
+    )}/resolve`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(request),
+    },
+  )
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        'Your session is no longer valid',
+      )
+    }
+
+    if (response.status === 403) {
+      throw new Error(
+        'You do not have permission to resolve support tickets',
+      )
+    }
+
+    if (response.status === 404) {
+      throw new Error(
+        'Ticket not found or it is no longer assigned to you',
+      )
+    }
+
+    if (response.status === 400) {
+      throw new Error(
+        'Enter a valid resolution summary before resolving the ticket',
+      )
+    }
+
+    if (response.status === 409) {
+      throw new Error(
+        'This ticket can no longer be resolved from its current state',
+      )
+    }
+
+    throw new Error(
+      'Unable to resolve ticket. Please try again.',
     )
   }
 

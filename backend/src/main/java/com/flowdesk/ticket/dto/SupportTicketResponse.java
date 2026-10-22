@@ -31,6 +31,8 @@ public record SupportTicketResponse(
         OffsetDateTime firstRespondedAt,
         OffsetDateTime resolvedAt,
 
+        String resolutionSummary,
+
         SlaStatus responseSlaStatus,
         SlaStatus resolutionSlaStatus
 
