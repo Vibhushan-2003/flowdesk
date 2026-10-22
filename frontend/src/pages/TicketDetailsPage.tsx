@@ -450,6 +450,19 @@ export function TicketDetailsPage() {
                   </div>
                 </div>
               </section>
+
+              {ticket.resolutionSummary?.trim() && (
+                <section
+                  className="ticket-description"
+                  aria-label="Resolution summary"
+                >
+                  <h3>Resolution summary</h3>
+
+                  <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                    {ticket.resolutionSummary}
+                  </p>
+                </section>
+              )}
             </article>
 
             <section className="ticket-conversation-card">

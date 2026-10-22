@@ -6,6 +6,8 @@ import {
   useState,
 } from 'react'
 
+import ReactMarkdown from 'react-markdown'
+
 import { askAiSupportCopilot } from '../api/aiSupportCopilot'
 
 import type {
@@ -176,9 +178,19 @@ export function AiSupportCopilotCard({
         >
           <h4>Copilot suggestion</h4>
 
-          <p className="ai-copilot-answer-text">
-            {result.answer}
-          </p>
+          <div className="ai-copilot-answer-text">
+            <ReactMarkdown
+              skipHtml
+              components={{
+                a: ({ children }) => (
+                  <span>{children}</span>
+                ),
+                img: () => null,
+              }}
+            >
+              {result.answer}
+            </ReactMarkdown>
+          </div>
 
           <p className="ai-copilot-help">
             Review this suggestion before taking action
