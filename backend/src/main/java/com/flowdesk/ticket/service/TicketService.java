@@ -15,6 +15,7 @@ import com.flowdesk.sla.repository.SlaPolicyRepository;
 
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketStatus;
 import com.flowdesk.ticket.domain.TicketType;
 
@@ -288,6 +289,62 @@ public class TicketService {
         );
     }
 
+    // Day 31: Optional database-level requester search and filtering.
+    // The original three-argument method above remains available to existing callers.
+    @Transactional
+    public PageResponse<TicketSummaryResponse> getMyTickets(
+            UUID authenticatedUserId,
+            int page,
+            int size,
+            String search,
+            TicketStatus status,
+            TicketPriority priority,
+            String sort
+    ) {
+        if (page < 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Page must be zero or greater"
+            );
+        }
+        if (size < 1 || size > 100) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Size must be between 1 and 100"
+            );
+        }
+
+        String normalizedSort = sort == null || sort.isBlank()
+                ? "newest"
+                : sort.trim().toLowerCase(Locale.ROOT);
+
+        Sort.Direction direction = switch (normalizedSort) {
+            case "newest" -> Sort.Direction.DESC;
+            case "oldest" -> Sort.Direction.ASC;
+            default -> throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Sort must be newest or oldest"
+            );
+        };
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(direction, "createdAt")
+                        .and(Sort.by(direction, "id"))
+        );
+
+        Page<Ticket> tickets = ticketRepository.searchMyTickets(
+                authenticatedUserId,
+                buildSearchPattern(search),
+                status,
+                priority,
+                pageable
+        );
+
+        return toPageResponse(tickets);
+    }
+
     @Transactional
     public TicketResponse getMyTicket(
             UUID authenticatedUserId,
@@ -476,6 +533,28 @@ public class TicketService {
                 .toUpperCase(
                         Locale.ROOT
                 );
+    }
+
+    private String buildSearchPattern(String search) {
+        if (search == null || search.isBlank()) {
+            return null;
+        }
+
+        String normalized = search.trim().toLowerCase(Locale.ROOT);
+        if (normalized.length() > 100) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Search must be 100 characters or fewer"
+            );
+        }
+
+        // '!' is the escape character specified in TicketRepository's JPQL.
+        String escaped = normalized
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+
+        return "%" + escaped + "%";
     }
 
     private PageResponse<TicketSummaryResponse>

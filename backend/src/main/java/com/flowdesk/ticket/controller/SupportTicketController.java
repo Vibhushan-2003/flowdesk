@@ -1,6 +1,10 @@
+
 package com.flowdesk.ticket.controller;
 
 import com.flowdesk.common.dto.PageResponse;
+
+import com.flowdesk.ticket.domain.TicketPriority;
+import com.flowdesk.ticket.domain.TicketStatus;
 
 import com.flowdesk.ticket.dto.CreateTicketCommentRequest;
 import com.flowdesk.ticket.dto.ResolveTicketRequest;
@@ -38,46 +42,44 @@ import java.util.UUID;
 @RequestMapping("/api/support/tickets")
 public class SupportTicketController {
 
-    private final SupportTicketService
-            supportTicketService;
-
-    private final TicketCommentService
-            ticketCommentService;
+    private final SupportTicketService supportTicketService;
+    private final TicketCommentService ticketCommentService;
 
     public SupportTicketController(
             SupportTicketService supportTicketService,
             TicketCommentService ticketCommentService
     ) {
-        this.supportTicketService =
-                supportTicketService;
-
-        this.ticketCommentService =
-                ticketCommentService;
+        this.supportTicketService = supportTicketService;
+        this.ticketCommentService = ticketCommentService;
     }
 
     @GetMapping("/my")
-    public ResponseEntity<
-            PageResponse<SupportTicketSummaryResponse>>
+    public ResponseEntity<PageResponse<SupportTicketSummaryResponse>>
             getMyAssignedTickets(
                     @AuthenticationPrincipal Jwt jwt,
                     @RequestParam(defaultValue = "0") int page,
-                    @RequestParam(defaultValue = "10") int size
+                    @RequestParam(defaultValue = "10") int size,
+                    @RequestParam(required = false) String search,
+                    @RequestParam(required = false) TicketStatus status,
+                    @RequestParam(required = false) TicketPriority priority,
+                    @RequestParam(defaultValue = "newest") String sort
             ) {
 
         validatePagination(page, size);
 
         UUID authenticatedUserId =
-                UUID.fromString(
-                        jwt.getSubject()
-                );
+                UUID.fromString(jwt.getSubject());
 
         PageResponse<SupportTicketSummaryResponse> response =
-                supportTicketService
-                        .getMyAssignedTickets(
-                                authenticatedUserId,
-                                page,
-                                size
-                        );
+                supportTicketService.getMyAssignedTickets(
+                        authenticatedUserId,
+                        page,
+                        size,
+                        search,
+                        status,
+                        priority,
+                        sort
+                );
 
         return ResponseEntity.ok(response);
     }
@@ -90,16 +92,13 @@ public class SupportTicketController {
             ) {
 
         UUID authenticatedUserId =
-                UUID.fromString(
-                        jwt.getSubject()
-                );
+                UUID.fromString(jwt.getSubject());
 
         List<TicketCommentResponse> response =
-                ticketCommentService
-                        .getSupportComments(
-                                authenticatedUserId,
-                                ticketNumber
-                        );
+                ticketCommentService.getSupportComments(
+                        authenticatedUserId,
+                        ticketNumber
+                );
 
         return ResponseEntity.ok(response);
     }
@@ -109,23 +108,18 @@ public class SupportTicketController {
             addTicketComment(
                     @AuthenticationPrincipal Jwt jwt,
                     @PathVariable String ticketNumber,
-                    @Valid
-                    @RequestBody
-                    CreateTicketCommentRequest request
+                    @Valid @RequestBody CreateTicketCommentRequest request
             ) {
 
         UUID authenticatedUserId =
-                UUID.fromString(
-                        jwt.getSubject()
-                );
+                UUID.fromString(jwt.getSubject());
 
         TicketCommentResponse response =
-                ticketCommentService
-                        .addSupportComment(
-                                authenticatedUserId,
-                                ticketNumber,
-                                request
-                        );
+                ticketCommentService.addSupportComment(
+                        authenticatedUserId,
+                        ticketNumber,
+                        request
+                );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -140,16 +134,13 @@ public class SupportTicketController {
             ) {
 
         UUID authenticatedUserId =
-                UUID.fromString(
-                        jwt.getSubject()
-                );
+                UUID.fromString(jwt.getSubject());
 
         SupportTicketResponse response =
-                supportTicketService
-                        .getMyAssignedTicket(
-                                authenticatedUserId,
-                                ticketNumber
-                        );
+                supportTicketService.getMyAssignedTicket(
+                        authenticatedUserId,
+                        ticketNumber
+                );
 
         return ResponseEntity.ok(response);
     }
@@ -159,23 +150,18 @@ public class SupportTicketController {
             updateStatus(
                     @AuthenticationPrincipal Jwt jwt,
                     @PathVariable String ticketNumber,
-                    @Valid
-                    @RequestBody
-                    UpdateTicketStatusRequest request
+                    @Valid @RequestBody UpdateTicketStatusRequest request
             ) {
 
         UUID authenticatedUserId =
-                UUID.fromString(
-                        jwt.getSubject()
-                );
+                UUID.fromString(jwt.getSubject());
 
         SupportTicketResponse response =
-                supportTicketService
-                        .updateStatus(
-                                authenticatedUserId,
-                                ticketNumber,
-                                request
-                        );
+                supportTicketService.updateStatus(
+                        authenticatedUserId,
+                        ticketNumber,
+                        request
+                );
 
         return ResponseEntity.ok(response);
     }
@@ -185,23 +171,18 @@ public class SupportTicketController {
             resolveTicket(
                     @AuthenticationPrincipal Jwt jwt,
                     @PathVariable String ticketNumber,
-                    @Valid
-                    @RequestBody
-                    ResolveTicketRequest request
+                    @Valid @RequestBody ResolveTicketRequest request
             ) {
 
         UUID authenticatedUserId =
-                UUID.fromString(
-                        jwt.getSubject()
-                );
+                UUID.fromString(jwt.getSubject());
 
         SupportTicketResponse response =
-                supportTicketService
-                        .resolveTicket(
-                                authenticatedUserId,
-                                ticketNumber,
-                                request
-                        );
+                supportTicketService.resolveTicket(
+                        authenticatedUserId,
+                        ticketNumber,
+                        request
+                );
 
         return ResponseEntity.ok(response);
     }
