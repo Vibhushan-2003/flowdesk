@@ -1,0 +1,198 @@
+
+/* FlowDesk Day 31 — Ticket Search & Filters */
+
+.tickets-page form[aria-label="Ticket filters"],
+.support-work-page form[aria-label="Assigned ticket filters"],
+.support-work-page form[aria-label="Ticket filters"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px !important;
+  padding: 22px;
+  margin: 24px 0 !important;
+
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+
+  box-shadow: 0 3px 14px rgba(15, 23, 42, 0.035);
+}
+
+/* Form labels */
+
+.tickets-page form[aria-label="Ticket filters"] label,
+.support-work-page form[aria-label="Assigned ticket filters"] label,
+.support-work-page form[aria-label="Ticket filters"] label {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Search field */
+
+.tickets-page form[aria-label="Ticket filters"] label:first-child,
+.support-work-page form[aria-label="Assigned ticket filters"] label:first-child,
+.support-work-page form[aria-label="Ticket filters"] label:first-child {
+  flex: 1 1 250px;
+  min-width: 210px;
+}
+
+/* All inputs and dropdowns */
+
+.tickets-page form[aria-label="Ticket filters"] input,
+.tickets-page form[aria-label="Ticket filters"] select,
+.support-work-page form[aria-label="Assigned ticket filters"] input,
+.support-work-page form[aria-label="Assigned ticket filters"] select,
+.support-work-page form[aria-label="Ticket filters"] input,
+.support-work-page form[aria-label="Ticket filters"] select {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  box-sizing: border-box;
+
+  padding: 0 13px;
+
+  color: #172033;
+  background: #ffffff;
+
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+/* Dropdown width */
+
+.tickets-page form[aria-label="Ticket filters"] label:not(:first-child),
+.support-work-page form[aria-label="Assigned ticket filters"] label:not(:first-child),
+.support-work-page form[aria-label="Ticket filters"] label:not(:first-child) {
+  flex: 1 1 145px;
+  min-width: 130px;
+}
+
+/* Focus indication */
+
+.tickets-page form[aria-label="Ticket filters"] input:focus,
+.tickets-page form[aria-label="Ticket filters"] select:focus,
+.support-work-page form[aria-label="Assigned ticket filters"] input:focus,
+.support-work-page form[aria-label="Assigned ticket filters"] select:focus,
+.support-work-page form[aria-label="Ticket filters"] input:focus,
+.support-work-page form[aria-label="Ticket filters"] select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14);
+}
+
+/* Buttons */
+
+.tickets-page form[aria-label="Ticket filters"] button,
+.support-work-page form[aria-label="Assigned ticket filters"] button,
+.support-work-page form[aria-label="Ticket filters"] button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 44px;
+  min-height: 44px;
+  box-sizing: border-box;
+
+  padding: 0 18px;
+  margin: 0;
+
+  border-radius: 9px;
+
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+/* Apply filters button */
+
+.tickets-page form[aria-label="Ticket filters"] button[type="submit"],
+.support-work-page form[aria-label="Assigned ticket filters"] button[type="submit"],
+.support-work-page form[aria-label="Ticket filters"] button[type="submit"] {
+  color: #ffffff;
+  background: #182235;
+  border: 1px solid #182235;
+}
+
+.tickets-page form[aria-label="Ticket filters"] button[type="submit"]:hover,
+.support-work-page form[aria-label="Assigned ticket filters"] button[type="submit"]:hover,
+.support-work-page form[aria-label="Ticket filters"] button[type="submit"]:hover {
+  background: #30415e;
+  border-color: #30415e;
+}
+
+/* Clear button */
+
+.tickets-page form[aria-label="Ticket filters"] button[type="button"],
+.support-work-page form[aria-label="Assigned ticket filters"] button[type="button"],
+.support-work-page form[aria-label="Ticket filters"] button[type="button"] {
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+}
+
+.tickets-page form[aria-label="Ticket filters"] button[type="button"]:hover,
+.support-work-page form[aria-label="Assigned ticket filters"] button[type="button"]:hover,
+.support-work-page form[aria-label="Ticket filters"] button[type="button"]:hover {
+  background: #e2e8f0;
+}
+
+/* Keyboard accessibility */
+
+.tickets-page form[aria-label="Ticket filters"] button:focus-visible,
+.support-work-page form[aria-label="Assigned ticket filters"] button:focus-visible,
+.support-work-page form[aria-label="Ticket filters"] button:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 3px;
+}
+
+/* Responsive layout */
+
+@media (max-width: 800px) {
+  .tickets-page form[aria-label="Ticket filters"],
+  .support-work-page form[aria-label="Assigned ticket filters"],
+  .support-work-page form[aria-label="Ticket filters"] {
+    padding: 16px;
+    gap: 12px !important;
+  }
+
+  .tickets-page form[aria-label="Ticket filters"] label:first-child,
+  .support-work-page form[aria-label="Assigned ticket filters"] label:first-child,
+  .support-work-page form[aria-label="Ticket filters"] label:first-child {
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .tickets-page form[aria-label="Ticket filters"] label,
+  .support-work-page form[aria-label="Assigned ticket filters"] label,
+  .support-work-page form[aria-label="Ticket filters"] label {
+    flex-basis: 100%;
+  }
+
+  .tickets-page form[aria-label="Ticket filters"] button,
+  .support-work-page form[aria-label="Assigned ticket filters"] button,
+  .support-work-page form[aria-label="Ticket filters"] button {
+    flex: 1 1 120px;
+  }
+}

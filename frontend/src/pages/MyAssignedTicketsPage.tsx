@@ -1,42 +1,84 @@
+
 import {
+  type FormEvent,
   useEffect,
   useState,
 } from 'react'
 
 import { useNavigate } from 'react-router-dom'
 
-import { getMyAssignedTickets } from '../api/ticket'
+
+import '../styles/ticket-filters.css'
+
+
+import {
+  getMyAssignedTickets,
+  type TicketListFilters,
+} from '../api/ticket'
+
 import { useAuth } from '../auth/useAuth'
 
 import type {
   PageResponse,
   SlaStatus,
   SupportTicketSummary,
+  TicketPriority,
+  TicketStatus,
 } from '../types/ticket'
 
 const PAGE_SIZE = 10
+
+const STATUSES: TicketStatus[] = [
+  'PENDING_APPROVAL',
+  'OPEN',
+  'ASSIGNED',
+  'IN_PROGRESS',
+  'WAITING_FOR_USER',
+  'RESOLVED',
+  'CLOSED',
+  'CANCELLED',
+]
+
+const PRIORITIES: TicketPriority[] = [
+  'LOW',
+  'MEDIUM',
+  'HIGH',
+  'CRITICAL',
+]
+
+const DEFAULT_FILTERS: TicketListFilters = {
+  search: '',
+  status: '',
+  priority: '',
+  sort: 'newest',
+}
 
 function formatLabel(value: string) {
   return value.replaceAll('_', ' ')
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleString()
+function formatDate(value: string | null) {
+  if (!value) {
+    return 'Not started'
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return date.toLocaleString()
 }
 
-function formatSlaStatus(
-  status: SlaStatus,
-) {
+function formatSlaStatus(status: SlaStatus) {
   switch (status) {
     case 'MET':
       return 'Met'
-
     case 'BREACHED':
       return 'Breached'
-
     case 'PENDING':
       return 'Pending'
-
     case 'UNKNOWN':
       return 'Unknown'
   }
@@ -53,17 +95,54 @@ export function MyAssignedTicketsPage() {
   const navigate = useNavigate()
 
   const [page, setPage] = useState(0)
+  const [searchText, setSearchText] = useState('')
+
+  const [selectedStatus, setSelectedStatus] =
+    useState<TicketStatus | ''>('')
+
+  const [selectedPriority, setSelectedPriority] =
+    useState<TicketPriority | ''>('')
+
+  const [selectedSort, setSelectedSort] =
+    useState<'newest' | 'oldest'>('newest')
+
+  const [appliedFilters, setAppliedFilters] =
+    useState<TicketListFilters>(DEFAULT_FILTERS)
 
   const [ticketPage, setTicketPage] =
     useState<PageResponse<SupportTicketSummary> | null>(
       null,
     )
 
-  const [isLoading, setIsLoading] =
-    useState(true)
+  const [isLoading, setIsLoading] = useState(true)
 
   const [error, setError] =
     useState<string | null>(null)
+
+  function applyFilters(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault()
+
+    setPage(0)
+
+    setAppliedFilters({
+      search: searchText.trim(),
+      status: selectedStatus,
+      priority: selectedPriority,
+      sort: selectedSort,
+    })
+  }
+
+  function resetFilters() {
+    setSearchText('')
+    setSelectedStatus('')
+    setSelectedPriority('')
+    setSelectedSort('newest')
+
+    setPage(0)
+    setAppliedFilters({ ...DEFAULT_FILTERS })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -85,12 +164,12 @@ export function MyAssignedTicketsPage() {
       setError(null)
 
       try {
-        const response =
-          await getMyAssignedTickets(
-            accessToken,
-            page,
-            PAGE_SIZE,
-          )
+        const response = await getMyAssignedTickets(
+          accessToken,
+          page,
+          PAGE_SIZE,
+          appliedFilters,
+        )
 
         if (!cancelled) {
           setTicketPage(response)
@@ -119,7 +198,17 @@ export function MyAssignedTicketsPage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, page])
+  }, [
+    accessToken,
+    page,
+    appliedFilters,
+  ])
+
+  const hasFilters = Boolean(
+    appliedFilters.search ||
+    appliedFilters.status ||
+    appliedFilters.priority,
+  )
 
   return (
     <main className="support-work-page">
@@ -132,10 +221,9 @@ export function MyAssignedTicketsPage() {
           <h1>My assigned tickets</h1>
 
           <p className="support-page-description">
-            Your active support workload. Open a
-            ticket to start work, wait for the
-            requester, resume work, or resolve the
-            issue.
+            Your active support workload. Open a ticket
+            to start work, wait for the requester,
+            resume work, or resolve the issue.
           </p>
         </div>
 
@@ -143,9 +231,7 @@ export function MyAssignedTicketsPage() {
           <button
             type="button"
             className="secondary-button"
-            onClick={() =>
-              navigate('/support/queue')
-            }
+            onClick={() => navigate('/support/queue')}
           >
             Support queue
           </button>
@@ -153,14 +239,118 @@ export function MyAssignedTicketsPage() {
           <button
             type="button"
             className="secondary-button"
-            onClick={() =>
-              navigate('/dashboard')
-            }
+            onClick={() => navigate('/dashboard')}
           >
             Dashboard
           </button>
         </div>
       </header>
+
+      <form
+        onSubmit={applyFilters}
+        aria-label="Assigned ticket filters"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          alignItems: 'end',
+          margin: '20px 0',
+        }}
+      >
+        <label>
+          Search title or ticket number
+          <input
+            type="search"
+            value={searchText}
+            maxLength={100}
+            onChange={(event) =>
+              setSearchText(event.target.value)
+            }
+            placeholder="Search tickets"
+          />
+        </label>
+
+        <label>
+          Status
+          <select
+            value={selectedStatus}
+            onChange={(event) =>
+              setSelectedStatus(
+                event.target.value as TicketStatus | '',
+              )
+            }
+          >
+            <option value="">
+              All statuses
+            </option>
+
+            {STATUSES.map((status) => (
+              <option
+                key={status}
+                value={status}
+              >
+                {formatLabel(status)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Priority
+          <select
+            value={selectedPriority}
+            onChange={(event) =>
+              setSelectedPriority(
+                event.target.value as TicketPriority | '',
+              )
+            }
+          >
+            <option value="">
+              All priorities
+            </option>
+
+            {PRIORITIES.map((priority) => (
+              <option
+                key={priority}
+                value={priority}
+              >
+                {priority}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Order
+          <select
+            value={selectedSort}
+            onChange={(event) =>
+              setSelectedSort(
+                event.target.value as 'newest' | 'oldest',
+              )
+            }
+          >
+            <option value="newest">
+              Newest first
+            </option>
+
+            <option value="oldest">
+              Oldest first
+            </option>
+          </select>
+        </label>
+
+        <button type="submit">
+          Apply filters
+        </button>
+
+        <button
+          type="button"
+          onClick={resetFilters}
+        >
+          Clear
+        </button>
+      </form>
 
       <section className="support-overview">
         <article>
@@ -173,13 +363,11 @@ export function MyAssignedTicketsPage() {
 
         <article>
           <span>Workspace</span>
-
           <strong>Support engineer</strong>
         </article>
 
         <article>
           <span>Workflow</span>
-
           <strong>Assignment based</strong>
         </article>
       </section>
@@ -212,22 +400,32 @@ export function MyAssignedTicketsPage() {
               ✓
             </div>
 
-            <h2>No active assignments</h2>
+            <h2>
+              {hasFilters
+                ? 'No matching assignments'
+                : 'No active assignments'}
+            </h2>
 
             <p>
-              You currently have no tickets assigned
-              to you. Open the support queue when
-              you are ready to take another issue.
+              {hasFilters
+                ? 'Try changing your search or filters.'
+                : 'You currently have no tickets assigned to you. Open the support queue when you are ready to take another issue.'}
             </p>
 
             <button
               type="button"
               className="primary-button"
-              onClick={() =>
-                navigate('/support/queue')
-              }
+              onClick={() => {
+                if (hasFilters) {
+                  resetFilters()
+                } else {
+                  navigate('/support/queue')
+                }
+              }}
             >
-              Open support queue
+              {hasFilters
+                ? 'Clear filters'
+                : 'Open support queue'}
             </button>
           </section>
         )}
@@ -257,9 +455,7 @@ export function MyAssignedTicketsPage() {
                         {ticket.ticketNumber}
                       </button>
 
-                      <h2>
-                        {ticket.title}
-                      </h2>
+                      <h2>{ticket.title}</h2>
                     </div>
 
                     <span
@@ -267,9 +463,7 @@ export function MyAssignedTicketsPage() {
                         ticket.status,
                       )}
                     >
-                      {formatLabel(
-                        ticket.status,
-                      )}
+                      {formatLabel(ticket.status)}
                     </span>
                   </div>
 
@@ -278,9 +472,7 @@ export function MyAssignedTicketsPage() {
                       <span>Type</span>
 
                       <strong>
-                        {formatLabel(
-                          ticket.type,
-                        )}
+                        {formatLabel(ticket.type)}
                       </strong>
                     </div>
 
@@ -296,9 +488,7 @@ export function MyAssignedTicketsPage() {
                       <span>Assigned</span>
 
                       <strong>
-                        {formatDate(
-                          ticket.assignedAt,
-                        )}
+                        {formatDate(ticket.assignedAt)}
                       </strong>
                     </div>
 
@@ -306,9 +496,7 @@ export function MyAssignedTicketsPage() {
                       <span>Created</span>
 
                       <strong>
-                        {formatDate(
-                          ticket.createdAt,
-                        )}
+                        {formatDate(ticket.createdAt)}
                       </strong>
                     </div>
 
@@ -326,9 +514,7 @@ export function MyAssignedTicketsPage() {
                       <span>Response due</span>
 
                       <strong>
-                        {formatDate(
-                          ticket.responseDueAt,
-                        )}
+                        {formatDate(ticket.responseDueAt)}
                       </strong>
                     </div>
 
@@ -346,9 +532,7 @@ export function MyAssignedTicketsPage() {
                       <span>Resolution due</span>
 
                       <strong>
-                        {formatDate(
-                          ticket.resolutionDueAt,
-                        )}
+                        {formatDate(ticket.resolutionDueAt)}
                       </strong>
                     </div>
                   </div>
@@ -385,10 +569,7 @@ export function MyAssignedTicketsPage() {
               disabled={ticketPage.first}
               onClick={() =>
                 setPage((current) =>
-                  Math.max(
-                    0,
-                    current - 1,
-                  ),
+                  Math.max(0, current - 1),
                 )
               }
             >
@@ -404,9 +585,7 @@ export function MyAssignedTicketsPage() {
               type="button"
               disabled={ticketPage.last}
               onClick={() =>
-                setPage(
-                  (current) => current + 1,
-                )
+                setPage((current) => current + 1)
               }
             >
               Next

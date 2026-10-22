@@ -1,3 +1,4 @@
+
 package com.flowdesk.ticket.service;
 
 import com.flowdesk.audit.domain.AuditAction;
@@ -11,6 +12,7 @@ import com.flowdesk.notification.service.NotificationService;
 
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketStatus;
 
 import com.flowdesk.ticket.dto.ResolveTicketRequest;
@@ -29,14 +31,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 
 import org.springframework.stereotype.Service;
-
 import org.springframework.transaction.annotation.Transactional;
-
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -44,28 +43,18 @@ import java.util.UUID;
 @Service
 public class SupportTicketService {
 
-    private final TicketAssignmentRepository
-            ticketAssignmentRepository;
-
-    private final NotificationService
-            notificationService;
-
-    private final AuditService
-            auditService;
+    private final TicketAssignmentRepository ticketAssignmentRepository;
+    private final NotificationService notificationService;
+    private final AuditService auditService;
 
     public SupportTicketService(
             TicketAssignmentRepository ticketAssignmentRepository,
             NotificationService notificationService,
             AuditService auditService
     ) {
-        this.ticketAssignmentRepository =
-                ticketAssignmentRepository;
-
-        this.notificationService =
-                notificationService;
-
-        this.auditService =
-                auditService;
+        this.ticketAssignmentRepository = ticketAssignmentRepository;
+        this.notificationService = notificationService;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -76,15 +65,14 @@ public class SupportTicketService {
                     int size
             ) {
 
-        PageRequest pageable =
-                PageRequest.of(
-                        page,
-                        size,
-                        Sort.by(
-                                Sort.Direction.DESC,
-                                "assignedAt"
-                        )
-                );
+        PageRequest pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(
+                        Sort.Direction.DESC,
+                        "assignedAt"
+                )
+        );
 
         Page<TicketAssignment> assignments =
                 ticketAssignmentRepository
@@ -93,10 +81,70 @@ public class SupportTicketService {
                                 pageable
                         );
 
-        Page<SupportTicketSummaryResponse> responsePage =
-                assignments.map(
-                        this::toSummaryResponse
+        return toPageResponse(assignments);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<SupportTicketSummaryResponse>
+            getMyAssignedTickets(
+                    UUID supportEngineerId,
+                    int page,
+                    int size,
+                    String search,
+                    TicketStatus status,
+                    TicketPriority priority,
+                    String sort
+            ) {
+
+        if (page < 0 || size < 1 || size > 100) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid pagination"
+            );
+        }
+
+        String normalizedSort =
+                sort == null || sort.isBlank()
+                        ? "newest"
+                        : sort.trim().toLowerCase(Locale.ROOT);
+
+        Sort.Direction direction = switch (normalizedSort) {
+            case "newest" -> Sort.Direction.DESC;
+            case "oldest" -> Sort.Direction.ASC;
+            default -> throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Sort must be newest or oldest"
+            );
+        };
+
+        String searchPattern = buildSearchPattern(search);
+
+        PageRequest pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(direction, "assignedAt")
+                        .and(Sort.by(direction, "id"))
+        );
+
+        Page<TicketAssignment> assignments =
+                ticketAssignmentRepository.searchMyActiveAssignments(
+                        supportEngineerId,
+                        searchPattern,
+                        status,
+                        priority,
+                        pageable
                 );
+
+        return toPageResponse(assignments);
+    }
+
+    private PageResponse<SupportTicketSummaryResponse>
+            toPageResponse(
+                    Page<TicketAssignment> assignments
+            ) {
+
+        Page<SupportTicketSummaryResponse> responsePage =
+                assignments.map(this::toSummaryResponse);
 
         return new PageResponse<>(
                 responsePage.getContent(),
@@ -109,6 +157,28 @@ public class SupportTicketService {
         );
     }
 
+    private String buildSearchPattern(String search) {
+
+        if (search == null || search.isBlank()) {
+            return null;
+        }
+
+        String normalized =
+                search.trim().toLowerCase(Locale.ROOT);
+
+        if (normalized.length() > 100) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Search must be 100 characters or fewer"
+            );
+        }
+
+        return "%" + normalized
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_") + "%";
+    }
+
     @Transactional(readOnly = true)
     public SupportTicketResponse
             getMyAssignedTicket(
@@ -117,9 +187,7 @@ public class SupportTicketService {
             ) {
 
         String normalizedTicketNumber =
-                normalizeTicketNumber(
-                        ticketNumber
-                );
+                normalizeTicketNumber(ticketNumber);
 
         TicketAssignment assignment =
                 ticketAssignmentRepository
@@ -128,16 +196,13 @@ public class SupportTicketService {
                                 supportEngineerId
                         )
                         .orElseThrow(
-                                () ->
-                                        new ResponseStatusException(
-                                                HttpStatus.NOT_FOUND,
-                                                "Ticket not found"
-                                        )
+                                () -> new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Ticket not found"
+                                )
                         );
 
-        return toResponse(
-                assignment
-        );
+        return toResponse(assignment);
     }
 
     @Transactional
@@ -149,9 +214,7 @@ public class SupportTicketService {
             ) {
 
         String normalizedTicketNumber =
-                normalizeTicketNumber(
-                        ticketNumber
-                );
+                normalizeTicketNumber(ticketNumber);
 
         TicketAssignment assignment =
                 ticketAssignmentRepository
@@ -160,11 +223,10 @@ public class SupportTicketService {
                                 supportEngineerId
                         )
                         .orElseThrow(
-                                () ->
-                                        new ResponseStatusException(
-                                                HttpStatus.NOT_FOUND,
-                                                "Ticket not found"
-                                        )
+                                () -> new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Ticket not found"
+                                )
                         );
 
         if (request == null) {
@@ -175,48 +237,34 @@ public class SupportTicketService {
         }
 
         /*
-         * RESOLVED is intentionally not handled through
-         * the generic status endpoint anymore.
-         *
-         * Resolving is now a richer business operation
-         * that requires a human-approved resolution
-         * summary.
+         * Resolving requires a human-approved resolution
+         * summary, so the dedicated resolve endpoint is used.
          */
-        if (request.status()
-                == TicketStatus.RESOLVED) {
-
+        if (request.status() == TicketStatus.RESOLVED) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Use the resolve endpoint to resolve a ticket"
             );
         }
 
-        Ticket ticket =
-                assignment.getTicket();
-
-        TicketStatus previousStatus =
-                ticket.getStatus();
+        Ticket ticket = assignment.getTicket();
+        TicketStatus previousStatus = ticket.getStatus();
 
         try {
-            ticket.transitionSupportStatus(
-                    request.status()
-            );
-        }
-        catch (IllegalArgumentException exception) {
+            ticket.transitionSupportStatus(request.status());
+        } catch (IllegalArgumentException exception) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     exception.getMessage()
             );
-        }
-        catch (IllegalStateException exception) {
+        } catch (IllegalStateException exception) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     exception.getMessage()
             );
         }
 
-        TicketStatus newStatus =
-                ticket.getStatus();
+        TicketStatus newStatus = ticket.getStatus();
 
         ticketAssignmentRepository.flush();
 
@@ -232,9 +280,7 @@ public class SupportTicketService {
                 newStatus
         );
 
-        return toResponse(
-                assignment
-        );
+        return toResponse(assignment);
     }
 
     @Transactional
@@ -246,17 +292,11 @@ public class SupportTicketService {
             ) {
 
         String normalizedTicketNumber =
-                normalizeTicketNumber(
-                        ticketNumber
-                );
+                normalizeTicketNumber(ticketNumber);
 
         /*
          * Lock and verify the active assignment.
-         *
-         * This ensures only the currently assigned
-         * support engineer can resolve the ticket and
-         * protects the transition from concurrent
-         * assignment changes.
+         * Only the currently assigned engineer may resolve.
          */
         TicketAssignment assignment =
                 ticketAssignmentRepository
@@ -265,11 +305,10 @@ public class SupportTicketService {
                                 supportEngineerId
                         )
                         .orElseThrow(
-                                () ->
-                                        new ResponseStatusException(
-                                                HttpStatus.NOT_FOUND,
-                                                "Ticket not found"
-                                        )
+                                () -> new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Ticket not found"
+                                )
                         );
 
         if (request == null) {
@@ -279,24 +318,17 @@ public class SupportTicketService {
             );
         }
 
-        Ticket ticket =
-                assignment.getTicket();
-
-        TicketStatus previousStatus =
-                ticket.getStatus();
+        Ticket ticket = assignment.getTicket();
+        TicketStatus previousStatus = ticket.getStatus();
 
         try {
-            ticket.resolve(
-                    request.resolutionSummary()
-            );
-        }
-        catch (IllegalArgumentException exception) {
+            ticket.resolve(request.resolutionSummary());
+        } catch (IllegalArgumentException exception) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     exception.getMessage()
             );
-        }
-        catch (IllegalStateException exception) {
+        } catch (IllegalStateException exception) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     exception.getMessage()
@@ -306,9 +338,6 @@ public class SupportTicketService {
         /*
          * Resolution and assignment release happen in
          * the same database transaction.
-         *
-         * We must never leave a RESOLVED ticket with an
-         * active support assignment.
          */
         assignment.release();
 
@@ -321,12 +350,8 @@ public class SupportTicketService {
         );
 
         /*
-         * Do not put the resolution summary itself in
-         * audit metadata.
-         *
-         * The summary is business data stored on the
-         * ticket. The audit record only captures the
-         * state transition.
+         * Keep the resolution summary out of audit metadata.
+         * The audit record captures only the status transition.
          */
         recordStatusChange(
                 assignment,
@@ -334,9 +359,7 @@ public class SupportTicketService {
                 ticket.getStatus()
         );
 
-        return toResponse(
-                assignment
-        );
+        return toResponse(assignment);
     }
 
     private void recordStatusChange(
@@ -345,8 +368,7 @@ public class SupportTicketService {
             TicketStatus newStatus
     ) {
 
-        Ticket ticket =
-                assignment.getTicket();
+        Ticket ticket = assignment.getTicket();
 
         auditService.recordUserAction(
                 assignment.getAssignedToUser(),
@@ -355,10 +377,8 @@ public class SupportTicketService {
                 ticket.getId(),
                 ticket.getTicketNumber(),
                 Map.of(
-                        "fromStatus",
-                        previousStatus.name(),
-                        "toStatus",
-                        newStatus.name()
+                        "fromStatus", previousStatus.name(),
+                        "toStatus", newStatus.name()
                 )
         );
     }
@@ -369,14 +389,9 @@ public class SupportTicketService {
             TicketStatus newStatus
     ) {
 
-        Ticket ticket =
-                assignment.getTicket();
-
-        User recipient =
-                ticket.getCreatedByUser();
-
-        User actor =
-                assignment.getAssignedToUser();
+        Ticket ticket = assignment.getTicket();
+        User recipient = ticket.getCreatedByUser();
+        User actor = assignment.getAssignedToUser();
 
         if (recipient == null) {
             return;
@@ -385,84 +400,69 @@ public class SupportTicketService {
         if (actor != null
                 && actor.getId() != null
                 && recipient.getId() != null
-                && actor.getId()
-                        .equals(
-                                recipient.getId()
-                        )) {
+                && actor.getId().equals(recipient.getId())) {
 
             return;
         }
 
         if (newStatus == TicketStatus.IN_PROGRESS
-                && previousStatus
-                        == TicketStatus.ASSIGNED) {
+                && previousStatus == TicketStatus.ASSIGNED) {
 
-            notificationService
-                    .createNotification(
-                            recipient,
-                            actor,
-                            ticket,
-                            NotificationType
-                                    .TICKET_STATUS_CHANGED,
-                            "Support work started",
-                            "A support engineer started working on "
-                                    + ticket.getTicketNumber()
-                    );
+            notificationService.createNotification(
+                    recipient,
+                    actor,
+                    ticket,
+                    NotificationType.TICKET_STATUS_CHANGED,
+                    "Support work started",
+                    "A support engineer started working on "
+                            + ticket.getTicketNumber()
+            );
 
             return;
         }
 
-        if (newStatus
-                == TicketStatus.WAITING_FOR_USER) {
+        if (newStatus == TicketStatus.WAITING_FOR_USER) {
 
-            notificationService
-                    .createNotification(
-                            recipient,
-                            actor,
-                            ticket,
-                            NotificationType
-                                    .TICKET_STATUS_CHANGED,
-                            "Waiting for your response",
-                            "Support is waiting for your response on "
-                                    + ticket.getTicketNumber()
-                    );
+            notificationService.createNotification(
+                    recipient,
+                    actor,
+                    ticket,
+                    NotificationType.TICKET_STATUS_CHANGED,
+                    "Waiting for your response",
+                    "Support is waiting for your response on "
+                            + ticket.getTicketNumber()
+            );
 
             return;
         }
 
         if (newStatus == TicketStatus.IN_PROGRESS
-                && previousStatus
-                        == TicketStatus.WAITING_FOR_USER) {
+                && previousStatus == TicketStatus.WAITING_FOR_USER) {
 
-            notificationService
-                    .createNotification(
-                            recipient,
-                            actor,
-                            ticket,
-                            NotificationType
-                                    .TICKET_STATUS_CHANGED,
-                            "Work resumed",
-                            "Support resumed work on "
-                                    + ticket.getTicketNumber()
-                    );
+            notificationService.createNotification(
+                    recipient,
+                    actor,
+                    ticket,
+                    NotificationType.TICKET_STATUS_CHANGED,
+                    "Work resumed",
+                    "Support resumed work on "
+                            + ticket.getTicketNumber()
+            );
 
             return;
         }
 
-        if (newStatus
-                == TicketStatus.RESOLVED) {
+        if (newStatus == TicketStatus.RESOLVED) {
 
-            notificationService
-                    .createNotification(
-                            recipient,
-                            actor,
-                            ticket,
-                            NotificationType
-                                    .TICKET_RESOLVED,
-                            "Ticket resolved",
-                            ticket.getTicketNumber()
-                                    + " has been resolved"
-                    );
+            notificationService.createNotification(
+                    recipient,
+                    actor,
+                    ticket,
+                    NotificationType.TICKET_RESOLVED,
+                    "Ticket resolved",
+                    ticket.getTicketNumber()
+                            + " has been resolved"
+            );
         }
     }
 
@@ -471,13 +471,10 @@ public class SupportTicketService {
                     TicketAssignment assignment
             ) {
 
-        Ticket ticket =
-                assignment.getTicket();
+        Ticket ticket = assignment.getTicket();
 
         OffsetDateTime evaluatedAt =
-                OffsetDateTime.now(
-                        ZoneOffset.UTC
-                );
+                OffsetDateTime.now(ZoneOffset.UTC);
 
         return new SupportTicketSummaryResponse(
                 ticket.getId(),
@@ -490,12 +487,8 @@ public class SupportTicketService {
                 assignment.getAssignedAt(),
                 ticket.getResponseDueAt(),
                 ticket.getResolutionDueAt(),
-                ticket.evaluateResponseSla(
-                        evaluatedAt
-                ),
-                ticket.evaluateResolutionSla(
-                        evaluatedAt
-                )
+                ticket.evaluateResponseSla(evaluatedAt),
+                ticket.evaluateResolutionSla(evaluatedAt)
         );
     }
 
@@ -504,13 +497,10 @@ public class SupportTicketService {
                     TicketAssignment assignment
             ) {
 
-        Ticket ticket =
-                assignment.getTicket();
+        Ticket ticket = assignment.getTicket();
 
         OffsetDateTime evaluatedAt =
-                OffsetDateTime.now(
-                        ZoneOffset.UTC
-                );
+                OffsetDateTime.now(ZoneOffset.UTC);
 
         return new SupportTicketResponse(
                 ticket.getId(),
@@ -530,12 +520,8 @@ public class SupportTicketService {
                 ticket.getFirstRespondedAt(),
                 ticket.getResolvedAt(),
                 ticket.getResolutionSummary(),
-                ticket.evaluateResponseSla(
-                        evaluatedAt
-                ),
-                ticket.evaluateResolutionSla(
-                        evaluatedAt
-                )
+                ticket.evaluateResponseSla(evaluatedAt),
+                ticket.evaluateResolutionSla(evaluatedAt)
         );
     }
 
@@ -543,9 +529,7 @@ public class SupportTicketService {
             String ticketNumber
     ) {
 
-        if (ticketNumber == null
-                || ticketNumber.isBlank()) {
-
+        if (ticketNumber == null || ticketNumber.isBlank()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Ticket number is required"
@@ -554,8 +538,6 @@ public class SupportTicketService {
 
         return ticketNumber
                 .trim()
-                .toUpperCase(
-                        Locale.ROOT
-                );
+                .toUpperCase(Locale.ROOT);
     }
 }

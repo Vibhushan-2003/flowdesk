@@ -1,6 +1,9 @@
+
 package com.flowdesk.ticket.repository;
 
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.TicketPriority;
+import com.flowdesk.ticket.domain.TicketStatus;
 
 import jakarta.persistence.LockModeType;
 
@@ -65,4 +68,56 @@ public interface TicketAssignmentRepository
                     @Param("ticketId")
                     UUID ticketId
             );
+
+    @Query(
+            value = """
+                    SELECT assignment
+                    FROM TicketAssignment assignment
+                    WHERE assignment.assignedToUser.id = :supportEngineerId
+                      AND assignment.releasedAt IS NULL
+                      AND (
+                          :searchPattern IS NULL
+                          OR LOWER(assignment.ticket.ticketNumber)
+                              LIKE :searchPattern ESCAPE '!'
+                          OR LOWER(assignment.ticket.title)
+                              LIKE :searchPattern ESCAPE '!'
+                      )
+                      AND (
+                          :status IS NULL
+                          OR assignment.ticket.status = :status
+                      )
+                      AND (
+                          :priority IS NULL
+                          OR assignment.ticket.priority = :priority
+                      )
+                    """,
+            countQuery = """
+                    SELECT COUNT(assignment)
+                    FROM TicketAssignment assignment
+                    WHERE assignment.assignedToUser.id = :supportEngineerId
+                      AND assignment.releasedAt IS NULL
+                      AND (
+                          :searchPattern IS NULL
+                          OR LOWER(assignment.ticket.ticketNumber)
+                              LIKE :searchPattern ESCAPE '!'
+                          OR LOWER(assignment.ticket.title)
+                              LIKE :searchPattern ESCAPE '!'
+                      )
+                      AND (
+                          :status IS NULL
+                          OR assignment.ticket.status = :status
+                      )
+                      AND (
+                          :priority IS NULL
+                          OR assignment.ticket.priority = :priority
+                      )
+                    """
+    )
+    Page<TicketAssignment> searchMyActiveAssignments(
+            @Param("supportEngineerId") UUID supportEngineerId,
+            @Param("searchPattern") String searchPattern,
+            @Param("status") TicketStatus status,
+            @Param("priority") TicketPriority priority,
+            Pageable pageable
+    );
 }

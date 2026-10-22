@@ -1,3 +1,4 @@
+
 import { API_BASE_URL } from './config'
 
 import type {
@@ -9,11 +10,48 @@ import type {
   SupportTicketResponse,
   SupportTicketSummary,
   TicketCommentResponse,
+  TicketPriority,
   TicketResponse,
   TicketStatus,
   TicketSummary,
   UpdateTicketStatusRequest,
 } from '../types/ticket'
+
+export interface TicketListFilters {
+  search?: string
+  status?: TicketStatus | ''
+  priority?: TicketPriority | ''
+  sort?: 'newest' | 'oldest'
+}
+
+function buildTicketListQuery(
+  page: number,
+  size: number,
+  filters: TicketListFilters,
+): string {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+  })
+
+  if (filters.search?.trim()) {
+    params.set('search', filters.search.trim())
+  }
+
+  if (filters.status) {
+    params.set('status', filters.status)
+  }
+
+  if (filters.priority) {
+    params.set('priority', filters.priority)
+  }
+
+  if (filters.sort) {
+    params.set('sort', filters.sort)
+  }
+
+  return params.toString()
+}
 
 export async function createTicket(
   request: CreateTicketRequest,
@@ -56,9 +94,16 @@ export async function getMyTickets(
   accessToken: string,
   page = 0,
   size = 10,
+  filters: TicketListFilters = {},
 ): Promise<PageResponse<TicketSummary>> {
+  const query = buildTicketListQuery(
+    page,
+    size,
+    filters,
+  )
+
   const response = await fetch(
-    `${API_BASE_URL}/api/tickets/my?page=${page}&size=${size}`,
+    `${API_BASE_URL}/api/tickets/my?${query}`,
     {
       method: 'GET',
       headers: {
@@ -76,7 +121,7 @@ export async function getMyTickets(
 
     if (response.status === 400) {
       throw new Error(
-        'Invalid pagination request',
+        'Invalid ticket filters or pagination request',
       )
     }
 
@@ -311,9 +356,16 @@ export async function getMyAssignedTickets(
   accessToken: string,
   page = 0,
   size = 10,
+  filters: TicketListFilters = {},
 ): Promise<PageResponse<SupportTicketSummary>> {
+  const query = buildTicketListQuery(
+    page,
+    size,
+    filters,
+  )
+
   const response = await fetch(
-    `${API_BASE_URL}/api/support/tickets/my?page=${page}&size=${size}`,
+    `${API_BASE_URL}/api/support/tickets/my?${query}`,
     {
       method: 'GET',
       headers: {
@@ -337,7 +389,7 @@ export async function getMyAssignedTickets(
 
     if (response.status === 400) {
       throw new Error(
-        'Invalid pagination request',
+        'Invalid ticket filters or pagination request',
       )
     }
 

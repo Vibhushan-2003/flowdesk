@@ -1,6 +1,10 @@
+
 package com.flowdesk.ticket.controller;
 
 import com.flowdesk.common.dto.PageResponse;
+
+import com.flowdesk.ticket.domain.TicketPriority;
+import com.flowdesk.ticket.domain.TicketStatus;
 
 import com.flowdesk.ticket.dto.ClaimTicketResponse;
 import com.flowdesk.ticket.dto.CreateTicketCommentRequest;
@@ -72,7 +76,11 @@ public class TicketController {
             getMyTickets(
                     @AuthenticationPrincipal Jwt jwt,
                     @RequestParam(defaultValue = "0") int page,
-                    @RequestParam(defaultValue = "10") int size
+                    @RequestParam(defaultValue = "10") int size,
+                    @RequestParam(required = false) String search,
+                    @RequestParam(required = false) TicketStatus status,
+                    @RequestParam(required = false) TicketPriority priority,
+                    @RequestParam(defaultValue = "newest") String sort
             ) {
 
         validatePagination(page, size);
@@ -84,7 +92,11 @@ public class TicketController {
                 ticketService.getMyTickets(
                         authenticatedUserId,
                         page,
-                        size
+                        size,
+                        search,
+                        status,
+                        priority,
+                        sort
                 );
 
         return ResponseEntity.ok(response);
@@ -150,9 +162,7 @@ public class TicketController {
             addTicketComment(
                     @AuthenticationPrincipal Jwt jwt,
                     @PathVariable String ticketNumber,
-                    @Valid
-                    @RequestBody
-                    CreateTicketCommentRequest request
+                    @Valid @RequestBody CreateTicketCommentRequest request
             ) {
 
         UUID authenticatedUserId =

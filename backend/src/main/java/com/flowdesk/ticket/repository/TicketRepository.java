@@ -3,6 +3,7 @@ package com.flowdesk.ticket.repository;
 import com.flowdesk.sla.domain.SlaEventType;
 import com.flowdesk.sla.repository.projection.SlaPriorityBreachCount;
 import com.flowdesk.ticket.domain.Ticket;
+import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketStatus;
 
 import jakarta.persistence.LockModeType;
@@ -20,6 +21,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+
+
 public interface TicketRepository
         extends JpaRepository<Ticket, UUID> {
 
@@ -33,6 +36,56 @@ public interface TicketRepository
             UUID createdByUserId,
             Pageable pageable
     );
+    @Query(
+        value = """
+                SELECT ticket
+                FROM Ticket ticket
+                WHERE ticket.createdByUser.id = :createdByUserId
+                  AND (
+                      :searchPattern IS NULL
+                      OR LOWER(ticket.ticketNumber)
+                          LIKE :searchPattern ESCAPE '!'
+                      OR LOWER(ticket.title)
+                          LIKE :searchPattern ESCAPE '!'
+                  )
+                  AND (
+                      :status IS NULL
+                      OR ticket.status = :status
+                  )
+                  AND (
+                      :priority IS NULL
+                      OR ticket.priority = :priority
+                  )
+                """,
+        countQuery = """
+                SELECT COUNT(ticket)
+                FROM Ticket ticket
+                WHERE ticket.createdByUser.id = :createdByUserId
+                  AND (
+                      :searchPattern IS NULL
+                      OR LOWER(ticket.ticketNumber)
+                          LIKE :searchPattern ESCAPE '!'
+                      OR LOWER(ticket.title)
+                          LIKE :searchPattern ESCAPE '!'
+                  )
+                  AND (
+                      :status IS NULL
+                      OR ticket.status = :status
+                  )
+                  AND (
+                      :priority IS NULL
+                      OR ticket.priority = :priority
+                  )
+                """
+)
+Page<Ticket> searchMyTickets(
+        @Param("createdByUserId") UUID createdByUserId,
+        @Param("searchPattern") String searchPattern,
+        @Param("status") TicketStatus status,
+        @Param("priority") TicketPriority priority,
+        Pageable pageable
+);
+
 
     Optional<Ticket> findByTicketNumberAndCreatedByUser_Id(
             String ticketNumber,
