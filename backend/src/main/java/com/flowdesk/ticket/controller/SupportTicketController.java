@@ -3,6 +3,7 @@ package com.flowdesk.ticket.controller;
 import com.flowdesk.common.dto.PageResponse;
 
 import com.flowdesk.ticket.dto.CreateTicketCommentRequest;
+import com.flowdesk.ticket.dto.ResolveTicketRequest;
 import com.flowdesk.ticket.dto.SupportTicketResponse;
 import com.flowdesk.ticket.dto.SupportTicketSummaryResponse;
 import com.flowdesk.ticket.dto.TicketCommentResponse;
@@ -171,6 +172,32 @@ public class SupportTicketController {
         SupportTicketResponse response =
                 supportTicketService
                         .updateStatus(
+                                authenticatedUserId,
+                                ticketNumber,
+                                request
+                        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{ticketNumber}/resolve")
+    public ResponseEntity<SupportTicketResponse>
+            resolveTicket(
+                    @AuthenticationPrincipal Jwt jwt,
+                    @PathVariable String ticketNumber,
+                    @Valid
+                    @RequestBody
+                    ResolveTicketRequest request
+            ) {
+
+        UUID authenticatedUserId =
+                UUID.fromString(
+                        jwt.getSubject()
+                );
+
+        SupportTicketResponse response =
+                supportTicketService
+                        .resolveTicket(
                                 authenticatedUserId,
                                 ticketNumber,
                                 request

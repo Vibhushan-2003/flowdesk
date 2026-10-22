@@ -14,9 +14,14 @@ import {
 } from '../api/aiReplyDraft'
 
 import {
+  generateAiResolutionSummary,
+} from '../api/aiResolutionSummary'
+
+import {
   addSupportTicketComment,
   getSupportTicket,
   getSupportTicketComments,
+  resolveSupportTicket,
   updateSupportTicketStatus,
 } from '../api/ticket'
 
@@ -81,9 +86,6 @@ function getActionMessage(
     case 'WAITING_FOR_USER':
       return 'Ticket is now waiting for the requester.'
 
-    case 'RESOLVED':
-      return 'Ticket has been resolved successfully.'
-
     default:
       return 'Ticket status updated successfully.'
   }
@@ -107,11 +109,21 @@ export function SupportTicketDetailsPage() {
   const [commentBody, setCommentBody] =
     useState('')
 
+  const [
+    resolutionSummary,
+    setResolutionSummary,
+  ] = useState('')
+
   const [isLoading, setIsLoading] =
     useState(true)
 
   const [isUpdating, setIsUpdating] =
     useState(false)
+
+  const [
+    isResolving,
+    setIsResolving,
+  ] = useState(false)
 
   const [isSendingComment, setIsSendingComment] =
     useState(false)
@@ -122,10 +134,22 @@ export function SupportTicketDetailsPage() {
   ] =
     useState(false)
 
+  const [
+    isGeneratingResolutionSummary,
+    setIsGeneratingResolutionSummary,
+  ] =
+    useState(false)
+
   const [error, setError] =
     useState<string | null>(null)
 
   const [commentError, setCommentError] =
+    useState<string | null>(null)
+
+  const [
+    resolutionError,
+    setResolutionError,
+  ] =
     useState<string | null>(null)
 
   const [
@@ -137,6 +161,18 @@ export function SupportTicketDetailsPage() {
   const [
     aiReplyDraftNotice,
     setAiReplyDraftNotice,
+  ] =
+    useState<string | null>(null)
+
+  const [
+    aiResolutionSummaryError,
+    setAiResolutionSummaryError,
+  ] =
+    useState<string | null>(null)
+
+  const [
+    aiResolutionSummaryNotice,
+    setAiResolutionSummaryNotice,
   ] =
     useState<string | null>(null)
 
@@ -191,7 +227,14 @@ export function SupportTicketDetailsPage() {
 
         if (!cancelled) {
           setTicket(ticketResponse)
-          setComments(commentsResponse)
+
+          setComments(
+            commentsResponse,
+          )
+
+          setResolutionSummary(
+            ticketResponse.resolutionSummary ?? '',
+          )
         }
       } catch (caughtError) {
         if (cancelled) {
@@ -352,6 +395,152 @@ export function SupportTicketDetailsPage() {
     }
   }
 
+  async function
+  handleGenerateAiResolutionSummary() {
+    if (!accessToken || !ticketNumber) {
+      setAiResolutionSummaryError(
+        'Your session is no longer valid',
+      )
+
+      return
+    }
+
+    if (ticket?.status !== 'IN_PROGRESS') {
+      setAiResolutionSummaryError(
+        'AI resolution summaries can only be generated while the ticket is in progress',
+      )
+
+      return
+    }
+
+    /*
+     * Never overwrite a manual summary or an
+     * AI draft that the engineer has edited.
+     */
+    if (resolutionSummary.trim()) {
+      setAiResolutionSummaryError(
+        'Clear the current resolution summary before generating a new AI draft',
+      )
+
+      return
+    }
+
+    setIsGeneratingResolutionSummary(true)
+    setAiResolutionSummaryError(null)
+    setAiResolutionSummaryNotice(null)
+    setResolutionError(null)
+
+    try {
+      const response =
+        await generateAiResolutionSummary(
+          accessToken,
+          ticketNumber,
+        )
+
+      /*
+       * AI only fills this editable textarea.
+       *
+       * Nothing is persisted and the ticket
+       * remains IN_PROGRESS.
+       */
+      setResolutionSummary(
+        response.draft,
+      )
+
+      setAiResolutionSummaryNotice(
+        `AI draft generated with ${response.model}. Review and edit it before resolving the ticket.`,
+      )
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setAiResolutionSummaryError(
+          caughtError.message,
+        )
+      } else {
+        setAiResolutionSummaryError(
+          'Unable to generate AI resolution summary',
+        )
+      }
+    } finally {
+      setIsGeneratingResolutionSummary(false)
+    }
+  }
+
+  async function handleResolveTicket() {
+    if (!accessToken || !ticketNumber) {
+      setResolutionError(
+        'Your session is no longer valid',
+      )
+
+      return
+    }
+
+    if (ticket?.status !== 'IN_PROGRESS') {
+      setResolutionError(
+        'This ticket can only be resolved while it is in progress',
+      )
+
+      return
+    }
+
+    const normalizedSummary =
+      resolutionSummary.trim()
+
+    if (!normalizedSummary) {
+      setResolutionError(
+        'Enter a resolution summary before resolving the ticket',
+      )
+
+      return
+    }
+
+    if (normalizedSummary.length > 4000) {
+      setResolutionError(
+        'Resolution summary must not exceed 4000 characters',
+      )
+
+      return
+    }
+
+    setIsResolving(true)
+    setResolutionError(null)
+    setAiResolutionSummaryError(null)
+    setSuccessMessage(null)
+
+    try {
+      const response =
+        await resolveSupportTicket(
+          accessToken,
+          ticketNumber,
+          normalizedSummary,
+        )
+
+      setTicket(response)
+
+      setResolutionSummary(
+        response.resolutionSummary ??
+          normalizedSummary,
+      )
+
+      setAiResolutionSummaryNotice(null)
+
+      setSuccessMessage(
+        'Ticket has been resolved successfully.',
+      )
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setResolutionError(
+          caughtError.message,
+        )
+      } else {
+        setResolutionError(
+          'Unable to resolve ticket',
+        )
+      }
+    } finally {
+      setIsResolving(false)
+    }
+  }
+
   async function handleSendComment(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -428,6 +617,11 @@ export function SupportTicketDetailsPage() {
   const hasDraftableMessage =
     Boolean(
       commentBody.trim(),
+    )
+
+  const hasResolutionSummary =
+    Boolean(
+      resolutionSummary.trim(),
     )
 
   return (
@@ -716,6 +910,18 @@ export function SupportTicketDetailsPage() {
                   </div>
                 </div>
               </section>
+
+              {ticket.resolutionSummary && (
+                <section className="support-description-section">
+                  <p className="support-section-label">
+                    Resolution
+                  </p>
+
+                  <p className="support-ticket-description-text">
+                    {ticket.resolutionSummary}
+                  </p>
+                </section>
+              )}
             </article>
 
             <aside className="support-workflow-panel">
@@ -760,38 +966,147 @@ export function SupportTicketDetailsPage() {
                     this ticket.
                   </p>
 
-                  <div className="support-workflow-actions">
+                  <button
+                    type="button"
+                    className="secondary-button support-workflow-button"
+                    disabled={
+                      isUpdating ||
+                      isResolving ||
+                      isGeneratingResolutionSummary
+                    }
+                    onClick={() =>
+                      void handleStatusChange(
+                        'WAITING_FOR_USER',
+                      )
+                    }
+                  >
+                    {isUpdating
+                      ? 'Updating...'
+                      : 'Wait for user'}
+                  </button>
+
+                  <div className="resolution-workflow">
+                    <p className="support-section-label">
+                      Resolution summary
+                    </p>
+
+                    <h3>
+                      Resolve ticket
+                    </h3>
+
+                    <p className="resolution-workflow-description">
+                      Record what was actually done and
+                      the verified outcome. You can write
+                      this manually or ask AI to prepare
+                      an editable draft.
+                    </p>
+
                     <button
                       type="button"
                       className="secondary-button support-workflow-button"
                       disabled={
-                        isUpdating
+                        isGeneratingResolutionSummary ||
+                        isResolving ||
+                        isUpdating ||
+                        hasResolutionSummary
                       }
                       onClick={() =>
-                        void handleStatusChange(
-                          'WAITING_FOR_USER',
-                        )
+                        void handleGenerateAiResolutionSummary()
                       }
                     >
-                      {isUpdating
-                        ? 'Updating...'
-                        : 'Wait for user'}
+                      {isGeneratingResolutionSummary
+                        ? 'Drafting...'
+                        : 'Draft summary with AI'}
                     </button>
+
+                    {aiResolutionSummaryNotice && (
+                      <p
+                        className="resolution-ai-notice"
+                        aria-live="polite"
+                      >
+                        {aiResolutionSummaryNotice}
+                      </p>
+                    )}
+
+                    {aiResolutionSummaryError && (
+                      <p
+                        className="form-error"
+                        role="alert"
+                      >
+                        {aiResolutionSummaryError}
+                      </p>
+                    )}
+
+                    <label
+                      className="resolution-summary-label"
+                      htmlFor="resolution-summary"
+                    >
+                      Final resolution summary
+                    </label>
+
+                    <textarea
+                      id="resolution-summary"
+                      value={resolutionSummary}
+                      maxLength={4000}
+                      rows={7}
+                      placeholder="Describe the verified action taken and outcome..."
+                      disabled={
+                        isResolving ||
+                        isGeneratingResolutionSummary ||
+                        isUpdating
+                      }
+                      onChange={(event) => {
+                        setResolutionSummary(
+                          event.target.value,
+                        )
+
+                        if (resolutionError) {
+                          setResolutionError(
+                            null,
+                          )
+                        }
+
+                        if (
+                          aiResolutionSummaryError
+                        ) {
+                          setAiResolutionSummaryError(
+                            null,
+                          )
+                        }
+                      }}
+                    />
+
+                    <div className="resolution-summary-footer">
+                      <span>
+                        {resolutionSummary.length}
+                        /4000
+                      </span>
+                    </div>
+
+                    {resolutionError && (
+                      <p
+                        className="form-error"
+                        role="alert"
+                      >
+                        {resolutionError}
+                      </p>
+                    )}
 
                     <button
                       type="button"
                       className="resolve-button support-workflow-button"
                       disabled={
-                        isUpdating
+                        isResolving ||
+                        isUpdating ||
+                        isGeneratingResolutionSummary ||
+                        !hasResolutionSummary
                       }
                       onClick={() =>
-                        void handleStatusChange(
-                          'RESOLVED',
-                        )
+                        void handleResolveTicket()
                       }
                     >
-                      {isUpdating
-                        ? 'Updating...'
+                      {isResolving
+                        ? 'Resolving...'
                         : 'Resolve ticket'}
                     </button>
                   </div>
@@ -842,6 +1157,20 @@ export function SupportTicketDetailsPage() {
                     and removed from your active
                     assignments.
                   </p>
+
+                  {ticket.resolutionSummary && (
+                    <div className="resolved-summary-box">
+                      <strong>
+                        Resolution summary
+                      </strong>
+
+                      <p>
+                        {
+                          ticket.resolutionSummary
+                        }
+                      </p>
+                    </div>
+                  )}
 
                   <button
                     type="button"
@@ -980,9 +1309,7 @@ export function SupportTicketDetailsPage() {
                 </div>
 
                 {aiReplyDraftNotice && (
-                  <p
-                    aria-live="polite"
-                  >
+                  <p aria-live="polite">
                     {aiReplyDraftNotice}
                   </p>
                 )}

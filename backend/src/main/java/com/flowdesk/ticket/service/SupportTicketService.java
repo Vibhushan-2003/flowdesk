@@ -13,6 +13,7 @@ import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
 import com.flowdesk.ticket.domain.TicketStatus;
 
+import com.flowdesk.ticket.dto.ResolveTicketRequest;
 import com.flowdesk.ticket.dto.SupportTicketResponse;
 import com.flowdesk.ticket.dto.SupportTicketSummaryResponse;
 import com.flowdesk.ticket.dto.UpdateTicketStatusRequest;
@@ -166,25 +167,35 @@ public class SupportTicketService {
                                         )
                         );
 
-        Ticket ticket =
-                assignment.getTicket();
-
-        /*
-         * Capture the previous state before applying
-         * the transition.
-         *
-         * We need this for both notifications and
-         * the immutable audit record.
-         */
-        TicketStatus previousStatus =
-                ticket.getStatus();
-
         if (request == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Status request is required"
             );
         }
+
+        /*
+         * RESOLVED is intentionally not handled through
+         * the generic status endpoint anymore.
+         *
+         * Resolving is now a richer business operation
+         * that requires a human-approved resolution
+         * summary.
+         */
+        if (request.status()
+                == TicketStatus.RESOLVED) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Use the resolve endpoint to resolve a ticket"
+            );
+        }
+
+        Ticket ticket =
+                assignment.getTicket();
+
+        TicketStatus previousStatus =
+                ticket.getStatus();
 
         try {
             ticket.transitionSupportStatus(
@@ -207,40 +218,136 @@ public class SupportTicketService {
         TicketStatus newStatus =
                 ticket.getStatus();
 
-        /*
-         * When resolved, release the engineer's
-         * active assignment exactly as before.
-         */
-        if (newStatus == TicketStatus.RESOLVED) {
-            assignment.release();
-        }
-
-        /*
-         * Flush the ticket / assignment mutation
-         * before recording dependent records.
-         */
         ticketAssignmentRepository.flush();
 
-        /*
-         * Keep the existing employee notification
-         * behavior.
-         *
-         * This is still part of the same transaction.
-         */
         notifyTicketCreatorAboutStatusChange(
                 assignment,
                 previousStatus,
                 newStatus
         );
 
+        recordStatusChange(
+                assignment,
+                previousStatus,
+                newStatus
+        );
+
+        return toResponse(
+                assignment
+        );
+    }
+
+    @Transactional
+    public SupportTicketResponse
+            resolveTicket(
+                    UUID supportEngineerId,
+                    String ticketNumber,
+                    ResolveTicketRequest request
+            ) {
+
+        String normalizedTicketNumber =
+                normalizeTicketNumber(
+                        ticketNumber
+                );
+
         /*
-         * Record the successful business transition.
+         * Lock and verify the active assignment.
          *
-         * The assigned support engineer is the actor.
-         * Because AuditService uses the default REQUIRED
-         * transaction propagation, this audit insert joins
-         * this same transaction.
+         * This ensures only the currently assigned
+         * support engineer can resolve the ticket and
+         * protects the transition from concurrent
+         * assignment changes.
          */
+        TicketAssignment assignment =
+                ticketAssignmentRepository
+                        .findActiveAssignmentForUpdate(
+                                normalizedTicketNumber,
+                                supportEngineerId
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Ticket not found"
+                                        )
+                        );
+
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Resolution request is required"
+            );
+        }
+
+        Ticket ticket =
+                assignment.getTicket();
+
+        TicketStatus previousStatus =
+                ticket.getStatus();
+
+        try {
+            ticket.resolve(
+                    request.resolutionSummary()
+            );
+        }
+        catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    exception.getMessage()
+            );
+        }
+        catch (IllegalStateException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    exception.getMessage()
+            );
+        }
+
+        /*
+         * Resolution and assignment release happen in
+         * the same database transaction.
+         *
+         * We must never leave a RESOLVED ticket with an
+         * active support assignment.
+         */
+        assignment.release();
+
+        ticketAssignmentRepository.flush();
+
+        notifyTicketCreatorAboutStatusChange(
+                assignment,
+                previousStatus,
+                ticket.getStatus()
+        );
+
+        /*
+         * Do not put the resolution summary itself in
+         * audit metadata.
+         *
+         * The summary is business data stored on the
+         * ticket. The audit record only captures the
+         * state transition.
+         */
+        recordStatusChange(
+                assignment,
+                previousStatus,
+                ticket.getStatus()
+        );
+
+        return toResponse(
+                assignment
+        );
+    }
+
+    private void recordStatusChange(
+            TicketAssignment assignment,
+            TicketStatus previousStatus,
+            TicketStatus newStatus
+    ) {
+
+        Ticket ticket =
+                assignment.getTicket();
+
         auditService.recordUserAction(
                 assignment.getAssignedToUser(),
                 AuditAction.TICKET_STATUS_CHANGED,
@@ -253,10 +360,6 @@ public class SupportTicketService {
                         "toStatus",
                         newStatus.name()
                 )
-        );
-
-        return toResponse(
-                assignment
         );
     }
 
@@ -279,11 +382,6 @@ public class SupportTicketService {
             return;
         }
 
-        /*
-         * Defensive protection against creating
-         * a notification where actor and recipient
-         * are accidentally the same user.
-         */
         if (actor != null
                 && actor.getId() != null
                 && recipient.getId() != null
@@ -431,6 +529,7 @@ public class SupportTicketService {
                 ticket.getResolutionDueAt(),
                 ticket.getFirstRespondedAt(),
                 ticket.getResolvedAt(),
+                ticket.getResolutionSummary(),
                 ticket.evaluateResponseSla(
                         evaluatedAt
                 ),

@@ -27,6 +27,9 @@ import java.util.UUID;
 @Table(name = "tickets")
 public class Ticket {
 
+    private static final int MAX_RESOLUTION_SUMMARY_LENGTH =
+            4000;
+
     @Id
     private UUID id;
 
@@ -90,6 +93,12 @@ public class Ticket {
 
     @Column(name = "first_responded_at")
     private OffsetDateTime firstRespondedAt;
+
+    @Column(
+            name = "resolution_summary",
+            columnDefinition = "TEXT"
+    )
+    private String resolutionSummary;
 
     @Column(
             name = "created_at",
@@ -308,15 +317,6 @@ public class Ticket {
                 "New SLA policy is required"
         );
 
-        /*
-         * Day 26 intentionally allows AI-assisted
-         * priority application only before support work
-         * begins.
-         *
-         * Once the ticket moves to IN_PROGRESS, changing
-         * the SLA target would rewrite historical response
-         * performance.
-         */
         if (status
                 != TicketStatus.ASSIGNED) {
 
@@ -325,13 +325,6 @@ public class Ticket {
             );
         }
 
-        /*
-         * An assigned ticket should already have its SLA
-         * snapshot.
-         *
-         * Incidents receive it at creation.
-         * Service requests receive it after approval.
-         */
         if (slaPolicy == null
                 || responseDueAt == null
                 || resolutionDueAt == null) {
@@ -355,22 +348,6 @@ public class Ticket {
             );
         }
 
-        /*
-         * Preserve the ORIGINAL SLA start time.
-         *
-         * We do not reset the SLA clock when priority
-         * changes.
-         *
-         * Example:
-         *
-         * Original MEDIUM:
-         * start     = 10:00
-         * response  = 11:00
-         *
-         * If HIGH response time is 30 minutes,
-         * the new deadline becomes 10:30,
-         * NOT "current time + 30 minutes".
-         */
         OffsetDateTime responseSlaStartedAt =
                 responseDueAt
                         .minusMinutes(
@@ -385,14 +362,6 @@ public class Ticket {
                                         .getResolutionMinutes()
                         );
 
-        /*
-         * Both existing deadlines must represent the same
-         * original SLA start.
-         *
-         * If they do not, the ticket already contains an
-         * inconsistent SLA snapshot and we must not silently
-         * overwrite it.
-         */
         if (!responseSlaStartedAt
                 .toInstant()
                 .equals(
@@ -463,9 +432,7 @@ public class Ticket {
 
                     case IN_PROGRESS ->
                             newStatus
-                                    == TicketStatus.WAITING_FOR_USER
-                                    || newStatus
-                                    == TicketStatus.RESOLVED;
+                                    == TicketStatus.WAITING_FOR_USER;
 
                     case WAITING_FOR_USER ->
                             newStatus
@@ -487,25 +454,57 @@ public class Ticket {
         status =
                 newStatus;
 
-        OffsetDateTime now =
-                OffsetDateTime.now(
-                        ZoneOffset.UTC
-                );
-
         if (newStatus
                 == TicketStatus.IN_PROGRESS
                 && firstRespondedAt == null) {
 
             firstRespondedAt =
-                    now;
+                    OffsetDateTime.now(
+                            ZoneOffset.UTC
+                    );
+        }
+    }
+
+    public void resolve(
+            String resolutionSummary
+    ) {
+        if (status
+                != TicketStatus.IN_PROGRESS) {
+
+            throw new IllegalStateException(
+                    "Ticket can only be resolved while in progress"
+            );
         }
 
-        if (newStatus
-                == TicketStatus.RESOLVED) {
+        if (resolutionSummary == null
+                || resolutionSummary.isBlank()) {
 
-            resolvedAt =
-                    now;
+            throw new IllegalArgumentException(
+                    "Resolution summary is required"
+            );
         }
+
+        String normalizedResolutionSummary =
+                resolutionSummary.trim();
+
+        if (normalizedResolutionSummary.length()
+                > MAX_RESOLUTION_SUMMARY_LENGTH) {
+
+            throw new IllegalArgumentException(
+                    "Resolution summary must not exceed 4000 characters"
+            );
+        }
+
+        this.resolutionSummary =
+                normalizedResolutionSummary;
+
+        this.status =
+                TicketStatus.RESOLVED;
+
+        this.resolvedAt =
+                OffsetDateTime.now(
+                        ZoneOffset.UTC
+                );
     }
 
     public SlaStatus evaluateResponseSla(
@@ -640,6 +639,10 @@ public class Ticket {
 
     public OffsetDateTime getFirstRespondedAt() {
         return firstRespondedAt;
+    }
+
+    public String getResolutionSummary() {
+        return resolutionSummary;
     }
 
     public OffsetDateTime getCreatedAt() {

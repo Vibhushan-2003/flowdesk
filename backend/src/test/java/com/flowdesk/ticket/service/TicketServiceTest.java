@@ -751,6 +751,12 @@ class TicketServiceTest {
                 createdAt
         );
 
+        when(
+                ticket.getResolutionSummary()
+        ).thenReturn(
+                "Restarted the affected service and confirmed normal operation."
+        );
+
         TicketResponse response =
                 ticketService
                         .getMyTicket(
@@ -771,6 +777,11 @@ class TicketServiceTest {
         assertEquals(
                 userId,
                 response.createdByUserId()
+        );
+
+        assertEquals(
+                "Restarted the affected service and confirmed normal operation.",
+                response.resolutionSummary()
         );
 
         verify(

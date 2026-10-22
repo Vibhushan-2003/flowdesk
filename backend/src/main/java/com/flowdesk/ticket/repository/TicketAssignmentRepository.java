@@ -6,9 +6,11 @@ import jakarta.persistence.LockModeType;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
@@ -49,5 +51,18 @@ public interface TicketAssignmentRepository
 
                     @Param("assignedToUserId")
                     UUID assignedToUserId
+            );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT assignment
+            FROM TicketAssignment assignment
+            WHERE assignment.ticket.id = :ticketId
+              AND assignment.releasedAt IS NULL
+            """)
+    Optional<TicketAssignment>
+            findActiveAssignmentByTicketIdForUpdate(
+                    @Param("ticketId")
+                    UUID ticketId
             );
 }

@@ -30,6 +30,8 @@ public record TicketResponse(
         OffsetDateTime firstRespondedAt,
         OffsetDateTime resolvedAt,
 
+        String resolutionSummary,
+
         SlaStatus responseSlaStatus,
         SlaStatus resolutionSlaStatus
 
