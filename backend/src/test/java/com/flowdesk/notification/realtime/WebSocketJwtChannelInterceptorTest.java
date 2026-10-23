@@ -723,6 +723,232 @@ class WebSocketJwtChannelInterceptorTest {
     }
 
     /*
+     * DAY 38 - REGRESSION TEST 1
+     *
+     * Unsupported STOMP client commands
+     * must be rejected.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "ACK",
+            "NACK",
+            "BEGIN",
+            "COMMIT",
+            "ABORT"
+    })
+    void unsupportedClientCommandsMustBeRejected(
+            String commandName
+    ) {
+
+        StompCommand command =
+                StompCommand.valueOf(commandName);
+
+        StompHeaderAccessor accessor =
+                createAccessor(
+                        command,
+                        "session-unsupported-command"
+                );
+
+        Message<byte[]> message =
+                createMessage(accessor);
+
+        assertThrows(
+                MessagingException.class,
+                () -> interceptor.preSend(
+                        message,
+                        messageChannel
+                )
+        );
+
+        verify(jwtDecoder, never())
+                .decode(anyString());
+    }
+
+    /*
+     * DAY 38 - REGRESSION TEST 2
+     *
+     * A valid registered session can
+     * unsubscribe without a new JWT decode.
+     */
+    @Test
+    void registeredSessionCanUnsubscribe() {
+
+        String sessionId =
+                "session-valid-unsubscribe";
+
+        Jwt jwt =
+                createJwt("unsubscribe-token");
+
+        JwtAuthenticationToken authentication =
+                createAuthentication(jwt);
+
+        when(sessionRegistry.find(sessionId))
+                .thenReturn(
+                        Optional.of(authentication)
+                );
+
+        StompHeaderAccessor accessor =
+                createAccessor(
+                        StompCommand.UNSUBSCRIBE,
+                        sessionId
+                );
+
+        accessor.setUser(authentication);
+
+        Message<byte[]> message =
+                createMessage(accessor);
+
+        assertSame(
+                message,
+                interceptor.preSend(
+                        message,
+                        messageChannel
+                )
+        );
+
+        verify(sessionRegistry).find(sessionId);
+
+        verify(jwtDecoder, never())
+                .decode(anyString());
+    }
+
+    /*
+     * DAY 38 - REGRESSION TEST 3
+     *
+     * An unregistered session cannot
+     * unsubscribe.
+     */
+    @Test
+    void unregisteredSessionCannotUnsubscribe() {
+
+        String sessionId =
+                "session-unregistered-unsubscribe";
+
+        JwtAuthenticationToken authentication =
+                createAuthentication(
+                        createJwt("unregistered-token")
+                );
+
+        when(sessionRegistry.find(sessionId))
+                .thenReturn(Optional.empty());
+
+        StompHeaderAccessor accessor =
+                createAccessor(
+                        StompCommand.UNSUBSCRIBE,
+                        sessionId
+                );
+
+        accessor.setUser(authentication);
+
+        Message<byte[]> message =
+                createMessage(accessor);
+
+        assertThrows(
+                MessagingException.class,
+                () -> interceptor.preSend(
+                        message,
+                        messageChannel
+                )
+        );
+    }
+
+    /*
+     * DAY 38 - REGRESSION TEST 4
+     *
+     * A mismatched JWT cannot unsubscribe
+     * from another authenticated session.
+     */
+    @Test
+    void mismatchedSessionCannotUnsubscribe() {
+
+        String sessionId =
+                "session-unsubscribe-mismatch";
+
+        JwtAuthenticationToken registered =
+                createAuthentication(
+                        createJwt("original-token")
+                );
+
+        JwtAuthenticationToken mismatched =
+                createAuthentication(
+                        createJwt("different-token")
+                );
+
+        when(sessionRegistry.find(sessionId))
+                .thenReturn(Optional.of(registered));
+
+        StompHeaderAccessor accessor =
+                createAccessor(
+                        StompCommand.UNSUBSCRIBE,
+                        sessionId
+                );
+
+        accessor.setUser(mismatched);
+
+        Message<byte[]> message =
+                createMessage(accessor);
+
+        assertThrows(
+                MessagingException.class,
+                () -> interceptor.preSend(
+                        message,
+                        messageChannel
+                )
+        );
+    }
+
+    /*
+     * DAY 38 - REGRESSION TEST 5
+     *
+     * Expired JWT blocks a new subscription.
+     */
+    @Test
+    void expiredJwtCannotCreateNewSubscription() {
+
+        String token = "expired-session-token";
+        String sessionId = "session-expired";
+
+        Jwt jwt = createJwt(token);
+
+        JwtAuthenticationToken authentication =
+                createAuthentication(jwt);
+
+        when(sessionRegistry.find(sessionId))
+                .thenReturn(Optional.of(authentication));
+
+        when(jwtDecoder.decode(token))
+                .thenThrow(
+                        new JwtException("JWT expired")
+                );
+
+        StompHeaderAccessor accessor =
+                createAccessor(
+                        StompCommand.SUBSCRIBE,
+                        sessionId
+                );
+
+        accessor.setDestination(
+                "/user/queue/notifications"
+        );
+
+        accessor.setUser(authentication);
+
+        Message<byte[]> message =
+                createMessage(accessor);
+
+        assertThrows(
+                MessagingException.class,
+                () -> interceptor.preSend(
+                        message,
+                        messageChannel
+                )
+        );
+
+        verify(jwtDecoder).decode(token);
+    }
+
+
+    /*
      * Helpers
      */
 

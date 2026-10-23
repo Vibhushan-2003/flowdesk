@@ -18,6 +18,8 @@ import org.springframework.messaging.simp.SimpMessageType;
 import org.springframework.messaging.support.MessageBuilder;
 
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -26,22 +28,23 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.oauth2.core.OAuth2Error;
-
 @ExtendWith(MockitoExtension.class)
 class WebSocketOutboundSecurityInterceptorTest {
 
-    private static final String SESSION_ID = "session-123";
+    private static final String SESSION_ID =
+            "session-123";
 
-    private static final String USER_ID = "user-123";
+    private static final String USER_ID =
+            "user-123";
 
-    private static final String TOKEN_VALUE = "test-jwt-token";
+    private static final String TOKEN_VALUE =
+            "test-jwt-token";
 
     private static final String NOTIFICATION_DESTINATION =
             "/queue/notifications-user123";
@@ -71,6 +74,12 @@ class WebSocketOutboundSecurityInterceptorTest {
                 );
     }
 
+    /*
+     * TEST 1
+     *
+     * A valid registered JWT session
+     * must receive its private notification.
+     */
     @Test
     void validRegisteredSessionMustReceiveNotification() {
 
@@ -103,6 +112,12 @@ class WebSocketOutboundSecurityInterceptorTest {
         verify(jwtDecoder).decode(TOKEN_VALUE);
     }
 
+    /*
+     * TEST 2
+     *
+     * An unregistered session must not
+     * receive a private notification.
+     */
     @Test
     void unregisteredSessionMustNotReceiveNotification() {
 
@@ -127,6 +142,12 @@ class WebSocketOutboundSecurityInterceptorTest {
         );
     }
 
+    /*
+     * TEST 3
+     *
+     * An expired JWT must not receive
+     * private notifications.
+     */
     @Test
     void expiredJwtMustNotReceiveNotification() {
 
@@ -139,7 +160,9 @@ class WebSocketOutboundSecurityInterceptorTest {
                 .thenReturn(Optional.of(authentication));
 
         when(jwtDecoder.decode(TOKEN_VALUE))
-                .thenThrow(new JwtException("Token expired"));
+                .thenThrow(
+                        new JwtException("Token expired")
+                );
 
         Message<byte[]> message =
                 createMessage(
@@ -157,6 +180,14 @@ class WebSocketOutboundSecurityInterceptorTest {
                 .convert(jwt);
     }
 
+    /*
+     * TEST 4
+     *
+     * A disabled account must not receive
+     * private notifications.
+     *
+     * Model converter rejection as null.
+     */
     @Test
     void disabledAccountMustNotReceiveNotification() {
 
@@ -171,13 +202,6 @@ class WebSocketOutboundSecurityInterceptorTest {
         when(jwtDecoder.decode(TOKEN_VALUE))
                 .thenReturn(jwt);
 
-        /*
-         * The existing converter is expected
-         * to reject accounts that are no longer
-         * authorized.
-         *
-         * This test models rejection as null.
-         */
         when(authenticationConverter.convert(jwt))
                 .thenReturn(null);
 
@@ -194,6 +218,12 @@ class WebSocketOutboundSecurityInterceptorTest {
         assertNull(result);
     }
 
+    /*
+     * TEST 5
+     *
+     * A changed user identity must not
+     * receive another user's notification.
+     */
     @Test
     void changedIdentityMustNotReceiveNotification() {
 
@@ -237,6 +267,12 @@ class WebSocketOutboundSecurityInterceptorTest {
         assertNull(result);
     }
 
+    /*
+     * TEST 6
+     *
+     * A notification without a session ID
+     * must be blocked.
+     */
     @Test
     void missingSessionIdMustNotReceiveNotification() {
 
@@ -259,6 +295,12 @@ class WebSocketOutboundSecurityInterceptorTest {
         );
     }
 
+    /*
+     * TEST 7
+     *
+     * A CONNECT_ACK control frame
+     * must pass without JWT validation.
+     */
     @Test
     void connectedControlFrameMustPassWithoutJwtValidation() {
 
@@ -281,6 +323,12 @@ class WebSocketOutboundSecurityInterceptorTest {
         );
     }
 
+    /*
+     * TEST 8
+     *
+     * Unrelated destinations must not
+     * be affected by notification security.
+     */
     @Test
     void otherDestinationsMustNotBeAffected() {
 
@@ -303,59 +351,215 @@ class WebSocketOutboundSecurityInterceptorTest {
         );
     }
 
-@Test
-void inactiveAccountRejectionMustBlockNotification() {
+    /*
+     * TEST 9
+     *
+     * An inactive account must be blocked
+     * when the authentication converter
+     * throws OAuth2AuthenticationException.
+     */
+    @Test
+    void inactiveAccountRejectionMustBlockNotification() {
 
-    Jwt jwt = createJwt(TOKEN_VALUE);
+        Jwt jwt = createJwt(TOKEN_VALUE);
 
-    JwtAuthenticationToken authentication =
-            createAuthentication(jwt);
+        JwtAuthenticationToken authentication =
+                createAuthentication(jwt);
 
-    when(sessionRegistry.find(SESSION_ID))
-            .thenReturn(Optional.of(authentication));
+        when(sessionRegistry.find(SESSION_ID))
+                .thenReturn(Optional.of(authentication));
 
-    when(jwtDecoder.decode(TOKEN_VALUE))
-            .thenReturn(jwt);
+        when(jwtDecoder.decode(TOKEN_VALUE))
+                .thenReturn(jwt);
+
+        when(authenticationConverter.convert(jwt))
+                .thenThrow(
+                        new OAuth2AuthenticationException(
+                                new OAuth2Error(
+                                        "invalid_token",
+                                        "Account is unavailable",
+                                        null
+                                )
+                        )
+                );
+
+        Message<byte[]> message =
+                createMessage(
+                        SimpMessageType.MESSAGE,
+                        SESSION_ID,
+                        NOTIFICATION_DESTINATION
+                );
+
+        Message<?> result =
+                interceptor.preSend(message, messageChannel);
+
+        assertNull(
+                result,
+                "Inactive accounts must not receive notifications"
+        );
+
+        verify(authenticationConverter).convert(jwt);
+    }
 
     /*
-     * The real JwtCurrentUserAuthoritiesConverter
-     * throws OAuth2AuthenticationException when
-     * a database account is INACTIVE.
+     * DAY 38 - TEST 10
      *
-     * Model that actual behavior here.
+     * A different JWT returned after
+     * revalidation must block delivery,
+     * even when the user ID is unchanged.
      */
-    when(authenticationConverter.convert(jwt))
-            .thenThrow(
-                    new OAuth2AuthenticationException(
-                            new OAuth2Error(
-                                    "invalid_token",
-                                    "Account is unavailable",
-                                    null
-                            )
-                    )
-            );
+    @Test
+    void changedJwtTokenMustBlockNotification() {
 
-    Message<byte[]> message =
-            createMessage(
-                    SimpMessageType.MESSAGE,
-                    SESSION_ID,
-                    NOTIFICATION_DESTINATION
-            );
+        Jwt originalJwt = createJwt(TOKEN_VALUE);
 
-    Message<?> result =
-            interceptor.preSend(
-                    message,
-                    messageChannel
-            );
+        JwtAuthenticationToken registered =
+                createAuthentication(originalJwt);
 
-    assertNull(
-            result,
-            "Inactive accounts must not receive notifications"
-    );
+        Jwt changedJwt =
+                createJwt("different-jwt-token");
 
-    verify(authenticationConverter).convert(jwt);
-}
+        JwtAuthenticationToken changedAuthentication =
+                createAuthentication(changedJwt);
 
+        when(sessionRegistry.find(SESSION_ID))
+                .thenReturn(Optional.of(registered));
+
+        when(jwtDecoder.decode(TOKEN_VALUE))
+                .thenReturn(originalJwt);
+
+        when(authenticationConverter.convert(originalJwt))
+                .thenReturn(changedAuthentication);
+
+        Message<byte[]> message =
+                createMessage(
+                        SimpMessageType.MESSAGE,
+                        SESSION_ID,
+                        NOTIFICATION_DESTINATION
+                );
+
+        Message<?> result =
+                interceptor.preSend(message, messageChannel);
+
+        assertNull(result);
+
+        verify(jwtDecoder).decode(TOKEN_VALUE);
+    }
+
+    /*
+     * DAY 38 - TEST 11
+     *
+     * A registered JWT authentication
+     * marked unauthenticated must not
+     * receive notifications.
+     */
+    @Test
+    void unauthenticatedRegisteredSessionMustBlockNotification() {
+
+        Jwt jwt = createJwt(TOKEN_VALUE);
+
+        JwtAuthenticationToken authentication =
+                createAuthentication(jwt);
+
+        authentication.setAuthenticated(false);
+
+        when(sessionRegistry.find(SESSION_ID))
+                .thenReturn(Optional.of(authentication));
+
+        Message<byte[]> message =
+                createMessage(
+                        SimpMessageType.MESSAGE,
+                        SESSION_ID,
+                        NOTIFICATION_DESTINATION
+                );
+
+        Message<?> result =
+                interceptor.preSend(message, messageChannel);
+
+        assertNull(result);
+    }
+
+    /*
+     * DAY 38 - TEST 12
+     *
+     * If the decoder returns null,
+     * the notification must be blocked.
+     */
+    @Test
+    void nullDecodedJwtMustBlockNotification() {
+
+        Jwt jwt = createJwt(TOKEN_VALUE);
+
+        JwtAuthenticationToken registered =
+                createAuthentication(jwt);
+
+        when(sessionRegistry.find(SESSION_ID))
+                .thenReturn(Optional.of(registered));
+
+        when(jwtDecoder.decode(TOKEN_VALUE))
+                .thenReturn(null);
+
+        Message<byte[]> message =
+                createMessage(
+                        SimpMessageType.MESSAGE,
+                        SESSION_ID,
+                        NOTIFICATION_DESTINATION
+                );
+
+        Message<?> result =
+                interceptor.preSend(message, messageChannel);
+
+        assertNull(result);
+
+        verify(authenticationConverter, never())
+                .convert(jwt);
+    }
+
+    /*
+     * DAY 38 - TEST 13
+     *
+     * Unexpected decoder failure must
+     * not allow private notification delivery.
+     */
+    @Test
+    void unexpectedDecoderFailureMustBlockNotification() {
+
+        Jwt jwt = createJwt(TOKEN_VALUE);
+
+        JwtAuthenticationToken registered =
+                createAuthentication(jwt);
+
+        when(sessionRegistry.find(SESSION_ID))
+                .thenReturn(Optional.of(registered));
+
+        when(jwtDecoder.decode(TOKEN_VALUE))
+                .thenThrow(
+                        new IllegalStateException(
+                                "Decoder unavailable"
+                        )
+                );
+
+        Message<byte[]> message =
+                createMessage(
+                        SimpMessageType.MESSAGE,
+                        SESSION_ID,
+                        NOTIFICATION_DESTINATION
+                );
+
+        Message<?> result =
+                interceptor.preSend(message, messageChannel);
+
+        assertNull(result);
+
+        verify(authenticationConverter, never())
+                .convert(jwt);
+    }
+
+    /*
+     * HELPER 1
+     *
+     * Create a JWT for testing.
+     */
     private Jwt createJwt(String tokenValue) {
 
         return Jwt.withTokenValue(tokenValue)
@@ -364,6 +568,11 @@ void inactiveAccountRejectionMustBlockNotification() {
                 .build();
     }
 
+    /*
+     * HELPER 2
+     *
+     * Create an authenticated JWT principal.
+     */
     private JwtAuthenticationToken createAuthentication(
             Jwt jwt
     ) {
@@ -379,6 +588,12 @@ void inactiveAccountRejectionMustBlockNotification() {
         );
     }
 
+    /*
+     * HELPER 3
+     *
+     * Create an outbound STOMP message
+     * with optional session and destination.
+     */
     private Message<byte[]> createMessage(
             SimpMessageType messageType,
             String sessionId,
