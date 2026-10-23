@@ -322,6 +322,10 @@ public class SecurityConfig {
                 false
         );
 
+        configuration.setExposedHeaders(
+                List.of("X-Request-ID")
+        );
+
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
 
