@@ -29,10 +29,13 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
-    env:
+        env:
       DB_URL: jdbc:postgresql://localhost:5432/flowdesk
       DB_USERNAME: flowdesk_app
       DB_PASSWORD: flowdesk_ci_password
+
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "2"
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "0"
 
     steps:
       - name: Checkout repository
