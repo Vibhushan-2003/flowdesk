@@ -1,7 +1,7 @@
+
 package com.flowdesk.notification.realtime;
 
 import org.springframework.beans.factory.annotation.Value;
-
 import org.springframework.context.annotation.Configuration;
 
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -19,20 +19,29 @@ public class WebSocketConfig
     private final WebSocketJwtChannelInterceptor
             webSocketJwtChannelInterceptor;
 
+    private final WebSocketOutboundSecurityInterceptor
+            webSocketOutboundSecurityInterceptor;
+
     private final String allowedOrigin;
 
     public WebSocketConfig(
             WebSocketJwtChannelInterceptor
                     webSocketJwtChannelInterceptor,
 
+            WebSocketOutboundSecurityInterceptor
+                    webSocketOutboundSecurityInterceptor,
+
             @Value("${app.cors.allowed-origin}")
             String allowedOrigin
     ) {
+
         this.webSocketJwtChannelInterceptor =
                 webSocketJwtChannelInterceptor;
 
-        this.allowedOrigin =
-                allowedOrigin;
+        this.webSocketOutboundSecurityInterceptor =
+                webSocketOutboundSecurityInterceptor;
+
+        this.allowedOrigin = allowedOrigin;
     }
 
     @Override
@@ -42,9 +51,7 @@ public class WebSocketConfig
 
         registry
                 .addEndpoint("/ws")
-                .setAllowedOrigins(
-                        allowedOrigin
-                );
+                .setAllowedOrigins(allowedOrigin);
     }
 
     @Override
@@ -53,29 +60,24 @@ public class WebSocketConfig
     ) {
 
         /*
-         * Client SEND destinations would begin
-         * with /app.
-         *
-         * We do not need client SEND messages
-         * for notifications yet, but defining
-         * this now keeps the architecture clear.
+         * Client application destinations.
          */
         registry.setApplicationDestinationPrefixes(
                 "/app"
         );
 
         /*
-         * Simple in-memory broker.
-         *
-         * Notification messages will ultimately
-         * be delivered to:
-         *
-         * /user/queue/notifications
+         * Simple in-memory message broker.
          */
         registry.enableSimpleBroker(
                 "/queue"
         );
 
+        /*
+         * Client private notification subscription:
+         *
+         * /user/queue/notifications
+         */
         registry.setUserDestinationPrefix(
                 "/user"
         );
@@ -86,8 +88,30 @@ public class WebSocketConfig
             ChannelRegistration registration
     ) {
 
+        /*
+         * Authenticate STOMP CONNECT.
+         *
+         * Validate client SUBSCRIBE requests.
+         *
+         * Reject unauthorized client messages.
+         */
         registration.interceptors(
                 webSocketJwtChannelInterceptor
+        );
+    }
+
+    @Override
+    public void configureClientOutboundChannel(
+            ChannelRegistration registration
+    ) {
+
+        /*
+         * Revalidate authenticated WebSocket
+         * sessions before private notification
+         * messages are sent to clients.
+         */
+        registration.interceptors(
+                webSocketOutboundSecurityInterceptor
         );
     }
 }
