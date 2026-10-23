@@ -1,10 +1,10 @@
 
-import { type FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTicketListUrlFilters } from '../hooks/useTicketListUrlFilters'
 
 import {
   getMyTickets,
-  type TicketListFilters,
 } from '../api/ticket'
 import { useAuth } from '../auth/useAuth'
 import { TicketListOverview } from '../components/TicketListOverview'
@@ -31,13 +31,6 @@ const PRIORITIES: TicketPriority[] = [
   'LOW', 'MEDIUM', 'HIGH', 'CRITICAL',
 ]
 
-const DEFAULT_FILTERS: TicketListFilters = {
-  search: '',
-  status: '',
-  priority: '',
-  sort: 'newest',
-}
-
 function formatLabel(value: string) {
   return value.replaceAll('_', ' ')
 }
@@ -63,17 +56,14 @@ export function MyTicketsPage() {
   const { accessToken } = useAuth()
   const navigate = useNavigate()
 
-  const [page, setPage] = useState(0)
-  const [searchText, setSearchText] = useState('')
-  const [selectedStatus, setSelectedStatus] =
-    useState<TicketStatus | ''>('')
-  const [selectedPriority, setSelectedPriority] =
-    useState<TicketPriority | ''>('')
-  const [selectedSort, setSelectedSort] =
-    useState<'newest' | 'oldest'>('newest')
-
-  const [appliedFilters, setAppliedFilters] =
-    useState<TicketListFilters>(DEFAULT_FILTERS)
+  const {
+    page, setPage, appliedFilters,
+    searchText, setSearchText,
+    selectedStatus, setSelectedStatus,
+    selectedPriority, setSelectedPriority,
+    selectedSort, setSelectedSort,
+    applyFilters, resetFilters,
+  } = useTicketListUrlFilters()
 
   const [ticketPage, setTicketPage] =
     useState<PageResponse<TicketSummary> | null>(null)
@@ -81,26 +71,6 @@ export function MyTicketsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshVersion, setRefreshVersion] = useState(0)
-
-  function applyFilters(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setPage(0)
-    setAppliedFilters({
-      search: searchText.trim(),
-      status: selectedStatus,
-      priority: selectedPriority,
-      sort: selectedSort,
-    })
-  }
-
-  function resetFilters() {
-    setSearchText('')
-    setSelectedStatus('')
-    setSelectedPriority('')
-    setSelectedSort('newest')
-    setPage(0)
-    setAppliedFilters({ ...DEFAULT_FILTERS })
-  }
 
   function refreshTickets() {
     setRefreshVersion((version) => version + 1)
