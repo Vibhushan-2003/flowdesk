@@ -1,3 +1,4 @@
+
 package com.flowdesk.auth.controller;
 
 import com.flowdesk.auth.dto.LoginRequest;
@@ -8,8 +9,11 @@ import com.flowdesk.auth.service.AuthService;
 import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,14 +44,28 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<MeResponse> me(
-            @AuthenticationPrincipal Jwt jwt
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication
     ) {
 
-        UUID userId = UUID.fromString(jwt.getSubject());
+        UUID userId =
+                UUID.fromString(jwt.getSubject());
 
-        String email = jwt.getClaimAsString("email");
+        String email =
+                jwt.getClaimAsString("email");
 
-        List<String> roles = jwt.getClaimAsStringList("roles");
+        List<String> roles =
+                authentication.getAuthorities()
+                        .stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .filter(authority ->
+                                authority.startsWith("ROLE_")
+                        )
+                        .map(authority ->
+                                authority.substring(5)
+                        )
+                        .sorted()
+                        .toList();
 
         return ResponseEntity.ok(
                 new MeResponse(

@@ -1,3 +1,4 @@
+
 package com.flowdesk.notification.realtime;
 
 import org.springframework.messaging.Message;
@@ -11,6 +12,7 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -39,6 +41,7 @@ public class WebSocketJwtChannelInterceptor
             JwtDecoder jwtDecoder,
             JwtAuthenticationConverter jwtAuthenticationConverter
     ) {
+
         this.jwtDecoder =
                 jwtDecoder;
 
@@ -62,6 +65,10 @@ public class WebSocketJwtChannelInterceptor
             return message;
         }
 
+        /*
+         * Authentication occurs only during
+         * the initial STOMP CONNECT frame.
+         */
         if (StompCommand.CONNECT
                 != accessor.getCommand()) {
 
@@ -98,17 +105,31 @@ public class WebSocketJwtChannelInterceptor
                         .trim();
 
         if (token.isBlank()) {
+
             throw new MessagingException(
                     "Missing WebSocket authorization token"
             );
         }
 
         try {
-            Jwt jwt =
-                    jwtDecoder.decode(
-                            token
-                    );
 
+            /*
+             * Step 1:
+             * Validate JWT signature,
+             * issuer and expiration.
+             */
+            Jwt jwt =
+                    jwtDecoder.decode(token);
+
+            /*
+             * Step 2:
+             * Convert JWT into Authentication.
+             *
+             * Day 36:
+             * The converter checks the user's
+             * current account status and roles
+             * from PostgreSQL.
+             */
             Authentication authentication =
                     jwtAuthenticationConverter
                             .convert(jwt);
@@ -122,6 +143,11 @@ public class WebSocketJwtChannelInterceptor
                 );
             }
 
+            /*
+             * Step 3:
+             * Attach authenticated user
+             * to this STOMP connection.
+             */
             accessor.setUser(
                     authentication
             );
@@ -129,8 +155,21 @@ public class WebSocketJwtChannelInterceptor
             return message;
         }
         catch (JwtException exception) {
+
             throw new MessagingException(
                     "Invalid or expired WebSocket token",
+                    exception
+            );
+        }
+        catch (AuthenticationException exception) {
+
+            /*
+             * Day 36:
+             * Rejected account or unavailable
+             * account authentication.
+             */
+            throw new MessagingException(
+                    "WebSocket account authentication failed",
                     exception
             );
         }

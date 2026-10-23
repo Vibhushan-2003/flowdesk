@@ -11,8 +11,18 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 public interface UserRepository
         extends JpaRepository<User, UUID> {
+
+    @EntityGraph(attributePaths = "roles")
+    @Query("SELECT u FROM User u WHERE u.id = :userId")
+    Optional<User> findWithRolesById(
+            @Param("userId") UUID userId
+    );
 
     Optional<User> findByEmailIgnoreCase(
             String email
