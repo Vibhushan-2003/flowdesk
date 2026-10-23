@@ -35,6 +35,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
+
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 @ExtendWith(MockitoExtension.class)
 class WebSocketJwtChannelInterceptorTest {
 
@@ -282,4 +287,52 @@ class WebSocketJwtChannelInterceptorTest {
                 anyString()
         );
     }
+
+    @Test
+void inactiveAccountCannotConnectWithValidJwt() {
+
+    String token = "valid-but-revoked-account-token";
+
+    Jwt jwt = mock(Jwt.class);
+
+    when(jwtDecoder.decode(token))
+            .thenReturn(jwt);
+
+    when(jwtAuthenticationConverter.convert(jwt))
+            .thenThrow(
+                    new OAuth2AuthenticationException(
+                            new OAuth2Error("invalid_token")
+                    )
+            );
+
+    StompHeaderAccessor accessor =
+            StompHeaderAccessor.create(StompCommand.CONNECT);
+
+    accessor.setNativeHeader(
+            "Authorization",
+            "Bearer " + token
+    );
+
+    accessor.setLeaveMutable(true);
+
+    Message<byte[]> message =
+            MessageBuilder.createMessage(
+                    new byte[0],
+                    accessor.getMessageHeaders()
+            );
+
+    assertThrows(
+            MessagingException.class,
+            () -> interceptor.preSend(
+                    message,
+                    messageChannel
+            )
+    );
+
+    assertNull(accessor.getUser());
+
+    verify(jwtDecoder).decode(token);
+    verify(jwtAuthenticationConverter).convert(jwt);
+}
+
 }

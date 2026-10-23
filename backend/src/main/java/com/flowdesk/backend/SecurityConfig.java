@@ -2,6 +2,7 @@
 package com.flowdesk.backend;
 
 import com.flowdesk.auth.security.FlowDeskUserDetailsService;
+import com.flowdesk.auth.security.JwtCurrentUserAuthoritiesConverter;
 
 import java.util.Base64;
 import java.util.List;
@@ -13,23 +14,29 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+
 import org.springframework.security.web.SecurityFilterChain;
+
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -73,11 +80,8 @@ public class SecurityConfig {
                          * Day 35: Secure user provisioning.
                          *
                          * Only administrators can create users.
-                         * New users still receive EMPLOYEE role
+                         * New users receive EMPLOYEE role
                          * through UserService.
-                         *
-                         * Initial administrator provisioning
-                         * is handled separately during setup.
                          */
                         .requestMatchers(
                                 HttpMethod.POST,
@@ -93,9 +97,9 @@ public class SecurityConfig {
                         .permitAll()
 
                         /*
-                         * WebSocket handshake.
-                         * STOMP CONNECT authentication is handled
-                         * by WebSocketJwtChannelInterceptor.
+                         * WebSocket handshake is public.
+                         * Authentication is handled during
+                         * STOMP CONNECT.
                          */
                         .requestMatchers(
                                 "/ws",
@@ -108,13 +112,13 @@ public class SecurityConfig {
                         )
                         .permitAll()
 
-                        // Audit trail is ADMIN-only
+                        // Audit trail - ADMIN only
                         .requestMatchers(
                                 "/api/audit/**"
                         )
                         .hasRole("ADMIN")
 
-                        // Operational SLA dashboard
+                        // SLA dashboard
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/sla/dashboard"
@@ -131,14 +135,14 @@ public class SecurityConfig {
                         )
                         .hasRole("SUPPORT_ENGINEER")
 
-                        // Support engineer claiming
+                        // Support engineer ticket claiming
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/tickets/*/claim"
                         )
                         .hasRole("SUPPORT_ENGINEER")
 
-                        // Assigned support workbench
+                        // Support engineer workbench
                         .requestMatchers(
                                 "/api/support/**"
                         )
@@ -153,7 +157,7 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
-                        // Default: authentication required
+                        // All remaining endpoints require JWT
                         .anyRequest()
                         .authenticated()
                 )
@@ -171,6 +175,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
+
         return new BCryptPasswordEncoder();
     }
 
@@ -196,6 +201,7 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(
             AuthenticationProvider authenticationProvider
     ) {
+
         return new ProviderManager(
                 authenticationProvider
         );
@@ -207,9 +213,10 @@ public class SecurityConfig {
             String encodedSecret
     ) {
 
-        byte[] keyBytes = Base64
-                .getDecoder()
-                .decode(encodedSecret);
+        byte[] keyBytes =
+                Base64.getDecoder().decode(
+                        encodedSecret
+                );
 
         return new SecretKeySpec(
                 keyBytes,
@@ -218,7 +225,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtEncoder jwtEncoder(SecretKey secretKey) {
+    public JwtEncoder jwtEncoder(
+            SecretKey secretKey
+    ) {
 
         return NimbusJwtEncoder
                 .withSecretKey(secretKey)
@@ -248,28 +257,34 @@ public class SecurityConfig {
         return decoder;
     }
 
+    /*
+     * Day 36: Current database-backed roles.
+     *
+     * JWT signature and expiration are validated
+     * by JwtDecoder.
+     *
+     * After that, currentUserAuthorities checks:
+     *
+     * 1. Whether the user exists.
+     * 2. Whether the account is ACTIVE.
+     * 3. Which roles the user currently has.
+     *
+     * Old JWT roles are no longer trusted
+     * for authorization decisions.
+     */
     @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+    public JwtAuthenticationConverter jwtAuthenticationConverter(
+            JwtCurrentUserAuthoritiesConverter currentUserAuthorities
+    ) {
 
-        JwtGrantedAuthoritiesConverter authoritiesConverter =
-                new JwtGrantedAuthoritiesConverter();
-
-        authoritiesConverter.setAuthoritiesClaimName(
-                "roles"
-        );
-
-        authoritiesConverter.setAuthorityPrefix(
-                "ROLE_"
-        );
-
-        JwtAuthenticationConverter authenticationConverter =
+        JwtAuthenticationConverter converter =
                 new JwtAuthenticationConverter();
 
-        authenticationConverter.setJwtGrantedAuthoritiesConverter(
-                authoritiesConverter
+        converter.setJwtGrantedAuthoritiesConverter(
+                currentUserAuthorities
         );
 
-        return authenticationConverter;
+        return converter;
     }
 
     @Bean
@@ -303,7 +318,9 @@ public class SecurityConfig {
                 )
         );
 
-        configuration.setAllowCredentials(false);
+        configuration.setAllowCredentials(
+                false
+        );
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();

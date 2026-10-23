@@ -1,3 +1,4 @@
+
 name: FlowDesk CI
 
 on:
@@ -33,6 +34,8 @@ jobs:
       DB_URL: jdbc:postgresql://localhost:5432/flowdesk
       DB_USERNAME: flowdesk_app
       DB_PASSWORD: flowdesk_ci_password
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "2"
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "0"
 
     steps:
       - name: Checkout repository
@@ -51,7 +54,6 @@ jobs:
       - name: Run backend tests
         working-directory: backend
         run: mvn clean test
-
 
   frontend:
     name: Frontend Build & Lint
