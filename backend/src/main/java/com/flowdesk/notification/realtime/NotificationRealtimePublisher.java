@@ -1,4 +1,8 @@
+
 package com.flowdesk.notification.realtime;
+
+import com.flowdesk.user.domain.UserStatus;
+import com.flowdesk.user.repository.UserRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,18 +27,28 @@ public class NotificationRealtimePublisher {
 
     private final SimpMessagingTemplate messagingTemplate;
 
+    private final UserRepository userRepository;
+
     public NotificationRealtimePublisher(
-            SimpMessagingTemplate messagingTemplate
+            SimpMessagingTemplate messagingTemplate,
+            UserRepository userRepository
     ) {
-        this.messagingTemplate =
-                messagingTemplate;
+
+        this.messagingTemplate = messagingTemplate;
+        this.userRepository = userRepository;
     }
 
     /*
-     * The database notification is the source of truth.
+     * DAY 37 - PHASE 4
      *
-     * WebSocket delivery happens only AFTER the
-     * surrounding transaction commits successfully.
+     * Database notifications remain the source
+     * of truth.
+     *
+     * WebSocket delivery takes place only after
+     * the database transaction commits.
+     *
+     * Before delivering a real-time notification,
+     * check the recipient's current account status.
      */
     @TransactionalEventListener(
             phase = TransactionPhase.AFTER_COMMIT
@@ -44,33 +58,69 @@ public class NotificationRealtimePublisher {
     ) {
 
         try {
-            messagingTemplate.convertAndSendToUser(
-                    event.recipientUserId()
-                            .toString(),
-
-                    NOTIFICATION_DESTINATION,
-
-                    event.notification()
-            );
-        }
-        catch (RuntimeException exception) {
 
             /*
-             * WebSocket delivery is best-effort.
+             * Step 1:
              *
-             * The database transaction has already
-             * committed at this point, so a temporary
-             * socket problem must not make the REST
-             * request appear to have failed.
+             * Check that the recipient still exists
+             * and their account is currently ACTIVE.
              *
-             * The user can still retrieve the
-             * persisted notification later through
-             * the normal REST API.
+             * Missing or inactive accounts must
+             * not receive real-time notifications.
+             */
+            boolean recipientIsActive =
+                    userRepository
+                            .findById(event.recipientUserId())
+                            .map(user ->
+                                    user.getStatus()
+                                            == UserStatus.ACTIVE
+                            )
+                            .orElse(false);
+
+            if (!recipientIsActive) {
+
+                LOGGER.debug(
+                        "Skipping real-time notification {} for unavailable recipient {}",
+                        event.notification().notificationId(),
+                        event.recipientUserId()
+                );
+
+                return;
+            }
+
+            /*
+             * Step 2:
+             *
+             * The recipient is currently ACTIVE.
+             *
+             * Deliver the notification using
+             * Spring's user-specific destination.
+             */
+            messagingTemplate.convertAndSendToUser(
+                    event.recipientUserId().toString(),
+                    NOTIFICATION_DESTINATION,
+                    event.notification()
+            );
+
+        } catch (RuntimeException exception) {
+
+            /*
+             * Step 3:
+             *
+             * If account validation or WebSocket
+             * delivery fails, do not send through
+             * an alternative unchecked path.
+             *
+             * The database notification has already
+             * been committed.
+             *
+             * The original REST operation must
+             * not appear to have failed because
+             * of real-time delivery.
              */
             LOGGER.warn(
-                    "Failed to deliver real-time notification {} to user {}",
-                    event.notification()
-                            .notificationId(),
+                    "Failed to validate or deliver real-time notification {} to user {}",
+                    event.notification().notificationId(),
                     event.recipientUserId(),
                     exception
             );
