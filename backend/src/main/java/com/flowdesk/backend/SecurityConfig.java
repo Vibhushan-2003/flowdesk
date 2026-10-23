@@ -1,3 +1,4 @@
+
 package com.flowdesk.backend;
 
 import com.flowdesk.auth.security.FlowDeskUserDetailsService;
@@ -9,37 +10,26 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.beans.factory.annotation.Value;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
 import org.springframework.http.HttpMethod;
-
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.ProviderManager;
-
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
-
 import org.springframework.security.web.SecurityFilterChain;
-
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -79,14 +69,23 @@ public class SecurityConfig {
                         )
                         .permitAll()
 
-                        // User registration
+                        /*
+                         * Day 35: Secure user provisioning.
+                         *
+                         * Only administrators can create users.
+                         * New users still receive EMPLOYEE role
+                         * through UserService.
+                         *
+                         * Initial administrator provisioning
+                         * is handled separately during setup.
+                         */
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/users"
                         )
-                        .permitAll()
+                        .hasRole("ADMIN")
 
-                        // Login
+                        // Public login
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/login"
@@ -94,13 +93,9 @@ public class SecurityConfig {
                         .permitAll()
 
                         /*
-                         * Day 16 WebSocket handshake.
-                         *
-                         * The HTTP upgrade itself is public.
-                         *
-                         * Authentication happens afterwards
-                         * inside the STOMP CONNECT frame using
-                         * WebSocketJwtChannelInterceptor.
+                         * WebSocket handshake.
+                         * STOMP CONNECT authentication is handled
+                         * by WebSocketJwtChannelInterceptor.
                          */
                         .requestMatchers(
                                 "/ws",
@@ -113,30 +108,13 @@ public class SecurityConfig {
                         )
                         .permitAll()
 
-                        /*
-                         * Day 20 immutable audit trail.
-                         *
-                         * Audit history is operationally
-                         * sensitive and is available only
-                         * to administrators.
-                         *
-                         * Protect the whole audit namespace
-                         * so future audit endpoints also
-                         * remain ADMIN-only by default.
-                         */
+                        // Audit trail is ADMIN-only
                         .requestMatchers(
                                 "/api/audit/**"
                         )
-                        .hasRole(
-                                "ADMIN"
-                        )
+                        .hasRole("ADMIN")
 
-                        /*
-                         * Day 19 SLA operations dashboard.
-                         *
-                         * Cross-ticket operational metrics
-                         * are visible only to supervisory roles.
-                         */
+                        // Operational SLA dashboard
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/sla/dashboard"
@@ -146,41 +124,36 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
-                        // Support Engineer queue
+                        // Support engineer queue
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/tickets/queue"
                         )
-                        .hasRole(
-                                "SUPPORT_ENGINEER"
-                        )
+                        .hasRole("SUPPORT_ENGINEER")
 
-                        // Support Engineer claim endpoint
+                        // Support engineer claiming
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/tickets/*/claim"
                         )
-                        .hasRole(
-                                "SUPPORT_ENGINEER"
-                        )
+                        .hasRole("SUPPORT_ENGINEER")
 
-                        // Support Engineer workbench
+                        // Assigned support workbench
                         .requestMatchers(
                                 "/api/support/**"
                         )
-                        .hasRole(
-                                "SUPPORT_ENGINEER"
-                        )
+                        .hasRole("SUPPORT_ENGINEER")
 
+                        // Approval workflow
                         .requestMatchers(
-                        "/api/approvals/**"
+                                "/api/approvals/**"
                         )
                         .hasAnyRole(
                                 "TEAM_LEAD",
                                 "ADMIN"
                         )
 
-                        // Everything else requires JWT
+                        // Default: authentication required
                         .anyRequest()
                         .authenticated()
                 )
@@ -198,19 +171,14 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-
         return new BCryptPasswordEncoder();
     }
 
     @Bean
-    public AuthenticationProvider
-            authenticationProvider(
-                    FlowDeskUserDetailsService
-                            userDetailsService,
-
-                    PasswordEncoder
-                            passwordEncoder
-            ) {
+    public AuthenticationProvider authenticationProvider(
+            FlowDeskUserDetailsService userDetailsService,
+            PasswordEncoder passwordEncoder
+    ) {
 
         DaoAuthenticationProvider provider =
                 new DaoAuthenticationProvider(
@@ -225,12 +193,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager
-            authenticationManager(
-                    AuthenticationProvider
-                            authenticationProvider
-            ) {
-
+    public AuthenticationManager authenticationManager(
+            AuthenticationProvider authenticationProvider
+    ) {
         return new ProviderManager(
                 authenticationProvider
         );
@@ -242,12 +207,9 @@ public class SecurityConfig {
             String encodedSecret
     ) {
 
-        byte[] keyBytes =
-                Base64
-                        .getDecoder()
-                        .decode(
-                                encodedSecret
-                        );
+        byte[] keyBytes = Base64
+                .getDecoder()
+                .decode(encodedSecret);
 
         return new SecretKeySpec(
                 keyBytes,
@@ -256,90 +218,71 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtEncoder jwtEncoder(
-            SecretKey secretKey
-    ) {
+    public JwtEncoder jwtEncoder(SecretKey secretKey) {
 
         return NimbusJwtEncoder
-                .withSecretKey(
-                        secretKey
-                )
-                .algorithm(
-                        MacAlgorithm.HS256
-                )
+                .withSecretKey(secretKey)
+                .algorithm(MacAlgorithm.HS256)
                 .build();
     }
 
     @Bean
     public JwtDecoder jwtDecoder(
             SecretKey secretKey,
-
             @Value("${app.security.jwt.issuer}")
             String issuer
     ) {
 
         NimbusJwtDecoder decoder =
                 NimbusJwtDecoder
-                        .withSecretKey(
-                                secretKey
-                        )
-                        .macAlgorithm(
-                                MacAlgorithm.HS256
-                        )
+                        .withSecretKey(secretKey)
+                        .macAlgorithm(MacAlgorithm.HS256)
                         .build();
 
         decoder.setJwtValidator(
-                JwtValidators
-                        .createDefaultWithIssuer(
-                                issuer
-                        )
+                JwtValidators.createDefaultWithIssuer(
+                        issuer
+                )
         );
 
         return decoder;
     }
 
     @Bean
-    public JwtAuthenticationConverter
-            jwtAuthenticationConverter() {
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
 
         JwtGrantedAuthoritiesConverter authoritiesConverter =
                 new JwtGrantedAuthoritiesConverter();
 
-        authoritiesConverter
-                .setAuthoritiesClaimName(
-                        "roles"
-                );
+        authoritiesConverter.setAuthoritiesClaimName(
+                "roles"
+        );
 
-        authoritiesConverter
-                .setAuthorityPrefix(
-                        "ROLE_"
-                );
+        authoritiesConverter.setAuthorityPrefix(
+                "ROLE_"
+        );
 
         JwtAuthenticationConverter authenticationConverter =
                 new JwtAuthenticationConverter();
 
-        authenticationConverter
-                .setJwtGrantedAuthoritiesConverter(
-                        authoritiesConverter
-                );
+        authenticationConverter.setJwtGrantedAuthoritiesConverter(
+                authoritiesConverter
+        );
 
         return authenticationConverter;
     }
 
     @Bean
-    public CorsConfigurationSource
-            corsConfigurationSource(
-                    @Value("${app.cors.allowed-origin}")
-                    String allowedOrigin
-            ) {
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origin}")
+            String allowedOrigin
+    ) {
 
         CorsConfiguration configuration =
                 new CorsConfiguration();
 
         configuration.setAllowedOrigins(
-                List.of(
-                        allowedOrigin
-                )
+                List.of(allowedOrigin)
         );
 
         configuration.setAllowedMethods(
@@ -360,9 +303,7 @@ public class SecurityConfig {
                 )
         );
 
-        configuration.setAllowCredentials(
-                false
-        );
+        configuration.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
