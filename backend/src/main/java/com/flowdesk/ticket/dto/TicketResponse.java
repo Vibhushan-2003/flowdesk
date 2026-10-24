@@ -33,7 +33,50 @@ public record TicketResponse(
         String resolutionSummary,
 
         SlaStatus responseSlaStatus,
-        SlaStatus resolutionSlaStatus
+        SlaStatus resolutionSlaStatus,
+        String rejectionReason
 
 ) {
+    public TicketResponse(
+            UUID id,
+            String ticketNumber,
+            TicketType type,
+            String title,
+            String description,
+            TicketPriority priority,
+            TicketStatus status,
+            UUID createdByUserId,
+            String createdByEmail,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            OffsetDateTime responseDueAt,
+            OffsetDateTime resolutionDueAt,
+            OffsetDateTime firstRespondedAt,
+            OffsetDateTime resolvedAt,
+            String resolutionSummary,
+            SlaStatus responseSlaStatus,
+            SlaStatus resolutionSlaStatus
+    ) {
+        this(
+                id,
+                ticketNumber,
+                type,
+                title,
+                description,
+                priority,
+                status,
+                createdByUserId,
+                createdByEmail,
+                createdAt,
+                updatedAt,
+                responseDueAt,
+                resolutionDueAt,
+                firstRespondedAt,
+                resolvedAt,
+                resolutionSummary,
+                responseSlaStatus,
+                resolutionSlaStatus,
+                null
+        );
+    }
 }

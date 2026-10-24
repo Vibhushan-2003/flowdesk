@@ -18,63 +18,16 @@ import {
 import { useAuth } from '../auth/useAuth'
 
 import type {
-  SlaStatus,
   TicketCommentResponse,
   TicketResponse,
 } from '../types/ticket'
 
-function formatLabel(value: string) {
-  return value.replaceAll('_', ' ')
-}
-
-function formatDate(
-  value: string | null,
-) {
-  if (!value) {
-    return 'Not started'
-  }
-
-  const date =
-    new Date(value)
-
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
-    return value
-  }
-
-  return date.toLocaleString()
-}
-
-function formatOptionalDate(
-  value: string | null,
-) {
-  if (!value) {
-    return 'Not yet'
-  }
-
-  return formatDate(value)
-}
-
-function formatSlaStatus(
-  status: SlaStatus,
-) {
-  switch (status) {
-    case 'MET':
-      return 'Met'
-
-    case 'BREACHED':
-      return 'Breached'
-
-    case 'PENDING':
-      return 'Pending'
-
-    case 'UNKNOWN':
-      return 'Unknown'
-  }
-}
+import {
+  formatDate,
+  formatLabel,
+  formatOptionalDate,
+  formatSlaStatus,
+} from '../utils/formatters'
 
 export function TicketDetailsPage() {
   const { accessToken } = useAuth()
@@ -301,17 +254,17 @@ export function TicketDetailsPage() {
 
                 <h2>{ticket.title}</h2>
 
-                <p>
-                  {formatLabel(
-                    ticket.type,
-                  )}
-                  {' · '}
-                  {ticket.priority}
-                  {' · '}
-                  {formatLabel(
-                    ticket.status,
-                  )}
-                </p>
+                <div className="ticket-success-tags" style={{ marginTop: '8px' }}>
+                  <span className={`support-status support-status-${ticket.status.toLowerCase().replaceAll('_', '-')}`}>
+                    {formatLabel(ticket.status)}
+                  </span>
+                  <span className={`priority-badge priority-badge-${ticket.priority.toLowerCase()}`}>
+                    {formatLabel(ticket.priority)}
+                  </span>
+                  <span className="priority-badge priority-badge-low">
+                    {formatLabel(ticket.type)}
+                  </span>
+                </div>
               </header>
 
               <section className="ticket-description">
@@ -336,16 +289,20 @@ export function TicketDetailsPage() {
                 <div>
                   <strong>Priority</strong>
 
-                  <p>{ticket.priority}</p>
+                  <p>
+                    <span className={`priority-badge priority-badge-${ticket.priority.toLowerCase()}`}>
+                      {formatLabel(ticket.priority)}
+                    </span>
+                  </p>
                 </div>
 
                 <div>
                   <strong>Status</strong>
 
                   <p>
-                    {formatLabel(
-                      ticket.status,
-                    )}
+                    <span className={`support-status support-status-${ticket.status.toLowerCase().replaceAll('_', '-')}`}>
+                      {formatLabel(ticket.status)}
+                    </span>
                   </p>
                 </div>
 
@@ -460,6 +417,28 @@ export function TicketDetailsPage() {
 
                   <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
                     {ticket.resolutionSummary}
+                  </p>
+                </section>
+              )}
+
+              {ticket.status === 'CANCELLED' && (
+                <section
+                  className="ticket-rejection-card"
+                  aria-label="Rejection details"
+                >
+                  <div className="ticket-rejection-header">
+                    <span className="support-status support-status-cancelled">
+                      Cancelled
+                    </span>
+                    <h3>Manager Rejection Reason</h3>
+                  </div>
+
+                  <p className="ticket-rejection-text">
+                    {ticket.rejectionReason?.trim()
+                      ? ticket.rejectionReason
+                      : ticket.type === 'SERVICE_REQUEST'
+                        ? 'No specific rejection reason was recorded.'
+                        : 'This ticket was cancelled.'}
                   </p>
                 </section>
               )}

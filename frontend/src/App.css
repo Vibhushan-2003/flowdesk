@@ -1,4 +1,4 @@
-#root {
+﻿#root {
   min-height: 100vh;
 }
 
@@ -2146,5 +2146,535 @@
   .notification-item-meta {
     flex-direction: column;
     gap: 0.25rem;
+  }
+}
+
+/* Day 45 UI Polish & Accessibility */
+
+/* Status Badges */
+.support-status-pending-approval {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.support-status-open {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+  color: #0369a1;
+}
+
+.support-status-closed {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.support-status-cancelled {
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+/* Priority Badges */
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.priority-badge-low {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+}
+
+.priority-badge-medium {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.priority-badge-high {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.priority-badge-critical {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+/* =========================
+   Approval Inbox
+   ========================= */
+.approval-inbox-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 18px;
+  margin-bottom: 24px;
+}
+
+.approval-card {
+  padding: 26px 28px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.approval-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.approval-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.approval-ticket-number {
+  margin: 0;
+  color: #1f2937;
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+}
+
+.approval-card-title {
+  margin: 0 0 12px 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  overflow-wrap: anywhere;
+}
+
+.approval-card-description {
+  margin: 0 0 18px 0;
+  padding: 14px 18px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #374151;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.approval-metadata-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 36px;
+  padding: 14px 0;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 20px;
+}
+
+.approval-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.approval-meta-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.approval-meta-value {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #111827;
+  overflow-wrap: anywhere;
+}
+
+.approval-decision-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.approval-decision-tabs {
+  display: flex;
+  gap: 10px;
+}
+
+.approval-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.approval-tab-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.approval-tab-btn.active {
+  background: #111827;
+  border-color: #111827;
+  color: #ffffff;
+}
+
+.approval-tab-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.approval-decision-box {
+  padding: 18px 20px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.approval-decision-box-heading {
+  margin: 0 0 12px 0;
+}
+
+.approval-decision-box-heading h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.approval-decision-box-heading p {
+  margin: 3px 0 0;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.approval-form-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.approval-form-label textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #1f2937;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.approval-form-label textarea:focus {
+  outline: 2px solid #9ca3af;
+  outline-offset: 1px;
+}
+
+.approval-char-count {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+.approval-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn-reject-submit {
+  padding: 11px 16px;
+  background: #ffffff;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.btn-reject-submit:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #b91c1c;
+}
+
+.btn-reject-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* =========================
+   Rejected Ticket Notice
+   ========================= */
+.ticket-rejection-card {
+  margin-top: 20px;
+  padding: 18px 22px;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #b91c1c;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.ticket-rejection-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.ticket-rejection-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.ticket-rejection-text {
+  margin: 0;
+  color: #374151;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* =========================
+   Ticket Creation Success
+   ========================= */
+.ticket-success-panel {
+  margin-top: 24px;
+  padding: 22px 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.ticket-success-panel h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.ticket-success-number {
+  font-size: 1rem;
+  color: #374151;
+  margin: 0 0 12px 0;
+}
+
+.ticket-success-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.ticket-success-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* =========================
+   Audit Trail Filters & Cards
+   ========================= */
+.audit-filters-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 20px 22px;
+  margin: 20px 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.audit-filters-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #4b5563;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.audit-filters-form label:first-child {
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+.audit-filters-form input,
+.audit-filters-form select {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  background: #ffffff;
+  color: #1f2937;
+}
+
+.audit-card {
+  overflow-wrap: anywhere;
+}
+
+.audit-card h2 {
+  overflow-wrap: anywhere;
+}
+
+.audit-card .account-details-grid strong {
+  overflow-wrap: anywhere;
+}
+
+/* =========================
+   SLA Operations
+   ========================= */
+.sla-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.sla-kpi-grid-compliance {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.sla-breaches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.sla-breach-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #b91c1c;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.sla-breach-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.sla-breach-ticket {
+  color: #111827;
+  font-weight: 700;
+}
+
+.sla-breach-type-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.sla-breach-time {
+  color: #6b7280;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* =========================
+   AI Retry Button
+   ========================= */
+.ai-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.ai-retry-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .sla-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sla-kpi-grid-compliance {
+    grid-template-columns: 1fr;
   }
 }

@@ -505,4 +505,63 @@ class AuditQueryServiceTest {
                 any(Pageable.class)
         );
     }
+
+    @Test
+    void getAuditEventsWithFiltersDelegatesToSearchAuditEvents() {
+
+        when(
+                auditLogRepository.searchAuditEvents(
+                        org.mockito.ArgumentMatchers.eq(AuditAction.TICKET_CREATED),
+                        org.mockito.ArgumentMatchers.eq("%fd-000001%"),
+                        any(Pageable.class)
+                )
+        ).thenReturn(
+                new PageImpl<>(
+                        List.of(),
+                        PageRequest.of(0, 20),
+                        0
+                )
+        );
+
+        PageResponse<AuditEventResponse> response =
+                auditQueryService.getAuditEvents(
+                        0,
+                        20,
+                        AuditAction.TICKET_CREATED,
+                        "FD-000001"
+                );
+
+        assertEquals(0, response.totalElements());
+
+        verify(
+                auditLogRepository
+        ).searchAuditEvents(
+                org.mockito.ArgumentMatchers.eq(AuditAction.TICKET_CREATED),
+                org.mockito.ArgumentMatchers.eq("%fd-000001%"),
+                any(Pageable.class)
+        );
+    }
+
+    @Test
+    void getAuditEventsRejectsSearchExceedingMaximumLength() {
+
+        String longSearch = "a".repeat(101);
+
+        ResponseStatusException exception =
+                assertThrows(
+                        ResponseStatusException.class,
+                        () ->
+                                auditQueryService.getAuditEvents(
+                                        0,
+                                        20,
+                                        null,
+                                        longSearch
+                                )
+                );
+
+        assertEquals(
+                HttpStatus.BAD_REQUEST,
+                exception.getStatusCode()
+        );
+    }
 }

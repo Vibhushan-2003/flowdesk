@@ -1,5 +1,6 @@
 package com.flowdesk.audit.controller;
 
+import com.flowdesk.audit.domain.AuditAction;
 import com.flowdesk.audit.dto.AuditEventResponse;
 import com.flowdesk.audit.service.AuditQueryService;
 
@@ -36,14 +37,26 @@ public class AuditController {
                     @RequestParam(
                             defaultValue = "50"
                     )
-                    int size
+                    int size,
+
+                    @RequestParam(
+                            required = false
+                    )
+                    AuditAction action,
+
+                    @RequestParam(
+                            required = false
+                    )
+                    String search
 
             ) {
 
         return auditQueryService
                 .getAuditEvents(
                         page,
-                        size
+                        size,
+                        action,
+                        search
                 );
     }
 }

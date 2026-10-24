@@ -11,7 +11,6 @@ import { TicketListOverview } from '../components/TicketListOverview'
 
 import type {
   PageResponse,
-  SlaStatus,
   TicketPriority,
   TicketStatus,
   TicketSummary,
@@ -31,26 +30,11 @@ const PRIORITIES: TicketPriority[] = [
   'LOW', 'MEDIUM', 'HIGH', 'CRITICAL',
 ]
 
-function formatLabel(value: string) {
-  return value.replaceAll('_', ' ')
-}
-
-function formatDate(value: string | null) {
-  if (!value) return 'Not started'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString()
-}
-
-function formatSlaStatus(status: SlaStatus) {
-  switch (status) {
-    case 'MET': return 'Met'
-    case 'BREACHED': return 'Breached'
-    case 'PENDING': return 'Pending'
-    case 'UNKNOWN': return 'Unknown'
-  }
-}
+import {
+  formatDate,
+  formatLabel,
+  formatSlaStatus,
+} from '../utils/formatters'
 
 export function MyTicketsPage() {
   const { accessToken } = useAuth()
@@ -207,7 +191,7 @@ export function MyTicketsPage() {
             <option value="">All priorities</option>
             {PRIORITIES.map((priority) => (
               <option key={priority} value={priority}>
-                {priority}
+                {formatLabel(priority)}
               </option>
             ))}
           </select>
@@ -310,7 +294,11 @@ export function MyTicketsPage() {
                       </button>
                       <h2>{ticket.title}</h2>
                     </div>
-                    <span className="ticket-status">
+                    <span
+                      className={`ticket-status support-status status-${ticket.status
+                        .toLowerCase()
+                        .replace(/_/g, '-')}`}
+                    >
                       {formatLabel(ticket.status)}
                     </span>
                   </div>
@@ -322,7 +310,11 @@ export function MyTicketsPage() {
                     </p>
                     <p>
                       <strong>Priority:</strong>{' '}
-                      {ticket.priority}
+                      <span
+                        className={`priority-badge priority-${ticket.priority.toLowerCase()}`}
+                      >
+                        {formatLabel(ticket.priority)}
+                      </span>
                     </p>
                     <p>
                       <strong>Created:</strong>{' '}

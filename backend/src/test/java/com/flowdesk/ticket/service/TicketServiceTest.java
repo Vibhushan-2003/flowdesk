@@ -1,5 +1,7 @@
 package com.flowdesk.ticket.service;
 
+import com.flowdesk.approval.domain.ApprovalRequest;
+import com.flowdesk.approval.domain.ApprovalStatus;
 import com.flowdesk.approval.repository.ApprovalRequestRepository;
 import com.flowdesk.approval.service.ApprovalNotificationService;
 import com.flowdesk.audit.domain.AuditAction;
@@ -790,6 +792,44 @@ class TicketServiceTest {
                 "FD-000002",
                 userId
         );
+    }
+
+    @Test
+    void getMyTicketWithRejectedServiceRequestReturnsPersistedRejectionReason() {
+
+        Ticket ticket = mock(Ticket.class);
+        User creator = mock(User.class);
+        ApprovalRequest approval = mock(ApprovalRequest.class);
+        UUID ticketId = UUID.randomUUID();
+
+        when(ticket.getId()).thenReturn(ticketId);
+        when(ticket.getTicketNumber()).thenReturn("FD-000029");
+        when(ticket.getType()).thenReturn(TicketType.SERVICE_REQUEST);
+        when(ticket.getTitle()).thenReturn("Request Figma Enterprise License");
+        when(ticket.getDescription()).thenReturn("Need enterprise design license");
+        when(ticket.getPriority()).thenReturn(TicketPriority.LOW);
+        when(ticket.getStatus()).thenReturn(TicketStatus.CANCELLED);
+        when(ticket.getCreatedByUser()).thenReturn(creator);
+        when(creator.getId()).thenReturn(userId);
+        when(creator.getEmail()).thenReturn("requester@flowdesk.test");
+
+        when(
+                ticketRepository.findByTicketNumberAndCreatedByUser_Id(
+                        "FD-000029",
+                        userId
+                )
+        ).thenReturn(java.util.Optional.of(ticket));
+
+        when(approval.getStatus()).thenReturn(ApprovalStatus.REJECTED);
+        when(approval.getDecisionNote()).thenReturn("Figma license budget exceeded for Q4.");
+        when(approvalRequestRepository.findByTicket_Id(ticketId))
+                .thenReturn(java.util.Optional.of(approval));
+
+        TicketResponse response = ticketService.getMyTicket(userId, "FD-000029");
+
+        assertEquals("FD-000029", response.ticketNumber());
+        assertEquals(TicketStatus.CANCELLED, response.status());
+        assertEquals("Figma license budget exceeded for Q4.", response.rejectionReason());
     }
 
     @Test

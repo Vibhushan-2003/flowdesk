@@ -31,45 +31,17 @@ import { AiTriageCard } from '../components/AiTriageCard'
 import { AiSupportCopilotCard } from '../components/AiSupportCopilotCard'
 
 import type {
-  SlaStatus,
   SupportTicketResponse,
   TicketCommentResponse,
   TicketStatus,
 } from '../types/ticket'
 
-function formatLabel(value: string) {
-  return value.replaceAll('_', ' ')
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleString()
-}
-
-function formatOptionalDate(
-  value: string | null,
-) {
-  return value
-    ? formatDate(value)
-    : 'Not yet'
-}
-
-function formatSlaStatus(
-  status: SlaStatus,
-) {
-  switch (status) {
-    case 'MET':
-      return 'Met'
-
-    case 'BREACHED':
-      return 'Breached'
-
-    case 'PENDING':
-      return 'Pending'
-
-    case 'UNKNOWN':
-      return 'Unknown'
-  }
-}
+import {
+  formatDate,
+  formatLabel,
+  formatOptionalDate,
+  formatSlaStatus,
+} from '../utils/formatters'
 
 function getStatusClass(status: string) {
   return `support-status support-status-${status
@@ -795,7 +767,11 @@ export function SupportTicketDetailsPage() {
                   <span>Priority</span>
 
                   <strong>
-                    {ticket.priority}
+                    <span
+                      className={`priority-badge priority-${ticket.priority.toLowerCase()}`}
+                    >
+                      {formatLabel(ticket.priority)}
+                    </span>
                   </strong>
                 </div>
 
@@ -1038,12 +1014,23 @@ export function SupportTicketDetailsPage() {
                     )}
 
                     {aiResolutionSummaryError && (
-                      <p
-                        className="form-error"
-                        role="alert"
-                      >
-                        {aiResolutionSummaryError}
-                      </p>
+                      <div className="ai-error-box" role="alert">
+                        <p className="form-error">
+                          {aiResolutionSummaryError}
+                        </p>
+                        {!hasResolutionSummary && (
+                          <button
+                            type="button"
+                            className="ai-retry-btn"
+                            disabled={isGeneratingResolutionSummary}
+                            onClick={() =>
+                              void handleGenerateAiResolutionSummary()
+                            }
+                          >
+                            ↻ Retry AI draft
+                          </button>
+                        )}
+                      </div>
                     )}
 
                     <label
@@ -1324,12 +1311,26 @@ export function SupportTicketDetailsPage() {
                 )}
 
                 {aiReplyDraftError && (
-                  <p
-                    className="form-error"
-                    role="alert"
-                  >
-                    {aiReplyDraftError}
-                  </p>
+                  <div className="ai-error-box" role="alert">
+                    <p
+                      className="form-error"
+                      role="alert"
+                    >
+                      {aiReplyDraftError}
+                    </p>
+                    {!hasDraftableMessage && (
+                      <button
+                        type="button"
+                        className="ai-retry-btn"
+                        disabled={isGeneratingReplyDraft}
+                        onClick={() =>
+                          void handleGenerateAiReplyDraft()
+                        }
+                      >
+                        ↻ Retry AI draft
+                      </button>
+                    )}
+                  </div>
                 )}
 
                 <textarea

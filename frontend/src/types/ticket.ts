@@ -49,6 +49,7 @@ export interface TicketResponse {
   resolutionSummary: string | null
   responseSlaStatus: SlaStatus
   resolutionSlaStatus: SlaStatus
+  rejectionReason?: string | null
 }
 
 export interface TicketSummary {

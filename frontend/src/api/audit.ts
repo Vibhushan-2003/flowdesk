@@ -3,19 +3,34 @@ import {
 } from './config'
 
 import type {
+  AuditAction,
   AuditEventsPage,
 } from '../types/audit'
+
+export interface AuditFilters {
+  search?: string
+  action?: AuditAction | ''
+}
 
 export async function getAuditEvents(
   accessToken: string,
   page = 0,
   size = 20,
+  filters?: AuditFilters,
 ): Promise<AuditEventsPage> {
   const searchParams =
     new URLSearchParams({
       page: String(page),
       size: String(size),
     })
+
+  if (filters?.search && filters.search.trim()) {
+    searchParams.set('search', filters.search.trim())
+  }
+
+  if (filters?.action) {
+    searchParams.set('action', filters.action)
+  }
 
   const response =
     await fetch(
