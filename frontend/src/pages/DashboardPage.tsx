@@ -214,6 +214,36 @@ export function DashboardPage() {
         {isAdmin && (
           <article className="dashboard-workspace-card">
             <p className="dashboard-card-label">
+              Administration workspace
+            </p>
+
+            <h2>
+              User management
+            </h2>
+
+            <p>
+              Manage user accounts, assign roles, create users,
+              and activate or deactivate system access.
+            </p>
+
+            <div className="dashboard-action-buttons">
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    '/admin/users',
+                  )
+                }
+              >
+                Manage users
+              </button>
+            </div>
+          </article>
+        )}
+
+        {isAdmin && (
+          <article className="dashboard-workspace-card">
+            <p className="dashboard-card-label">
               Governance workspace
             </p>
 

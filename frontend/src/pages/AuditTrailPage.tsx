@@ -36,6 +36,15 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'APPROVAL_REQUESTED',
   'APPROVAL_APPROVED',
   'APPROVAL_REJECTED',
+  'USER_CREATED',
+  'USER_ROLES_UPDATED',
+  'USER_ACTIVATED',
+  'USER_DEACTIVATED',
+  'AI_TRIAGE_GENERATED',
+  'AI_TRIAGE_APPLIED',
+  'AI_REPLY_DRAFT_GENERATED',
+  'AI_RESOLUTION_SUMMARY_DRAFT_GENERATED',
+  'AI_SUPPORT_COPILOT_USED',
 ]
 
 export function AuditTrailPage() {
@@ -437,7 +446,7 @@ function AuditEventCard({
         )}
       </p>
 
-      <h2>
+      <h2 style={{ overflowWrap: 'anywhere' }}>
         {displayTitle}
       </h2>
 
@@ -453,7 +462,7 @@ function AuditEventCard({
             Actor
           </span>
 
-          <strong>
+          <strong style={{ overflowWrap: 'anywhere' }}>
             {getActorLabel(
               event,
             )}
@@ -671,6 +680,50 @@ function AuditMetadata({
     )
   }
 
+  if (event.action === 'USER_CREATED') {
+    return (
+      <div className="account-details-grid">
+        <MetadataValue
+          label="Assigned roles"
+          value={getRoleListMetadata(event, 'assignedRoles')}
+        />
+      </div>
+    )
+  }
+
+  if (event.action === 'USER_ROLES_UPDATED') {
+    return (
+      <div className="account-details-grid">
+        <MetadataValue
+          label="Previous roles"
+          value={getRoleListMetadata(event, 'previousRoles')}
+        />
+        <MetadataValue
+          label="New roles"
+          value={getRoleListMetadata(event, 'newRoles')}
+        />
+      </div>
+    )
+  }
+
+  if (
+    event.action === 'USER_ACTIVATED' ||
+    event.action === 'USER_DEACTIVATED'
+  ) {
+    return (
+      <div className="account-details-grid">
+        <MetadataValue
+          label="Previous status"
+          value={getStringMetadata(event, 'previousStatus')}
+        />
+        <MetadataValue
+          label="New status"
+          value={getStringMetadata(event, 'newStatus')}
+        />
+      </div>
+    )
+  }
+
   return null
 }
 
@@ -712,33 +765,47 @@ function getActorLabel(
     'Unknown user'
 }
 
-function getActionLabel(
-  action: AuditAction,
-) {
+function getActionLabel(action: AuditAction): string {
   switch (action) {
     case 'TICKET_CREATED':
       return 'Ticket created'
-
     case 'TICKET_CLAIMED':
       return 'Ticket claimed'
-
     case 'TICKET_STATUS_CHANGED':
       return 'Ticket status changed'
-
     case 'SLA_RESPONSE_BREACHED':
       return 'Response SLA breached'
-
     case 'SLA_RESOLUTION_BREACHED':
       return 'Resolution SLA breached'
-
     case 'APPROVAL_REQUESTED':
       return 'Approval requested'
-
     case 'APPROVAL_APPROVED':
       return 'Approval approved'
-
     case 'APPROVAL_REJECTED':
       return 'Approval rejected'
+
+    case 'USER_CREATED':
+      return 'User created'
+    case 'USER_ROLES_UPDATED':
+      return 'User roles updated'
+    case 'USER_ACTIVATED':
+      return 'User account activated'
+    case 'USER_DEACTIVATED':
+      return 'User account deactivated'
+
+    case 'AI_TRIAGE_GENERATED':
+      return 'AI triage generated'
+    case 'AI_TRIAGE_APPLIED':
+      return 'AI triage applied'
+    case 'AI_REPLY_DRAFT_GENERATED':
+      return 'AI reply draft generated'
+    case 'AI_RESOLUTION_SUMMARY_DRAFT_GENERATED':
+      return 'AI resolution summary generated'
+    case 'AI_SUPPORT_COPILOT_USED':
+      return 'AI support copilot used'
+
+    default:
+      return formatLabel(action)
   }
 }
 
@@ -824,7 +891,58 @@ function getActionDescription(
         toStatus,
       )}.`
     }
+    case 'USER_CREATED':
+      return `User account ${reference} was created.`
+
+    case 'USER_ROLES_UPDATED':
+      return `Roles were updated for ${reference}.`
+
+    case 'USER_ACTIVATED':
+      return `User account ${reference} was activated.`
+
+    case 'USER_DEACTIVATED':
+      return `User account ${reference} was deactivated.`
+
+    case 'AI_TRIAGE_GENERATED':
+      return `AI triage suggestions were generated for ${reference}.`
+
+    case 'AI_TRIAGE_APPLIED':
+      return `AI triage suggestions were applied to ${reference}.`
+
+    case 'AI_REPLY_DRAFT_GENERATED':
+      return `An AI reply draft was generated for ${reference}.`
+
+    case 'AI_RESOLUTION_SUMMARY_DRAFT_GENERATED':
+      return `An AI resolution summary draft was generated for ${reference}.`
+
+    case 'AI_SUPPORT_COPILOT_USED':
+      return `The AI support copilot was used for ${reference}.`
+
+    default:
+      return `${formatLabel(event.action)} for ${reference}.`
   }
+}
+
+function getRoleListMetadata(
+  event: AuditEvent,
+  key: string,
+): string {
+  const value = event.metadata[key]
+
+  if (!Array.isArray(value)) {
+    return 'Not available'
+  }
+
+  const roles = value.filter(
+    (role): role is string =>
+      typeof role === 'string' && role.trim() !== '',
+  )
+
+  if (roles.length === 0) {
+    return 'Not available'
+  }
+
+  return roles.map((role) => formatLabel(role)).join(', ')
 }
 
 function getStringMetadata(

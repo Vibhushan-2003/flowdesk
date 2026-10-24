@@ -80,7 +80,33 @@ public class User {
 
     // Controlled way to assign a role to a user
     public void assignRole(Role role) {
+        if (role == null) {
+            throw new IllegalArgumentException("Role must not be null");
+        }
         this.roles.add(role);
+    }
+
+    public void removeRole(Role role) {
+        if (role == null) {
+            throw new IllegalArgumentException("Role must not be null");
+        }
+        this.roles.remove(role);
+    }
+
+    public void replaceRoles(Set<Role> newRoles) {
+        if (newRoles == null || newRoles.isEmpty()) {
+            throw new IllegalArgumentException("User must have at least one role");
+        }
+        this.roles.clear();
+        this.roles.addAll(newRoles);
+    }
+
+    public void activate() {
+        this.status = UserStatus.ACTIVE;
+    }
+
+    public void deactivate() {
+        this.status = UserStatus.INACTIVE;
     }
 
     public UUID getId() {

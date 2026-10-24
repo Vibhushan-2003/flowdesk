@@ -11,48 +11,40 @@ export type AuditAction =
   | 'APPROVAL_REQUESTED'
   | 'APPROVAL_APPROVED'
   | 'APPROVAL_REJECTED'
+  | 'USER_CREATED'
+  | 'USER_ROLES_UPDATED'
+  | 'USER_ACTIVATED'
+  | 'USER_DEACTIVATED'
+  | 'AI_TRIAGE_GENERATED'
+  | 'AI_TRIAGE_APPLIED'
+  | 'AI_REPLY_DRAFT_GENERATED'
+  | 'AI_RESOLUTION_SUMMARY_DRAFT_GENERATED'
+  | 'AI_SUPPORT_COPILOT_USED'
 
 export type AuditTargetType =
   | 'TICKET'
   | 'APPROVAL'
+  | 'USER'
 
 export interface AuditEvent {
   id: string
-
   actorType: AuditActorType
-
   actorUserId: string | null
-
   actorEmail: string | null
-
   action: AuditAction
-
   targetType: AuditTargetType
-
   targetId: string
-
   targetReference: string | null
-
-  metadata: Record<
-    string,
-    unknown
-  >
-
+  metadata: Record<string, unknown>
   occurredAt: string
 }
 
 export interface AuditEventsPage {
   content: AuditEvent[]
-
   page: number
-
   size: number
-
   totalElements: number
-
   totalPages: number
-
   first: boolean
-
   last: boolean
 }

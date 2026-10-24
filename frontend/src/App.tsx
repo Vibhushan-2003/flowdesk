@@ -20,6 +20,7 @@ import { SlaDashboardPage } from './pages/SlaDashboardPage'
 import { SupportQueuePage } from './pages/SupportQueuePage'
 import { SupportTicketDetailsPage } from './pages/SupportTicketDetailsPage'
 import { TicketDetailsPage } from './pages/TicketDetailsPage'
+import { UserManagementPage } from './pages/UserManagementPage'
 
 function App() {
   return (
@@ -105,6 +106,13 @@ function App() {
             path="/audit"
             element={
               <AuditTrailPage />
+            }
+          />
+
+          <Route
+            path="/admin/users"
+            element={
+              <UserManagementPage />
             }
           />
         </Route>
