@@ -1,3 +1,4 @@
+
 package com.flowdesk.common.exception;
 
 import java.time.Instant;
@@ -9,6 +10,7 @@ public record ApiError(
         String error,
         String message,
         String path,
-        Map<String, String> fieldErrors
+        Map<String, String> fieldErrors,
+        String requestId
 ) {
 }
