@@ -44,6 +44,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import com.flowdesk.auth.ratelimit.LoginRateLimitingFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
 @Configuration
 public class SecurityConfig {
 
@@ -52,7 +55,8 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthenticationConverter jwtAuthenticationConverter,
             CorsConfigurationSource corsConfigurationSource,
-            SecurityErrorResponseWriter securityErrorResponseWriter
+            SecurityErrorResponseWriter securityErrorResponseWriter,
+            LoginRateLimitingFilter loginRateLimitingFilter
     ) throws Exception {
 
         // Day 43: Preserve the standard Bearer authentication challenge.
@@ -60,6 +64,10 @@ public class SecurityConfig {
                 new BearerTokenAuthenticationEntryPoint();
 
         http
+                .addFilterBefore(
+                        loginRateLimitingFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                )
                 .cors(cors ->
                         cors.configurationSource(
                                 corsConfigurationSource
