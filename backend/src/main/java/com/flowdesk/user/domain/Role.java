@@ -26,6 +26,12 @@ public class Role {
     protected Role() {
     }
 
+    public Role(RoleCode code, String description) {
+        this.id = UUID.randomUUID();
+        this.code = code;
+        this.description = description;
+    }
+
     public UUID getId() {
         return id;
     }

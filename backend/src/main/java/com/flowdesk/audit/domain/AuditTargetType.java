@@ -4,5 +4,7 @@ public enum AuditTargetType {
 
     TICKET,
 
-    APPROVAL
+    APPROVAL,
+
+    USER
 }

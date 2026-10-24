@@ -126,6 +126,12 @@ public class SecurityConfig {
                         )
                         .hasRole("ADMIN")
 
+                        // User management - ADMIN only
+                        .requestMatchers(
+                                "/api/admin/**"
+                        )
+                        .hasRole("ADMIN")
+
                         // SLA dashboard
                         .requestMatchers(
                                 HttpMethod.GET,
