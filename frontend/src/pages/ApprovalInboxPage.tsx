@@ -409,7 +409,7 @@ export function ApprovalInboxPage() {
                 </span>
               </div>
 
-              <div className="dashboard-workspace-grid">
+              <div className="approval-inbox-grid">
                 {approvalPage.content.map(
                   (approval) => (
                     <ApprovalCard
@@ -510,6 +510,9 @@ function ApprovalCard({
   onApprove,
   onReject,
 }: ApprovalCardProps) {
+  const [activeDecision, setActiveDecision] =
+    useState<'approve' | 'reject'>('approve')
+
   const [
     approvalNote,
     setApprovalNote,
@@ -544,52 +547,66 @@ function ApprovalCard({
     )
   }
 
-  return (
-    <article className="dashboard-workspace-card">
-      <p className="dashboard-card-label">
-        {approval.ticketNumber}
-      </p>
+  const priorityClass = `priority-badge priority-badge-${approval.priority.toLowerCase()}`
 
-      <h2>
+  return (
+    <article className="approval-card">
+      <div className="approval-card-header">
+        <div className="approval-card-tags">
+          <span className="approval-ticket-number">
+            {approval.ticketNumber}
+          </span>
+
+          <span className={priorityClass}>
+            {formatLabel(approval.priority)}
+          </span>
+
+          <span className="support-status support-status-pending-approval">
+            Pending Decision
+          </span>
+        </div>
+
+        <span className="approval-meta-label">
+          Requested {formatDate(approval.requestedAt)}
+        </span>
+      </div>
+
+      <h2 className="approval-card-title">
         {approval.ticketTitle}
       </h2>
 
-      <p>
+      <div className="approval-card-description">
         {approval.ticketDescription}
-      </p>
+      </div>
 
-      <div className="account-details-grid">
-        <div>
-          <span>
+      <div className="approval-metadata-strip">
+        <div className="approval-meta-item">
+          <span className="approval-meta-label">
             Requester
           </span>
 
-          <strong>
+          <strong className="approval-meta-value">
             {approval.requestedByEmail}
           </strong>
         </div>
 
-        <div>
-          <span>
-            Priority
+        <div className="approval-meta-item">
+          <span className="approval-meta-label">
+            Request Type
           </span>
 
-          <strong>
-            {formatLabel(
-              approval.priority,
-            )}
+          <strong className="approval-meta-value">
+            Service Request
           </strong>
         </div>
 
-        <div>
-          <span>
-            Requested
+        <div className="approval-meta-item">
+          <span className="approval-meta-label">
+            Priority Level
           </span>
 
-          <strong>
-            {formatDate(
-              approval.requestedAt,
-            )}
+          <strong className="approval-meta-value">
+            {formatLabel(approval.priority)}
           </strong>
         </div>
       </div>
@@ -601,90 +618,127 @@ function ApprovalCard({
           decide it.
         </p>
       ) : (
-        <>
-          <form
-            className="ticket-form"
-            onSubmit={
-              handleApproveSubmit
-            }
-          >
-            <label>
-              Approval note
-
-              <textarea
-                value={
-                  approvalNote
-                }
-                maxLength={500}
-                disabled={
-                  isSubmitting
-                }
-                placeholder="Optional note for this approval"
-                onChange={(
-                  event,
-                ) =>
-                  setApprovalNote(
-                    event.target.value,
-                  )
-                }
-              />
-            </label>
+        <div className="approval-decision-panel">
+          <div className="approval-decision-tabs" role="tablist" aria-label="Decision options">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeDecision === 'approve'}
+              className={`approval-tab-btn ${
+                activeDecision === 'approve' ? 'active' : ''
+              }`}
+              onClick={() => setActiveDecision('approve')}
+              disabled={isSubmitting}
+            >
+              Approve Request
+            </button>
 
             <button
-              type="submit"
-              disabled={
-                isSubmitting
-              }
+              type="button"
+              role="tab"
+              aria-selected={activeDecision === 'reject'}
+              className={`approval-tab-btn ${
+                activeDecision === 'reject' ? 'active' : ''
+              }`}
+              onClick={() => setActiveDecision('reject')}
+              disabled={isSubmitting}
             >
-              {isSubmitting
-                ? 'Processing...'
-                : 'Approve request'}
+              Reject Request
             </button>
-          </form>
+          </div>
 
-          <form
-            className="ticket-form"
-            onSubmit={
-              handleRejectSubmit
-            }
-          >
-            <label>
-              Rejection reason
-
-              <textarea
-                value={
-                  rejectionReason
-                }
-                maxLength={500}
-                required
-                disabled={
-                  isSubmitting
-                }
-                placeholder="Required reason for rejection"
-                onChange={(
-                  event,
-                ) =>
-                  setRejectionReason(
-                    event.target.value,
-                  )
-                }
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={
-                isSubmitting ||
-                rejectionReason
-                  .trim() === ''
-              }
+          {activeDecision === 'approve' ? (
+            <form
+              className="approval-decision-box"
+              onSubmit={handleApproveSubmit}
             >
-              {isSubmitting
-                ? 'Processing...'
-                : 'Reject request'}
-            </button>
-          </form>
-        </>
+              <div className="approval-decision-box-heading">
+                <h3>Approve Service Request</h3>
+                <p>
+                  Approving will transition this ticket to OPEN and place it in the support queue.
+                </p>
+              </div>
+
+              <label className="approval-form-label">
+                Approval note (optional)
+
+                <textarea
+                  value={approvalNote}
+                  maxLength={500}
+                  rows={3}
+                  disabled={isSubmitting}
+                  placeholder="Optional note or context for this approval..."
+                  onChange={(event) =>
+                    setApprovalNote(event.target.value)
+                  }
+                />
+
+                <span className="approval-char-count">
+                  {approvalNote.length}/500
+                </span>
+              </label>
+
+              <div className="approval-form-actions">
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting
+                    ? 'Processing approval...'
+                    : 'Confirm Approval'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form
+              className="approval-decision-box"
+              onSubmit={handleRejectSubmit}
+            >
+              <div className="approval-decision-box-heading">
+                <h3>Reject Service Request</h3>
+                <p>
+                  Rejecting will cancel the service request and record your reason for the requester.
+                </p>
+              </div>
+
+              <label className="approval-form-label">
+                Rejection reason (required)
+
+                <textarea
+                  value={rejectionReason}
+                  maxLength={500}
+                  rows={3}
+                  required
+                  disabled={isSubmitting}
+                  placeholder="Provide a clear explanation for the requester..."
+                  onChange={(event) =>
+                    setRejectionReason(event.target.value)
+                  }
+                />
+
+                <span className="approval-char-count">
+                  {rejectionReason.length}/500
+                </span>
+              </label>
+
+              <div className="approval-form-actions">
+                <button
+                  type="submit"
+                  className="btn-reject-submit"
+                  disabled={
+                    isSubmitting ||
+                    rejectionReason.trim() === ''
+                  }
+                >
+                  {isSubmitting
+                    ? 'Processing rejection...'
+                    : 'Confirm Rejection'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       )}
     </article>
   )

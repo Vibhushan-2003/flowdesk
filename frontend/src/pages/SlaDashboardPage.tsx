@@ -31,6 +31,12 @@ const PRIORITIES: SlaTicketPriority[] = [
   'LOW',
 ]
 
+import {
+  formatDate,
+  formatLabel,
+  formatPercent,
+} from '../utils/formatters'
+
 export function SlaDashboardPage() {
   const {
     accessToken,
@@ -181,48 +187,52 @@ export function SlaDashboardPage() {
       {!isLoading &&
         dashboard && (
         <>
-          <section className="dashboard-workspace-grid">
-            <MetricCard
-              label="Active tickets"
-              value={
-                dashboard.activeTickets
-              }
-              description="Tickets currently in an active operational state."
-            />
+          <section aria-label="Ticket volume and breaches">
+            <div className="sla-kpi-grid">
+              <MetricCard
+                label="Active tickets"
+                value={
+                  dashboard.activeTickets
+                }
+                description="Tickets currently in an active operational state."
+              />
 
-            <MetricCard
-              label="Response breached"
-              value={
-                dashboard.responseBreached
-              }
-              description="Active tickets still waiting for a first response after the deadline."
-            />
+              <MetricCard
+                label="Response breached"
+                value={
+                  dashboard.responseBreached
+                }
+                description="Active tickets waiting for first response after the deadline."
+              />
 
-            <MetricCard
-              label="Resolution breached"
-              value={
-                dashboard.resolutionBreached
-              }
-              description="Active unresolved tickets already past their resolution deadline."
-            />
+              <MetricCard
+                label="Resolution breached"
+                value={
+                  dashboard.resolutionBreached
+                }
+                description="Active unresolved tickets past their resolution deadline."
+              />
+            </div>
 
-            <MetricCard
-              label="Response compliance"
-              value={formatPercent(
-                dashboard
-                  .responseCompliancePercent,
-              )}
-              description="Known first responses completed within their SLA."
-            />
+            <div className="sla-kpi-grid-compliance">
+              <MetricCard
+                label="Response compliance"
+                value={formatPercent(
+                  dashboard
+                    .responseCompliancePercent,
+                )}
+                description="Known first responses completed within their SLA."
+              />
 
-            <MetricCard
-              label="Resolution compliance"
-              value={formatPercent(
-                dashboard
-                  .resolutionCompliancePercent,
-              )}
-              description="Known resolutions completed within their SLA."
-            />
+              <MetricCard
+                label="Resolution compliance"
+                value={formatPercent(
+                  dashboard
+                    .resolutionCompliancePercent,
+                )}
+                description="Known resolutions completed within their SLA."
+              />
+            </div>
           </section>
 
           <section className="user-card">
@@ -283,54 +293,47 @@ export function SlaDashboardPage() {
                 recorded yet.
               </p>
             ) : (
-              <div className="dashboard-workspace-grid">
+              <div className="sla-breaches-list">
                 {dashboard
                   .recentBreaches
                   .map(
                     (breach) => (
                       <article
                         key={`${breach.ticketNumber}-${breach.eventType}`}
-                        className="dashboard-workspace-card"
+                        className="sla-breach-item"
                       >
-                        <p className="dashboard-card-label">
-                          {
-                            breach.ticketNumber
-                          }
-                        </p>
-
-                        <h2>
-                          {formatLabel(
-                            breach.eventType,
-                          )}
-                        </h2>
-
-                        <p>
-                          Priority:{' '}
-                          <strong>
-                            {
-                              breach.priority
-                            }
+                        <div className="sla-breach-info">
+                          <strong className="sla-breach-ticket">
+                            {breach.ticketNumber}
                           </strong>
-                        </p>
 
-                        <p>
-                          Status:{' '}
-                          <strong>
-                            {formatLabel(
-                              breach.status,
-                            )}
-                          </strong>
-                        </p>
+                          <span className="sla-breach-type-tag">
+                            {breach.eventType === 'RESPONSE_BREACHED'
+                              ? 'Response SLA Missed'
+                              : 'Resolution SLA Missed'}
+                          </span>
 
-                        <p>
-                          Breached:{' '}
-                          <strong>
-                            {formatDate(
-                              breach
-                                .occurredAt,
-                            )}
-                          </strong>
-                        </p>
+                          <span
+                            className={`priority-badge priority-${breach.priority.toLowerCase()}`}
+                          >
+                            {formatLabel(breach.priority)}
+                          </span>
+
+                          <span
+                            className={`support-status status-${breach.status
+                              .toLowerCase()
+                              .replace(/_/g, '-')}`}
+                          >
+                            {formatLabel(breach.status)}
+                          </span>
+                        </div>
+
+                        <div className="sla-breach-time">
+                          <span>Breached: </span>
+                          <time dateTime={breach.occurredAt}>
+                            {formatDate(breach.occurredAt)}
+                          </time>
+                        </div>
                       </article>
                     ),
                   )}
@@ -369,42 +372,4 @@ function MetricCard({
       </p>
     </article>
   )
-}
-
-function formatPercent(
-  value: number | null,
-) {
-  if (value === null) {
-    return 'Not enough data'
-  }
-
-  return `${value.toFixed(1)}%`
-}
-
-function formatLabel(
-  value: string,
-) {
-  return value.replaceAll(
-    '_',
-    ' ',
-  )
-}
-
-function formatDate(
-  value: string,
-) {
-  const date =
-    new Date(
-      value,
-    )
-
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
-    return value
-  }
-
-  return date.toLocaleString()
 }

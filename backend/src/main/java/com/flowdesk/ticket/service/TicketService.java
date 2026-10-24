@@ -1,6 +1,7 @@
 package com.flowdesk.ticket.service;
 
 import com.flowdesk.approval.domain.ApprovalRequest;
+import com.flowdesk.approval.domain.ApprovalStatus;
 import com.flowdesk.approval.repository.ApprovalRequestRepository;
 import com.flowdesk.approval.service.ApprovalNotificationService;
 
@@ -590,6 +591,15 @@ public class TicketService {
                         ZoneOffset.UTC
                 );
 
+        String rejectionReason = null;
+        if (ticket.getStatus() == TicketStatus.CANCELLED) {
+            rejectionReason = approvalRequestRepository
+                    .findByTicket_Id(ticket.getId())
+                    .filter(approval -> approval.getStatus() == ApprovalStatus.REJECTED)
+                    .map(ApprovalRequest::getDecisionNote)
+                    .orElse(null);
+        }
+
         return new TicketResponse(
                 ticket.getId(),
                 ticket.getTicketNumber(),
@@ -612,7 +622,8 @@ public class TicketService {
                 ),
                 ticket.evaluateResolutionSla(
                         evaluatedAt
-                )
+                ),
+                rejectionReason
         );
     }
 

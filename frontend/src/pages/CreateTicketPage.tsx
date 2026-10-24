@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { createTicket } from '../api/ticket'
 import { useAuth } from '../auth/useAuth'
@@ -7,9 +8,11 @@ import type {
   TicketResponse,
   TicketType,
 } from '../types/ticket'
+import { formatLabel } from '../utils/formatters'
 
 export function CreateTicketPage() {
   const { accessToken } = useAuth()
+  const navigate = useNavigate()
 
   const [type, setType] = useState<TicketType>('INCIDENT')
   const [title, setTitle] = useState('')
@@ -157,25 +160,59 @@ export function CreateTicketPage() {
 
         {createdTicket && (
           <section
-            className="ticket-success"
+            className="ticket-success-panel"
             aria-live="polite"
           >
             <h2>Ticket created successfully</h2>
 
-            <p>
+            <p className="ticket-success-number">
               Your ticket number is{' '}
               <strong>
                 {createdTicket.ticketNumber}
               </strong>
             </p>
 
-            <p>
-              {createdTicket.type}
-              {' · '}
-              {createdTicket.priority}
-              {' · '}
-              {createdTicket.status}
-            </p>
+            <div className="ticket-success-tags">
+              <span className="priority-badge priority-badge-low">
+                {formatLabel(createdTicket.type)}
+              </span>
+
+              <span className={`priority-badge priority-badge-${createdTicket.priority.toLowerCase()}`}>
+                {formatLabel(createdTicket.priority)}
+              </span>
+
+              <span className={`support-status support-status-${createdTicket.status.toLowerCase().replaceAll('_', '-')}`}>
+                {formatLabel(createdTicket.status)}
+              </span>
+            </div>
+
+            <div className="ticket-success-actions">
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() =>
+                  navigate(`/tickets/${createdTicket.ticketNumber}`)
+                }
+              >
+                View ticket {createdTicket.ticketNumber}
+              </button>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setCreatedTicket(null)}
+              >
+                Create another ticket
+              </button>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => navigate('/tickets')}
+              >
+                My Tickets
+              </button>
+            </div>
           </section>
         )}
       </section>

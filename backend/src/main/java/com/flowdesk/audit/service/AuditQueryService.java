@@ -1,5 +1,6 @@
 package com.flowdesk.audit.service;
 
+import com.flowdesk.audit.domain.AuditAction;
 import com.flowdesk.audit.domain.AuditLog;
 import com.flowdesk.audit.dto.AuditEventResponse;
 import com.flowdesk.audit.repository.AuditLogRepository;
@@ -8,6 +9,7 @@ import com.flowdesk.common.dto.PageResponse;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import org.springframework.http.HttpStatus;
 
@@ -41,20 +43,48 @@ public class AuditQueryService {
                     int page,
                     int size
             ) {
+        return getAuditEvents(page, size, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<AuditEventResponse>
+            getAuditEvents(
+                    int page,
+                    int size,
+                    AuditAction action,
+                    String search
+            ) {
 
         validatePagination(
                 page,
                 size
         );
 
-        Page<AuditLog> auditPage =
-                auditLogRepository
-                        .findAllByOrderByOccurredAtDesc(
-                                PageRequest.of(
-                                        page,
-                                        size
-                                )
-                        );
+        String searchPattern =
+                buildSearchPattern(search);
+
+        Pageable pageable =
+                PageRequest.of(
+                        page,
+                        size
+                );
+
+        Page<AuditLog> auditPage;
+        if (action == null && searchPattern == null) {
+            auditPage =
+                    auditLogRepository
+                            .findAllByOrderByOccurredAtDesc(
+                                    pageable
+                            );
+        } else {
+            auditPage =
+                    auditLogRepository
+                            .searchAuditEvents(
+                                    action,
+                                    searchPattern,
+                                    pageable
+                            );
+        }
 
         return new PageResponse<>(
                 auditPage
@@ -71,6 +101,27 @@ public class AuditQueryService {
                 auditPage.isFirst(),
                 auditPage.isLast()
         );
+    }
+
+    private String buildSearchPattern(String search) {
+        if (search == null || search.isBlank()) {
+            return null;
+        }
+
+        String normalized = search.trim().toLowerCase(java.util.Locale.ROOT);
+        if (normalized.length() > 100) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Search must be 100 characters or fewer"
+            );
+        }
+
+        String escaped = normalized
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+
+        return "%" + escaped + "%";
     }
 
     private void validatePagination(

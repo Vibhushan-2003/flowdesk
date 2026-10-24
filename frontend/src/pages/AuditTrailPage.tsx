@@ -27,6 +27,17 @@ import type {
 
 const PAGE_SIZE = 20
 
+const AUDIT_ACTIONS: AuditAction[] = [
+  'TICKET_CREATED',
+  'TICKET_CLAIMED',
+  'TICKET_STATUS_CHANGED',
+  'SLA_RESPONSE_BREACHED',
+  'SLA_RESOLUTION_BREACHED',
+  'APPROVAL_REQUESTED',
+  'APPROVAL_APPROVED',
+  'APPROVAL_REJECTED',
+]
+
 export function AuditTrailPage() {
   const {
     accessToken,
@@ -41,6 +52,26 @@ export function AuditTrailPage() {
     setPage,
   ] =
     useState(0)
+
+  const [
+    selectedAction,
+    setSelectedAction,
+  ] = useState<AuditAction | ''>('')
+
+  const [
+    searchQuery,
+    setSearchQuery,
+  ] = useState('')
+
+  const [
+    appliedAction,
+    setAppliedAction,
+  ] = useState<AuditAction | undefined>(undefined)
+
+  const [
+    appliedSearch,
+    setAppliedSearch,
+  ] = useState<string | undefined>(undefined)
 
   const [
     auditPage,
@@ -61,6 +92,21 @@ export function AuditTrailPage() {
     setError,
   ] =
     useState<string | null>(null)
+
+  function handleFilterSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    setPage(0)
+    setAppliedAction(selectedAction ? selectedAction : undefined)
+    setAppliedSearch(searchQuery.trim() ? searchQuery.trim() : undefined)
+  }
+
+  function handleResetFilters() {
+    setSelectedAction('')
+    setSearchQuery('')
+    setAppliedAction(undefined)
+    setAppliedSearch(undefined)
+    setPage(0)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -87,6 +133,10 @@ export function AuditTrailPage() {
             accessToken,
             page,
             PAGE_SIZE,
+            {
+              action: appliedAction,
+              search: appliedSearch,
+            },
           )
 
         if (!cancelled) {
@@ -119,36 +169,27 @@ export function AuditTrailPage() {
   }, [
     accessToken,
     page,
+    appliedAction,
+    appliedSearch,
   ])
 
   function handleSignOut() {
     signOut()
-
     navigate('/login')
   }
 
   function handlePreviousPage() {
-    setPage(
-      (currentPage) =>
-        Math.max(
-          0,
-          currentPage - 1,
-        ),
-    )
+    setPage((currentPage) => Math.max(0, currentPage - 1))
   }
 
   function handleNextPage() {
-    if (
-      auditPage?.last
-    ) {
+    if (auditPage?.last) {
       return
     }
-
-    setPage(
-      (currentPage) =>
-        currentPage + 1,
-    )
+    setPage((currentPage) => currentPage + 1)
   }
+
+  const hasActiveFilters = Boolean(appliedAction || appliedSearch)
 
   return (
     <main className="dashboard-page">
@@ -191,6 +232,51 @@ export function AuditTrailPage() {
           </button>
         </div>
       </header>
+
+      <form
+        className="audit-filters-form"
+        onSubmit={handleFilterSubmit}
+        aria-label="Audit filters"
+      >
+        <label>
+          Search target or actor
+          <input
+            type="search"
+            value={searchQuery}
+            maxLength={100}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="e.g. FD-000028 or user@example.com"
+          />
+        </label>
+
+        <label>
+          Action
+          <select
+            value={selectedAction}
+            onChange={(event) =>
+              setSelectedAction(event.target.value as AuditAction | '')
+            }
+          >
+            <option value="">All actions</option>
+            {AUDIT_ACTIONS.map((action) => (
+              <option key={action} value={action}>
+                {getActionLabel(action)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button type="submit" className="primary-button">
+          Filter
+        </button>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={handleResetFilters}
+        >
+          Clear
+        </button>
+      </form>
 
       {isLoading && (
         <section className="user-card">
@@ -239,14 +325,26 @@ export function AuditTrailPage() {
                 .length === 0 ? (
                 <div className="empty-state">
                   <h2>
-                    No audit events yet
+                    {hasActiveFilters
+                      ? 'No matching audit events'
+                      : 'No audit events yet'}
                   </h2>
 
                   <p>
-                    Business activity will appear
-                    here after audited actions are
-                    recorded.
+                    {hasActiveFilters
+                      ? 'Try adjusting your search query or action filter.'
+                      : 'Business activity will appear here after audited actions are recorded.'}
                   </p>
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={handleResetFilters}
+                      style={{ marginTop: '0.75rem' }}
+                    >
+                      Clear filters
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="dashboard-workspace-grid">
@@ -325,8 +423,14 @@ interface AuditEventCardProps {
 function AuditEventCard({
   event,
 }: AuditEventCardProps) {
+  const displayTitle =
+    event.targetReference ??
+    (typeof event.metadata['ticketNumber'] === 'string'
+      ? event.metadata['ticketNumber']
+      : `${formatLabel(event.targetType)} Event`)
+
   return (
-    <article className="dashboard-workspace-card">
+    <article className="dashboard-workspace-card audit-card">
       <p className="dashboard-card-label">
         {getActionLabel(
           event.action,
@@ -334,10 +438,7 @@ function AuditEventCard({
       </p>
 
       <h2>
-        {event.targetReference ??
-          formatLabel(
-            event.targetType,
-          )}
+        {displayTitle}
       </h2>
 
       <p>

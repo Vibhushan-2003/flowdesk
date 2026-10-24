@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react'
 
@@ -68,6 +69,37 @@ export function NotificationBell() {
     user?.roles.includes(
       'SUPPORT_ENGINEER',
     ) ?? false
+
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+        buttonRef.current?.focus()
+      }
+    }
+
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('mousedown', handleClickOutside)
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
 
   /*
    * Initial authoritative unread count.
@@ -325,8 +357,9 @@ export function NotificationBell() {
   }
 
   return (
-    <div className="notification-bell-wrapper">
+    <div className="notification-bell-wrapper" ref={wrapperRef}>
       <button
+        ref={buttonRef}
         type="button"
         className="notification-bell-button"
         aria-label="Notifications"

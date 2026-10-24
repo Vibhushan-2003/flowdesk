@@ -48,7 +48,9 @@ class AuditControllerTest {
                 auditQueryService
                         .getAuditEvents(
                                 0,
-                                50
+                                50,
+                                null,
+                                null
                         )
         ).thenReturn(
                 expectedResponse
@@ -58,7 +60,9 @@ class AuditControllerTest {
                 auditController
                         .getAuditEvents(
                                 0,
-                                50
+                                50,
+                                null,
+                                null
                         );
 
         assertSame(
@@ -70,7 +74,9 @@ class AuditControllerTest {
                 auditQueryService
         ).getAuditEvents(
                 0,
-                50
+                50,
+                null,
+                null
         );
     }
 }
