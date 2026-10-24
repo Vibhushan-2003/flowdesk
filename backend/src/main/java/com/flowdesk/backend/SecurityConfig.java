@@ -3,6 +3,7 @@ package com.flowdesk.backend;
 
 import com.flowdesk.auth.security.FlowDeskUserDetailsService;
 import com.flowdesk.auth.security.JwtCurrentUserAuthoritiesConverter;
+import com.flowdesk.auth.security.SecurityErrorResponseWriter;
 
 import java.util.Base64;
 import java.util.List;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -34,6 +36,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
 
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -48,8 +51,13 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationConverter jwtAuthenticationConverter,
-            CorsConfigurationSource corsConfigurationSource
+            CorsConfigurationSource corsConfigurationSource,
+            SecurityErrorResponseWriter securityErrorResponseWriter
     ) throws Exception {
+
+        // Day 43: Preserve the standard Bearer authentication challenge.
+        BearerTokenAuthenticationEntryPoint bearerEntryPoint =
+                new BearerTokenAuthenticationEntryPoint();
 
         http
                 .cors(cors ->
@@ -162,8 +170,86 @@ public class SecurityConfig {
                         .authenticated()
                 )
 
-                .oauth2ResourceServer(oauth2 ->
-                        oauth2.jwt(jwt ->
+                /*
+                 * Day 43: Standard JSON responses for
+                 * authentication and authorization errors.
+                 *
+                 * The Bearer entry point writes the required
+                 * WWW-Authenticate header.
+                 *
+                 * Our response writer then writes the
+                 * standardized ApiError JSON body.
+                 */
+                .exceptionHandling(exceptions -> exceptions
+
+                        .authenticationEntryPoint(
+                                (request, response, exception) -> {
+
+                                    bearerEntryPoint.commence(
+                                            request,
+                                            response,
+                                            exception
+                                    );
+
+                                    securityErrorResponseWriter.write(
+                                            request,
+                                            response,
+                                            HttpStatus.UNAUTHORIZED,
+                                            "Authentication required"
+                                    );
+                                }
+                        )
+
+                        .accessDeniedHandler(
+                                (request, response, exception) ->
+                                        securityErrorResponseWriter.write(
+                                                request,
+                                                response,
+                                                HttpStatus.FORBIDDEN,
+                                                "Access denied"
+                                        )
+                        )
+                )
+
+                /*
+                 * Day 43: JWT resource-server errors.
+                 *
+                 * Missing/invalid authentication returns 401.
+                 * Insufficient permissions return 403.
+                 *
+                 * Existing JWT conversion remains unchanged.
+                 */
+                .oauth2ResourceServer(oauth2 -> oauth2
+
+                        .authenticationEntryPoint(
+                                (request, response, exception) -> {
+
+                                    bearerEntryPoint.commence(
+                                            request,
+                                            response,
+                                            exception
+                                    );
+
+                                    securityErrorResponseWriter.write(
+                                            request,
+                                            response,
+                                            HttpStatus.UNAUTHORIZED,
+                                            "Authentication required"
+                                    );
+                                }
+                        )
+
+                        .accessDeniedHandler(
+                                (request, response, exception) ->
+                                        securityErrorResponseWriter.write(
+                                                request,
+                                                response,
+                                                HttpStatus.FORBIDDEN,
+                                                "Access denied"
+                                        )
+                        )
+
+                        .jwt(jwt ->
                                 jwt.jwtAuthenticationConverter(
                                         jwtAuthenticationConverter
                                 )

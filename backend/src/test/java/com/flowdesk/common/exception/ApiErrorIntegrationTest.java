@@ -66,25 +66,96 @@ class ApiErrorIntegrationTest {
     }
 
     @Test
-    void unauthorizedRequestStillReturns401()
-            throws Exception {
+void unauthorizedRequestReturnsStandardJson()
+        throws Exception {
 
-        var result = mockMvc.perform(
-                get("/api/tickets/my")
-        )
-        .andExpect(status().isUnauthorized())
-        .andReturn();
+    var result = mockMvc.perform(
+            get("/api/tickets/my")
+                    .accept(MediaType.APPLICATION_JSON)
+    )
+    .andExpect(status().isUnauthorized())
+    .andExpect(content().contentTypeCompatibleWith(
+            MediaType.APPLICATION_JSON
+    ))
+    .andExpect(jsonPath("$.status").value(401))
+    .andExpect(jsonPath("$.message")
+            .value("Authentication required"))
+    .andExpect(jsonPath("$.path")
+            .value("/api/tickets/my"))
+    .andExpect(jsonPath("$.requestId").isString())
+    .andReturn();
 
-        // Unauthorized requests must still have
-        // a request ID in the response header.
-        String headerId = result.getResponse()
-                .getHeader("X-Request-ID");
+    String headerId = result.getResponse()
+            .getHeader("X-Request-ID");
 
-        assertNotNull(headerId);
+    assertNotNull(headerId);
+    assertDoesNotThrow(() -> UUID.fromString(headerId));
 
-        // The request ID must be a valid UUID.
-        assertDoesNotThrow(
-                () -> UUID.fromString(headerId)
-        );
-    }
+    String bodyId = JsonPath.read(
+            result.getResponse().getContentAsString(),
+            "$.requestId"
+    );
+
+    assertEquals(headerId, bodyId);
+}
+
+@Test
+@WithMockUser(roles = "EMPLOYEE")
+void employeeCannotAccessAdminAuditEndpoint()
+        throws Exception {
+
+    var result = mockMvc.perform(
+            get("/api/audit")
+                    .accept(MediaType.APPLICATION_JSON)
+    )
+    .andExpect(status().isForbidden())
+    .andExpect(content().contentTypeCompatibleWith(
+            MediaType.APPLICATION_JSON
+    ))
+    .andExpect(jsonPath("$.status").value(403))
+    .andExpect(jsonPath("$.message")
+            .value("Access denied"))
+    .andExpect(jsonPath("$.requestId").isString())
+    .andReturn();
+
+    String headerId = result.getResponse()
+            .getHeader("X-Request-ID");
+
+    assertNotNull(headerId);
+    assertDoesNotThrow(() -> UUID.fromString(headerId));
+
+    String bodyId = JsonPath.read(
+            result.getResponse().getContentAsString(),
+            "$.requestId"
+    );
+
+    assertEquals(headerId, bodyId);
+}
+
+@Test
+void invalidBearerTokenReturns401()
+        throws Exception {
+
+    mockMvc.perform(
+            get("/api/tickets/my")
+                    .header(
+                            "Authorization",
+                            "Bearer invalid.jwt.token"
+                    )
+                    .accept(MediaType.APPLICATION_JSON)
+    )
+    .andExpect(status().isUnauthorized())
+    .andExpect(header().string(
+        "WWW-Authenticate",
+        org.hamcrest.Matchers.startsWith("Bearer")
+))
+    .andExpect(content().contentTypeCompatibleWith(
+            MediaType.APPLICATION_JSON
+    ))
+    .andExpect(jsonPath("$.status").value(401))
+    .andExpect(jsonPath("$.message")
+            .value("Authentication required"))
+    .andExpect(jsonPath("$.requestId").isString());
+}
+
 }
