@@ -130,8 +130,8 @@ If all administrators are lost or deactivated in an environment that already con
    ```
 3. If an existing administrator was set to `INACTIVE`, reactivate them:
    ```sql
-   UPDATE users 
-   SET status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP 
+   UPDATE users
+   SET status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
    WHERE email = 'admin@example.com';
    ```
 4. If an existing active user needs to be promoted to administrator:

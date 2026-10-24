@@ -17,6 +17,10 @@ export async function login(
   })
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error('Too many login attempts. Please try again later.')
+    }
+
     if (response.status === 401) {
       throw new Error('Invalid email or password')
     }
