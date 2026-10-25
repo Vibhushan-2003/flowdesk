@@ -3,10 +3,15 @@ package com.flowdesk.auth.controller;
 
 import com.flowdesk.auth.dto.ChangePasswordRequest;
 import com.flowdesk.auth.dto.ChangePasswordResponse;
+import com.flowdesk.auth.dto.ForgotPasswordRequest;
+import com.flowdesk.auth.dto.ForgotPasswordResponse;
 import com.flowdesk.auth.dto.LoginRequest;
 import com.flowdesk.auth.dto.LoginResponse;
 import com.flowdesk.auth.dto.MeResponse;
+import com.flowdesk.auth.dto.ResetPasswordRequest;
+import com.flowdesk.auth.dto.ResetPasswordResponse;
 import com.flowdesk.auth.service.AuthService;
+import com.flowdesk.auth.service.PasswordResetService;
 
 import jakarta.validation.Valid;
 
@@ -32,9 +37,14 @@ import java.util.UUID;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(
+            AuthService authService,
+            PasswordResetService passwordResetService
+    ) {
         this.authService = authService;
+        this.passwordResetService = passwordResetService;
     }
 
     @PostMapping("/login")
@@ -43,6 +53,24 @@ public class AuthController {
     ) {
         return ResponseEntity.ok(
                 authService.login(request)
+        );
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ForgotPasswordResponse> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request
+    ) {
+        return ResponseEntity.ok(
+                passwordResetService.requestPasswordReset(request)
+        );
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ResetPasswordResponse> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request
+    ) {
+        return ResponseEntity.ok(
+                passwordResetService.resetPassword(request)
         );
     }
 

@@ -2,9 +2,13 @@ import { API_BASE_URL } from './config'
 import type {
   ChangePasswordRequest,
   ChangePasswordResponse,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
   LoginRequest,
   LoginResponse,
   MeResponse,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
 } from '../types/auth'
 
 export async function login(
@@ -95,4 +99,78 @@ export async function changePassword(
   }
 
   return response.json() as Promise<ChangePasswordResponse>
+}
+
+export async function forgotPassword(
+  request: ForgotPasswordRequest,
+): Promise<ForgotPasswordResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error('Too many password reset requests. Please try again later.')
+    }
+
+    try {
+      const errorBody = await response.json()
+      if (errorBody && typeof errorBody.message === 'string') {
+        throw new Error(errorBody.message)
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message !== 'Unexpected end of JSON input') {
+        throw e
+      }
+    }
+
+    if (response.status === 400) {
+      throw new Error('Please enter a valid email address.')
+    }
+
+    throw new Error('Unable to process password reset request. Please try again.')
+  }
+
+  return response.json() as Promise<ForgotPasswordResponse>
+}
+
+export async function resetPassword(
+  request: ResetPasswordRequest,
+): Promise<ResetPasswordResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error('Too many attempts. Please try again later.')
+    }
+
+    try {
+      const errorBody = await response.json()
+      if (errorBody && typeof errorBody.message === 'string') {
+        throw new Error(errorBody.message)
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message !== 'Unexpected end of JSON input') {
+        throw e
+      }
+    }
+
+    if (response.status === 400) {
+      throw new Error('Please check the password information you entered.')
+    }
+
+    throw new Error('Unable to reset password. Please try again or request a new reset link.')
+  }
+
+  return response.json() as Promise<ResetPasswordResponse>
 }

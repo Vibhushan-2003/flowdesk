@@ -45,6 +45,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.flowdesk.auth.ratelimit.LoginRateLimitingFilter;
+import com.flowdesk.auth.ratelimit.PasswordResetRateLimitingFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
@@ -56,7 +57,8 @@ public class SecurityConfig {
             JwtAuthenticationConverter jwtAuthenticationConverter,
             CorsConfigurationSource corsConfigurationSource,
             SecurityErrorResponseWriter securityErrorResponseWriter,
-            LoginRateLimitingFilter loginRateLimitingFilter
+            LoginRateLimitingFilter loginRateLimitingFilter,
+            PasswordResetRateLimitingFilter passwordResetRateLimitingFilter
     ) throws Exception {
 
         // Day 43: Preserve the standard Bearer authentication challenge.
@@ -66,6 +68,10 @@ public class SecurityConfig {
         http
                 .addFilterBefore(
                         loginRateLimitingFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                )
+                .addFilterBefore(
+                        passwordResetRateLimitingFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
                 .cors(cors ->
@@ -109,6 +115,14 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/login"
+                        )
+                        .permitAll()
+
+                        // Public password recovery
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/auth/forgot-password",
+                                "/api/auth/reset-password"
                         )
                         .permitAll()
 

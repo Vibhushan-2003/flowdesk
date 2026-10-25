@@ -67,4 +67,67 @@ public class RateLimiterConfig {
         registration.setEnabled(false);
         return registration;
     }
+
+    @Bean
+    public DualQuotaRateLimiter forgotPasswordRateLimiter(
+            ForgotPasswordRateLimiterProperties properties,
+            Clock rateLimiterClock
+    ) {
+        Object lock = new Object();
+        SlidingWindowRateLimiter ipLimiter = new SlidingWindowRateLimiter(
+                properties.getIpMaxAttempts(),
+                properties.getIpWindowSeconds(),
+                properties.getMaxTrackedKeys(),
+                rateLimiterClock,
+                lock
+        );
+        SlidingWindowRateLimiter ipEmailLimiter = new SlidingWindowRateLimiter(
+                properties.getIpEmailMaxAttempts(),
+                properties.getIpEmailWindowSeconds(),
+                properties.getMaxTrackedKeys(),
+                rateLimiterClock,
+                lock
+        );
+        return new DualQuotaRateLimiter(ipLimiter, ipEmailLimiter, rateLimiterClock, lock);
+    }
+
+    @Bean
+    public SlidingWindowRateLimiter resetPasswordIpLimiter(
+            ForgotPasswordRateLimiterProperties properties,
+            Clock rateLimiterClock
+    ) {
+        return new SlidingWindowRateLimiter(
+                properties.getResetPasswordIpMaxAttempts(),
+                properties.getResetPasswordIpWindowSeconds(),
+                properties.getMaxTrackedKeys(),
+                rateLimiterClock,
+                new Object()
+        );
+    }
+
+    @Bean
+    public PasswordResetRateLimitingFilter passwordResetRateLimitingFilter(
+            ForgotPasswordRateLimiterProperties properties,
+            SecurityErrorResponseWriter securityErrorResponseWriter,
+            JsonMapper jsonMapper,
+            DualQuotaRateLimiter forgotPasswordRateLimiter,
+            SlidingWindowRateLimiter resetPasswordIpLimiter
+    ) {
+        return new PasswordResetRateLimitingFilter(
+                properties,
+                securityErrorResponseWriter,
+                jsonMapper,
+                forgotPasswordRateLimiter,
+                resetPasswordIpLimiter
+        );
+    }
+
+    @Bean
+    public FilterRegistrationBean<PasswordResetRateLimitingFilter> passwordResetRateLimitingFilterRegistration(
+            PasswordResetRateLimitingFilter filter
+    ) {
+        FilterRegistrationBean<PasswordResetRateLimitingFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
 }
