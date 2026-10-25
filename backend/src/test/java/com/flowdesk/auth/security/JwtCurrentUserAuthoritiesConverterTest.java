@@ -42,6 +42,7 @@ class JwtCurrentUserAuthoritiesConverterTest {
         Role employeeRole = mock(Role.class);
 
         when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
+        when(user.getCredentialVersion()).thenReturn(1L);
         when(user.getRoles()).thenReturn(Set.of(employeeRole));
         when(employeeRole.getCode()).thenReturn(RoleCode.EMPLOYEE);
         when(repository.findWithRolesById(userId))
@@ -98,6 +99,7 @@ class JwtCurrentUserAuthoritiesConverterTest {
                 .header("alg", "HS256")
                 .subject("not-a-uuid")
                 .claim("roles", Set.of("ADMIN"))
+                .claim("credential_version", 1L)
                 .build();
 
         assertThrows(
@@ -108,13 +110,83 @@ class JwtCurrentUserAuthoritiesConverterTest {
         verifyNoInteractions(repository);
     }
 
+    @Test
+    void missingCredentialVersionMustBeRejected() {
+        UUID userId = UUID.randomUUID();
+        User user = mock(User.class);
+        Role employeeRole = mock(Role.class);
+
+        when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
+        when(user.getRoles()).thenReturn(Set.of(employeeRole));
+        when(employeeRole.getCode()).thenReturn(RoleCode.EMPLOYEE);
+        when(repository.findWithRolesById(userId)).thenReturn(Optional.of(user));
+
+        Jwt jwtWithoutVersion = Jwt.withTokenValue("test-token")
+                .header("alg", "HS256")
+                .subject(userId.toString())
+                .claim("roles", Set.of("EMPLOYEE"))
+                .build();
+
+        assertThrows(
+                OAuth2AuthenticationException.class,
+                () -> converter.convert(jwtWithoutVersion)
+        );
+    }
+
+    @Test
+    void mismatchedCredentialVersionMustBeRejected() {
+        UUID userId = UUID.randomUUID();
+        User user = mock(User.class);
+        Role employeeRole = mock(Role.class);
+
+        when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
+        when(user.getCredentialVersion()).thenReturn(2L); // user version is 2
+        when(user.getRoles()).thenReturn(Set.of(employeeRole));
+        when(employeeRole.getCode()).thenReturn(RoleCode.EMPLOYEE);
+        when(repository.findWithRolesById(userId)).thenReturn(Optional.of(user));
+
+        // old token with version 1
+        Jwt oldJwt = jwt(userId, "EMPLOYEE", 1L);
+
+        assertThrows(
+                OAuth2AuthenticationException.class,
+                () -> converter.convert(oldJwt)
+        );
+    }
+
+    @Test
+    void matchingCredentialVersionMustBeAccepted() {
+        UUID userId = UUID.randomUUID();
+        User user = mock(User.class);
+        Role employeeRole = mock(Role.class);
+
+        when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
+        when(user.getCredentialVersion()).thenReturn(2L);
+        when(user.getRoles()).thenReturn(Set.of(employeeRole));
+        when(employeeRole.getCode()).thenReturn(RoleCode.EMPLOYEE);
+        when(repository.findWithRolesById(userId)).thenReturn(Optional.of(user));
+
+        Jwt currentJwt = jwt(userId, "EMPLOYEE", 2L);
+
+        Collection<GrantedAuthority> authorities = converter.convert(currentJwt);
+        assertNotNull(authorities);
+        assertTrue(authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_EMPLOYEE")));
+    }
+
     private Jwt jwt(UUID userId, String role) {
+        return jwt(userId, role, 1L);
+    }
+
+    private Jwt jwt(UUID userId, String role, Long credentialVersion) {
         return Jwt.withTokenValue("test-token")
                 .header("alg", "HS256")
                 .subject(userId.toString())
-                .claims(claims ->
-                        claims.put("roles", Set.of(role))
-                )
+                .claims(claims -> {
+                    claims.put("roles", Set.of(role));
+                    if (credentialVersion != null) {
+                        claims.put("credential_version", credentialVersion);
+                    }
+                })
                 .build();
     }
 }

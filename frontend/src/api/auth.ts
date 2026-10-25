@@ -1,5 +1,7 @@
 import { API_BASE_URL } from './config'
 import type {
+  ChangePasswordRequest,
+  ChangePasswordResponse,
   LoginRequest,
   LoginResponse,
   MeResponse,
@@ -54,4 +56,43 @@ export async function getCurrentUser(
   }
 
   return response.json() as Promise<MeResponse>
+}
+
+export async function changePassword(
+  accessToken: string,
+  request: ChangePasswordRequest,
+): Promise<ChangePasswordResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Your session is no longer valid. Please sign in again.')
+    }
+
+    try {
+      const errorBody = await response.json()
+      if (errorBody && typeof errorBody.message === 'string') {
+        throw new Error(errorBody.message)
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message !== 'Unexpected end of JSON input') {
+        throw e
+      }
+    }
+
+    if (response.status === 400) {
+      throw new Error('Please check the password information you entered')
+    }
+
+    throw new Error('Unable to change password. Please try again.')
+  }
+
+  return response.json() as Promise<ChangePasswordResponse>
 }

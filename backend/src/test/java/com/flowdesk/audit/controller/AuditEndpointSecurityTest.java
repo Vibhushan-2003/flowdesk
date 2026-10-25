@@ -199,6 +199,7 @@ class AuditEndpointSecurityTest {
         Role role = mock(Role.class);
 
         when(user.getStatus()).thenReturn(status);
+        when(user.getCredentialVersion()).thenReturn(1L);
 
         if (status == UserStatus.ACTIVE) {
             when(user.getRoles()).thenReturn(Set.of(role));
@@ -225,6 +226,7 @@ class AuditEndpointSecurityTest {
                         now.plus(30, ChronoUnit.MINUTES)
                 )
                 .claim("roles", List.of(role))
+                .claim("credential_version", 1L)
                 .build();
 
         return jwtEncoder

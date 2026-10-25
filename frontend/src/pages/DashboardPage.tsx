@@ -1,6 +1,7 @@
-import { useNavigate } from 'react-router-dom'
+﻿import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/useAuth'
+import { ChangePasswordCard } from '../components/ChangePasswordCard'
 import { NotificationBell } from '../components/NotificationBell'
 
 export function DashboardPage() {
@@ -324,6 +325,8 @@ export function DashboardPage() {
           </div>
         </div>
       </section>
+
+      <ChangePasswordCard />
     </main>
   )
 }

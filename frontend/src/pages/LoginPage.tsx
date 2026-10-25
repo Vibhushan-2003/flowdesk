@@ -1,10 +1,11 @@
-import {
+﻿import {
   type FormEvent,
   useState,
 } from 'react'
 
 import {
   Navigate,
+  useLocation,
   useNavigate,
 } from 'react-router-dom'
 
@@ -17,11 +18,14 @@ export function LoginPage() {
   } = useAuth()
 
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const successNotice = (location.state as { message?: string } | null)?.message
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />
@@ -64,6 +68,15 @@ export function LoginPage() {
             Sign in to manage your IT service requests.
           </p>
         </div>
+
+        {successNotice && (
+          <p
+            className="form-success"
+            role="status"
+          >
+            {successNotice}
+          </p>
+        )}
 
         <form
           className="login-form"

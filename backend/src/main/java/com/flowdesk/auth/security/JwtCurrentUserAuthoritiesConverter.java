@@ -52,6 +52,26 @@ public class JwtCurrentUserAuthoritiesConverter
             throw invalidAccount();
         }
 
+        Object versionClaim = jwt.getClaim("credential_version");
+        if (versionClaim == null) {
+            throw invalidAccount();
+        }
+
+        long tokenVersion;
+        if (versionClaim instanceof Number number) {
+            tokenVersion = number.longValue();
+        } else {
+            try {
+                tokenVersion = Long.parseLong(versionClaim.toString().trim());
+            } catch (NumberFormatException exception) {
+                throw invalidAccount();
+            }
+        }
+
+        if (tokenVersion != user.getCredentialVersion()) {
+            throw invalidAccount();
+        }
+
         Set<GrantedAuthority> authorities =
                 user.getRoles()
                         .stream()
