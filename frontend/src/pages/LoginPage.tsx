@@ -1,9 +1,10 @@
-﻿import {
+import {
   type FormEvent,
   useState,
 } from 'react'
 
 import {
+  Link,
   Navigate,
   useLocation,
   useNavigate,
@@ -97,7 +98,12 @@ export function LoginPage() {
           </label>
 
           <label>
-            Password
+            <div className="label-with-link">
+              <span>Password</span>
+              <Link to="/forgot-password" className="forgot-password-link">
+                Forgot password?
+              </Link>
+            </div>
 
             <input
               type="password"

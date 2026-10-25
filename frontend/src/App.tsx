@@ -13,9 +13,11 @@ import { ApprovalInboxPage } from './pages/ApprovalInboxPage'
 import { AuditTrailPage } from './pages/AuditTrailPage'
 import { CreateTicketPage } from './pages/CreateTicketPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyAssignedTicketsPage } from './pages/MyAssignedTicketsPage'
 import { MyTicketsPage } from './pages/MyTicketsPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { SlaDashboardPage } from './pages/SlaDashboardPage'
 import { SupportQueuePage } from './pages/SupportQueuePage'
 import { SupportTicketDetailsPage } from './pages/SupportTicketDetailsPage'
@@ -28,6 +30,16 @@ function App() {
       <Route
         path="/login"
         element={<LoginPage />}
+      />
+
+      <Route
+        path="/forgot-password"
+        element={<ForgotPasswordPage />}
+      />
+
+      <Route
+        path="/reset-password"
+        element={<ResetPasswordPage />}
       />
 
       <Route element={<ProtectedRoute />}>
