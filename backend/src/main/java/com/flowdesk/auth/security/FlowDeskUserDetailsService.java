@@ -46,7 +46,8 @@ public class FlowDeskUserDetailsService implements UserDetailsService {
                 user.getEmail(),
                 user.getPasswordHash(),
                 roles,
-                user.getStatus() == UserStatus.ACTIVE
+                user.getStatus() == UserStatus.ACTIVE,
+                user.getCredentialVersion()
         );
     }
 }

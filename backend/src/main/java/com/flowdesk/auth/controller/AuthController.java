@@ -1,6 +1,8 @@
 
 package com.flowdesk.auth.controller;
 
+import com.flowdesk.auth.dto.ChangePasswordRequest;
+import com.flowdesk.auth.dto.ChangePasswordResponse;
 import com.flowdesk.auth.dto.LoginRequest;
 import com.flowdesk.auth.dto.LoginResponse;
 import com.flowdesk.auth.dto.MeResponse;
@@ -8,11 +10,13 @@ import com.flowdesk.auth.service.AuthService;
 
 import jakarta.validation.Valid;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.server.ResponseStatusException;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -73,6 +77,23 @@ public class AuthController {
                         email,
                         roles
                 )
+        );
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<ChangePasswordResponse> changePassword(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        UUID userId;
+        try {
+            userId = UUID.fromString(jwt.getSubject());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+
+        return ResponseEntity.ok(
+                authService.changePassword(userId, request)
         );
     }
 }

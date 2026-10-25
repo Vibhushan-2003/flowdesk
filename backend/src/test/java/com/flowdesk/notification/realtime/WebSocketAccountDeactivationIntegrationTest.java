@@ -101,6 +101,7 @@ class WebSocketAccountDeactivationIntegrationTest {
                 .header("alg", "HS256")
                 .subject(principalName)
                 .claim("roles", Set.of("EMPLOYEE"))
+                .claim("credential_version", 1L)
                 .build();
 
         when(jwtDecoder.decode(tokenValue))
@@ -118,6 +119,9 @@ class WebSocketAccountDeactivationIntegrationTest {
 
         when(user.getRoles())
                 .thenReturn(Set.of(employeeRole));
+
+        when(user.getCredentialVersion())
+                .thenReturn(1L);
 
         /*
          * At first, the account is ACTIVE.

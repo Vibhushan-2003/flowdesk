@@ -49,6 +49,7 @@ public class TokenService {
                 .expiresAt(now.plus(accessTokenTtl))
                 .claim("email", user.email())
                 .claim("roles", roles)
+                .claim("credential_version", user.credentialVersion())
                 .build();
 
         JwsHeader header = JwsHeader

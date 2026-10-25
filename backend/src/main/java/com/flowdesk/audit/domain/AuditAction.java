@@ -34,5 +34,7 @@ public enum AuditAction {
 
     USER_ACTIVATED,
 
-    USER_DEACTIVATED
+    USER_DEACTIVATED,
+
+    PASSWORD_CHANGED
 }

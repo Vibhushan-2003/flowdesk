@@ -44,6 +44,9 @@ public class User {
     @Column(nullable = false, length = 20)
     private UserStatus status;
 
+    @Column(name = "credential_version", nullable = false)
+    private Long credentialVersion = 1L;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "user_roles",
@@ -76,6 +79,7 @@ public class User {
         this.firstName = firstName;
         this.lastName = lastName;
         this.status = UserStatus.ACTIVE;
+        this.credentialVersion = 1L;
     }
 
     // Controlled way to assign a role to a user
@@ -140,8 +144,19 @@ public class User {
     public Instant getCreatedAt() {
         return createdAt;
     }
-
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public long getCredentialVersion() {
+        return credentialVersion != null ? credentialVersion : 1L;
+    }
+
+    public void changePassword(String newPasswordHash) {
+        if (newPasswordHash == null || newPasswordHash.isBlank()) {
+            throw new IllegalArgumentException("Password hash must not be blank");
+        }
+        this.passwordHash = newPasswordHash;
+        this.credentialVersion = (this.credentialVersion == null ? 1L : this.credentialVersion) + 1L;
     }
 }

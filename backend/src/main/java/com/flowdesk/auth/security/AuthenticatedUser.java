@@ -16,8 +16,19 @@ public record AuthenticatedUser(
         String email,
         String passwordHash,
         Set<RoleCode> roles,
-        boolean enabled
+        boolean enabled,
+        long credentialVersion
 ) implements UserDetails {
+
+    public AuthenticatedUser(
+            UUID id,
+            String email,
+            String passwordHash,
+            Set<RoleCode> roles,
+            boolean enabled
+    ) {
+        this(id, email, passwordHash, roles, enabled, 1L);
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
