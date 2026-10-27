@@ -44,7 +44,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import com.flowdesk.auth.ratelimit.AcceptInvitationRateLimitingFilter;
 import com.flowdesk.auth.ratelimit.LoginRateLimitingFilter;
+import com.flowdesk.auth.ratelimit.OAuthRateLimitingFilter;
 import com.flowdesk.auth.ratelimit.PasswordResetRateLimitingFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -58,7 +60,9 @@ public class SecurityConfig {
             CorsConfigurationSource corsConfigurationSource,
             SecurityErrorResponseWriter securityErrorResponseWriter,
             LoginRateLimitingFilter loginRateLimitingFilter,
-            PasswordResetRateLimitingFilter passwordResetRateLimitingFilter
+            PasswordResetRateLimitingFilter passwordResetRateLimitingFilter,
+            AcceptInvitationRateLimitingFilter acceptInvitationRateLimitingFilter,
+            OAuthRateLimitingFilter oauthRateLimitingFilter
     ) throws Exception {
 
         // Day 43: Preserve the standard Bearer authentication challenge.
@@ -72,6 +76,14 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(
                         passwordResetRateLimitingFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                )
+                .addFilterBefore(
+                        acceptInvitationRateLimitingFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                )
+                .addFilterBefore(
+                        oauthRateLimitingFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
                 .cors(cors ->
@@ -118,13 +130,24 @@ public class SecurityConfig {
                         )
                         .permitAll()
 
-                        // Public password recovery
+                        // Public password recovery & invitation acceptance
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/forgot-password",
-                                "/api/auth/reset-password"
+                                "/api/auth/reset-password",
+                                "/api/auth/accept-invitation",
+                                "/api/auth/oauth2/google",
+                                "/api/auth/oauth2/google/link"
                         )
                         .permitAll()
+
+                        // Public OAuth2 configuration
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/auth/oauth2/config"
+                        )
+                        .permitAll()
+
 
                         /*
                          * WebSocket handshake is public.

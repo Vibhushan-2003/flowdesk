@@ -287,6 +287,23 @@ class PasswordResetServiceTest {
     }
 
     @Test
+    @DisplayName("Request password reset for invited user returns generic message and sends no email (prevents onboarding bypass)")
+    void requestPasswordResetInvitedUserDefendsEnumeration() {
+        User user = User.createInvitedUser("invited@flowdesk.test", "Bob", "Smith", "!INVITED!xyz");
+        ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
+        when(userRepository.findByEmailIgnoreCase("invited@flowdesk.test")).thenReturn(Optional.of(user));
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
+
+        ForgotPasswordResponse response = resetService.requestPasswordReset(
+                new ForgotPasswordRequest("invited@flowdesk.test")
+        );
+
+        assertEquals(ForgotPasswordResponse.genericSuccess().message(), response.message());
+        verify(tokenRepository, never()).save(any());
+        verify(emailSender, never()).send(any());
+    }
+
+    @Test
     @DisplayName("Reset password acquires locks in strict order (User row FIRST, token row SECOND)")
     void resetPasswordConsistentLockOrder() {
         User user = createTestUser("employee@flowdesk.test", "OldPass123!", UserStatus.ACTIVE);

@@ -1,6 +1,6 @@
 import type { Role } from './auth'
 
-export type UserStatus = 'ACTIVE' | 'INACTIVE'
+export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'INVITED'
 
 export interface AdminUserResponse {
   id: string
@@ -18,6 +18,17 @@ export interface AdminCreateUserRequest {
   firstName: string
   lastName: string
   roles: Role[]
+}
+
+export interface CreateUserInvitationRequest {
+  email: string
+  firstName: string
+  lastName: string
+  roles: Role[]
+}
+
+export interface ResendInvitationResponse {
+  message: string
 }
 
 export interface UpdateUserRolesRequest {

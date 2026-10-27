@@ -1,6 +1,8 @@
 
 package com.flowdesk.common.exception;
 
+import com.flowdesk.auth.dto.OAuthLinkingRequiredResponse;
+import com.flowdesk.auth.exception.OAuthLinkingRequiredException;
 import com.flowdesk.common.logging.RequestTracingFilter;
 import com.flowdesk.user.exception.DuplicateEmailException;
 
@@ -72,6 +74,26 @@ public class GlobalExceptionHandler {
                 request,
                 Map.of()
         );
+    }
+
+    @ExceptionHandler(OAuthLinkingRequiredException.class)
+    public ResponseEntity<OAuthLinkingRequiredResponse> handleOAuthLinkingRequired(
+            OAuthLinkingRequiredException exception,
+            HttpServletRequest request
+    ) {
+        OAuthLinkingRequiredResponse response = new OAuthLinkingRequiredResponse(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                "Conflict",
+                exception.getMessage(),
+                request.getRequestURI(),
+                exception.getLinkToken(),
+                exception.getEmail(),
+                exception.getProvider(),
+                Map.of("linkToken", exception.getLinkToken()),
+                currentRequestId()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
     @ExceptionHandler({

@@ -82,6 +82,35 @@ public class User {
         this.credentialVersion = 1L;
     }
 
+    // Controlled factory method to construct an INVITED user
+    public static User createInvitedUser(
+            String email,
+            String firstName,
+            String lastName,
+            String unusablePasswordHash
+    ) {
+        User user = new User();
+        user.email = email;
+        user.passwordHash = unusablePasswordHash;
+        user.firstName = firstName;
+        user.lastName = lastName;
+        user.status = UserStatus.INVITED;
+        user.credentialVersion = 1L;
+        return user;
+    }
+
+    public void acceptInvitation(String newPasswordHash) {
+        if (this.status != UserStatus.INVITED) {
+            throw new IllegalStateException("Only invited users can accept an invitation");
+        }
+        if (newPasswordHash == null || newPasswordHash.isBlank()) {
+            throw new IllegalArgumentException("Password hash must not be blank");
+        }
+        this.passwordHash = newPasswordHash;
+        this.status = UserStatus.ACTIVE;
+        this.credentialVersion = (this.credentialVersion == null ? 1L : this.credentialVersion) + 1L;
+    }
+
     // Controlled way to assign a role to a user
     public void assignRole(Role role) {
         if (role == null) {

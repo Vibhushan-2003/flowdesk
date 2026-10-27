@@ -49,3 +49,46 @@ export interface ResetPasswordRequest {
 export interface ResetPasswordResponse {
   message: string
 }
+
+export interface AcceptInvitationRequest {
+  token: string
+  newPassword: string
+  confirmPassword: string
+}
+
+export interface AcceptInvitationResponse {
+  message: string
+}
+
+export interface GoogleOAuthConfigResponse {
+  enabled: boolean
+  clientId: string
+  redirectUri: string
+  authUri: string
+}
+
+export interface GoogleAuthRequest {
+  code?: string
+  idToken?: string
+  state?: string
+  codeVerifier?: string
+  invitationToken?: string
+  linkToken?: string
+  flowDeskPassword?: string
+}
+
+export interface GoogleLinkAccountRequest {
+  linkToken: string
+  flowDeskPassword: string
+}
+
+export interface OAuthLinkingRequiredResponse {
+  status: 409
+  error: string
+  message: string
+  path: string
+  linkToken: string
+  email: string
+  provider: string
+  requestId?: string
+}

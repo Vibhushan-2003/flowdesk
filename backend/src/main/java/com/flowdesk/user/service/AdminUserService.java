@@ -269,6 +269,13 @@ public class AdminUserService {
         UserStatus currentStatus = targetUser.getStatus();
         UserStatus newStatus = request.status();
 
+        if (currentStatus == UserStatus.INVITED || newStatus == UserStatus.INVITED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Cannot manually change status of an invited user or transition user to invited"
+            );
+        }
+
         if (currentStatus == newStatus) {
             return toResponse(targetUser);
         }

@@ -2,6 +2,8 @@ import { API_BASE_URL } from './config'
 import type {
   AdminCreateUserRequest,
   AdminUserResponse,
+  CreateUserInvitationRequest,
+  ResendInvitationResponse,
   UpdateUserRolesRequest,
   UpdateUserStatusRequest,
   UserDirectoryFilter,
@@ -140,4 +142,44 @@ export async function updateUserStatus(
   }
 
   return response.json() as Promise<AdminUserResponse>
+}
+
+export async function createInvitation(
+  accessToken: string,
+  request: CreateUserInvitationRequest,
+): Promise<AdminUserResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/admin/users/invitations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const message = await extractErrorMessage(response, 'Failed to send invitation.')
+    throw new Error(message)
+  }
+
+  return response.json() as Promise<AdminUserResponse>
+}
+
+export async function resendInvitation(
+  accessToken: string,
+  userId: string,
+): Promise<ResendInvitationResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/invitations/resend`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (!response.ok) {
+    const message = await extractErrorMessage(response, 'Failed to resend invitation.')
+    throw new Error(message)
+  }
+
+  return response.json() as Promise<ResendInvitationResponse>
 }

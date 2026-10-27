@@ -388,4 +388,67 @@ class AdminUserServiceTest {
                 any()
         );
     }
+
+    @Test
+    void updateUserStatusRejectsTransitionWhenCurrentStatusIsInvited() {
+        UUID targetId = UUID.randomUUID();
+        User target = User.createInvitedUser("invited@test.com", "Invited", "User", "!INVITED!dummy");
+        ReflectionTestUtils.setField(target, "id", targetId);
+        target.assignRole(employeeRole);
+
+        when(userRepository.findWithRolesById(targetId)).thenReturn(Optional.of(target));
+        when(userRepository.findWithRolesById(actorAdminId)).thenReturn(Optional.of(actorAdmin));
+
+        UpdateUserStatusRequest request = new UpdateUserStatusRequest(UserStatus.ACTIVE);
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> adminUserService.updateUserStatus(targetId, request, actorAdminId)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("invited"));
+        verify(userRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateUserStatusRejectsTransitionWhenTargetStatusIsInvited() {
+        UUID targetId = UUID.randomUUID();
+        User target = new User("active@test.com", "h", "A", "U");
+        ReflectionTestUtils.setField(target, "id", targetId);
+        target.assignRole(employeeRole);
+
+        when(userRepository.findWithRolesById(targetId)).thenReturn(Optional.of(target));
+        when(userRepository.findWithRolesById(actorAdminId)).thenReturn(Optional.of(actorAdmin));
+
+        UpdateUserStatusRequest request = new UpdateUserStatusRequest(UserStatus.INVITED);
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> adminUserService.updateUserStatus(targetId, request, actorAdminId)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("invited"));
+        verify(userRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateUserStatusRejectsNoOpUpdateWhenBothCurrentAndTargetAreInvited() {
+        UUID targetId = UUID.randomUUID();
+        User target = User.createInvitedUser("invited@test.com", "Invited", "User", "!INVITED!dummy");
+        ReflectionTestUtils.setField(target, "id", targetId);
+        target.assignRole(employeeRole);
+
+        when(userRepository.findWithRolesById(targetId)).thenReturn(Optional.of(target));
+        when(userRepository.findWithRolesById(actorAdminId)).thenReturn(Optional.of(actorAdmin));
+
+        UpdateUserStatusRequest request = new UpdateUserStatusRequest(UserStatus.INVITED);
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> adminUserService.updateUserStatus(targetId, request, actorAdminId)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("invited"));
+        verify(userRepository, never()).saveAndFlush(any());
+    }
 }

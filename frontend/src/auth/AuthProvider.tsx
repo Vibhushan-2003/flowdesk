@@ -158,6 +158,28 @@ export function AuthProvider({
     )
   }
 
+  async function setSessionToken(
+    token: string,
+  ): Promise<void> {
+    const currentUser =
+      await getCurrentUser(
+        token,
+      )
+
+    sessionStorage.setItem(
+      ACCESS_TOKEN_STORAGE_KEY,
+      token,
+    )
+
+    setAccessToken(
+      token,
+    )
+
+    setUser(
+      currentUser,
+    )
+  }
+
   function signOut(): void {
     sessionStorage.removeItem(
       ACCESS_TOKEN_STORAGE_KEY,
@@ -186,6 +208,7 @@ export function AuthProvider({
           user !== null,
         isAuthLoading,
         signIn,
+        setSessionToken,
         signOut,
       }}
     >

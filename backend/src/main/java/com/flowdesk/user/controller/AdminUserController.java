@@ -7,7 +7,10 @@ import com.flowdesk.user.dto.AdminCreateUserRequest;
 import com.flowdesk.user.dto.UpdateUserRolesRequest;
 import com.flowdesk.user.dto.UpdateUserStatusRequest;
 import com.flowdesk.user.dto.UserResponse;
+import com.flowdesk.user.dto.CreateUserInvitationRequest;
+import com.flowdesk.user.dto.ResendInvitationResponse;
 import com.flowdesk.user.service.AdminUserService;
+import com.flowdesk.user.service.UserInvitationService;
 
 import jakarta.validation.Valid;
 
@@ -32,9 +35,14 @@ import java.util.UUID;
 public class AdminUserController {
 
     private final AdminUserService adminUserService;
+    private final UserInvitationService userInvitationService;
 
-    public AdminUserController(AdminUserService adminUserService) {
+    public AdminUserController(
+            AdminUserService adminUserService,
+            UserInvitationService userInvitationService
+    ) {
         this.adminUserService = adminUserService;
+        this.userInvitationService = userInvitationService;
     }
 
     @GetMapping
@@ -106,6 +114,30 @@ public class AdminUserController {
                 request,
                 actorUserId
         );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/invitations")
+    public ResponseEntity<UserResponse> createInvitation(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateUserInvitationRequest request
+    ) {
+        UUID actorUserId = UUID.fromString(jwt.getSubject());
+        UserResponse response = userInvitationService.createInvitation(request, actorUserId);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
+    }
+
+    @PostMapping("/{userId}/invitations/resend")
+    public ResponseEntity<ResendInvitationResponse> resendInvitation(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID userId
+    ) {
+        UUID actorUserId = UUID.fromString(jwt.getSubject());
+        ResendInvitationResponse response = userInvitationService.resendInvitation(userId, actorUserId);
 
         return ResponseEntity.ok(response);
     }

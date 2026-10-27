@@ -17,6 +17,8 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyAssignedTicketsPage } from './pages/MyAssignedTicketsPage'
 import { MyTicketsPage } from './pages/MyTicketsPage'
+import { AcceptInvitationPage } from './pages/AcceptInvitationPage'
+import { GoogleCallbackPage } from './pages/GoogleCallbackPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { SlaDashboardPage } from './pages/SlaDashboardPage'
 import { SupportQueuePage } from './pages/SupportQueuePage'
@@ -33,6 +35,11 @@ function App() {
       />
 
       <Route
+        path="/auth/google/callback"
+        element={<GoogleCallbackPage />}
+      />
+
+      <Route
         path="/forgot-password"
         element={<ForgotPasswordPage />}
       />
@@ -40,6 +47,11 @@ function App() {
       <Route
         path="/reset-password"
         element={<ResetPasswordPage />}
+      />
+
+      <Route
+        path="/accept-invitation"
+        element={<AcceptInvitationPage />}
       />
 
       <Route element={<ProtectedRoute />}>

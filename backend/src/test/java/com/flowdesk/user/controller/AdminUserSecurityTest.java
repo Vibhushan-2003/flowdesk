@@ -41,6 +41,9 @@ class AdminUserSecurityTest {
     @MockitoBean
     private AdminUserService adminUserService;
 
+    @MockitoBean
+    private com.flowdesk.user.service.UserInvitationService userInvitationService;
+
     private static final UUID TARGET_USER_ID = UUID.randomUUID();
     private static final UUID ACTOR_ADMIN_ID = UUID.randomUUID();
 
@@ -190,6 +193,90 @@ class AdminUserSecurityTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(UPDATE_STATUS_BODY))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void unauthenticatedUserCannotAccessInvitationEndpoints() throws Exception {
+        String body = """
+                {
+                  "email": "invitee@flowdesk.test",
+                  "firstName": "Invitee",
+                  "lastName": "User",
+                  "roles": ["EMPLOYEE"]
+                }
+                """;
+
+        mockMvc.perform(post("/api/admin/users/invitations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/admin/users/" + TARGET_USER_ID + "/invitations/resend"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(userInvitationService);
+    }
+
+    @Test
+    void nonAdminUserCannotAccessInvitationEndpoints() throws Exception {
+        String body = """
+                {
+                  "email": "invitee@flowdesk.test",
+                  "firstName": "Invitee",
+                  "lastName": "User",
+                  "roles": ["EMPLOYEE"]
+                }
+                """;
+
+        mockMvc.perform(post("/api/admin/users/invitations")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/admin/users/" + TARGET_USER_ID + "/invitations/resend")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(userInvitationService);
+    }
+
+    @Test
+    void adminCanAccessInvitationEndpoints() throws Exception {
+        String body = """
+                {
+                  "email": "invitee@flowdesk.test",
+                  "firstName": "Invitee",
+                  "lastName": "User",
+                  "roles": ["EMPLOYEE"]
+                }
+                """;
+
+        when(userInvitationService.createInvitation(any(), any()))
+                .thenReturn(new UserResponse(
+                        UUID.randomUUID(),
+                        "invitee@flowdesk.test",
+                        "Invitee",
+                        "User",
+                        UserStatus.INVITED,
+                        Set.of(RoleCode.EMPLOYEE),
+                        Instant.now()
+                ));
+
+        when(userInvitationService.resendInvitation(any(), any()))
+                .thenReturn(new com.flowdesk.user.dto.ResendInvitationResponse("Invitation resent successfully"));
+
+        mockMvc.perform(post("/api/admin/users/invitations")
+                        .with(jwt().jwt(builder -> builder.subject(ACTOR_ADMIN_ID.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/admin/users/" + TARGET_USER_ID + "/invitations/resend")
+                        .with(jwt().jwt(builder -> builder.subject(ACTOR_ADMIN_ID.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk());
     }
 }
