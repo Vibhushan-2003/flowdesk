@@ -6,8 +6,10 @@ import {
 import { useNavigate } from 'react-router-dom'
 
 import {
+  createInvitation,
   createUser,
   getUsers,
+  resendInvitation,
   updateUserRoles,
   updateUserStatus,
 } from '../api/userManagement'
@@ -65,6 +67,18 @@ export function UserManagementPage() {
   )
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+
+  // Invite User Modal state
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteFirstName, setInviteFirstName] = useState('')
+  const [inviteLastName, setInviteLastName] = useState('')
+  const [inviteRoles, setInviteRoles] = useState<Set<Role>>(
+    () => new Set<Role>(['EMPLOYEE']),
+  )
+  const [isInviting, setIsInviting] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [isResendingId, setIsResendingId] = useState<string | null>(null)
 
   // Edit Roles Modal state
   const [roleModalUser, setRoleModalUser] = useState<AdminUserResponse | null>(null)
@@ -216,6 +230,99 @@ export function UserManagementPage() {
     }
   }
 
+  // Invite User Handlers
+  function openInviteModal() {
+    setInviteEmail('')
+    setInviteFirstName('')
+    setInviteLastName('')
+    setInviteRoles(new Set<Role>(['EMPLOYEE']))
+    setInviteError(null)
+    setIsInviteModalOpen(true)
+  }
+
+  function closeInviteModal() {
+    setIsInviteModalOpen(false)
+    setInviteError(null)
+  }
+
+  function toggleInviteRole(role: Role) {
+    setInviteRoles((prev) => {
+      const next = new Set(prev)
+      if (next.has(role)) {
+        if (next.size > 1) {
+          next.delete(role)
+        }
+      } else {
+        next.add(role)
+      }
+      return next
+    })
+  }
+
+  async function handleInviteUserSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!accessToken) return
+
+    const trimmedEmail = inviteEmail.trim()
+    const trimmedFirstName = inviteFirstName.trim()
+    const trimmedLastName = inviteLastName.trim()
+
+    if (!trimmedEmail || !trimmedFirstName || !trimmedLastName) {
+      setInviteError('Email, first name, and last name are required.')
+      return
+    }
+
+    if (inviteRoles.size === 0) {
+      setInviteError('At least one role must be assigned.')
+      return
+    }
+
+    setIsInviting(true)
+    setInviteError(null)
+
+    try {
+      await createInvitation(accessToken, {
+        email: trimmedEmail,
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
+        roles: Array.from(inviteRoles),
+      })
+
+      setIsInviteModalOpen(false)
+      setSuccessMessage(`Invitation created for "${trimmedEmail}". Activation email dispatched.`)
+      setRefreshTrigger((prev) => prev + 1)
+    } catch (caughtError) {
+      setInviteError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Failed to send invitation.',
+      )
+    } finally {
+      setIsInviting(false)
+    }
+  }
+
+  async function handleResendInvitation(targetUser: AdminUserResponse) {
+    if (!accessToken) return
+
+    setIsResendingId(targetUser.id)
+    setError(null)
+
+    try {
+      await resendInvitation(accessToken, targetUser.id)
+      setSuccessMessage(`Invitation re-issued for "${targetUser.email}". Activation email dispatched.`)
+      setRefreshTrigger((prev) => prev + 1)
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Failed to resend invitation.',
+      )
+    } finally {
+      setIsResendingId(null)
+    }
+  }
+
   // Edit Roles Handlers
   function openRoleModal(targetUser: AdminUserResponse) {
     setRoleModalUser(targetUser)
@@ -348,6 +455,15 @@ export function UserManagementPage() {
 
           <button
             type="button"
+            className="primary-button"
+            style={{ background: '#059669', borderColor: '#059669' }}
+            onClick={openInviteModal}
+          >
+            + Invite user
+          </button>
+
+          <button
+            type="button"
             className="dashboard-secondary-button"
             onClick={() => navigate('/dashboard')}
           >
@@ -439,6 +555,7 @@ export function UserManagementPage() {
             <option value="">All statuses</option>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
+            <option value="INVITED">Invited</option>
           </select>
         </label>
 
@@ -565,11 +682,23 @@ export function UserManagementPage() {
                             fontSize: '0.75rem',
                             fontWeight: 600,
                             background:
-                              item.status === 'ACTIVE' ? '#ecfdf5' : '#f3f4f6',
+                              item.status === 'ACTIVE'
+                                ? '#ecfdf5'
+                                : item.status === 'INVITED'
+                                  ? '#fef9c3'
+                                  : '#f3f4f6',
                             color:
-                              item.status === 'ACTIVE' ? '#047857' : '#6b7280',
+                              item.status === 'ACTIVE'
+                                ? '#047857'
+                                : item.status === 'INVITED'
+                                  ? '#854d0e'
+                                  : '#6b7280',
                             border: `1px solid ${
-                              item.status === 'ACTIVE' ? '#a7f3d0' : '#e5e7eb'
+                              item.status === 'ACTIVE'
+                                ? '#a7f3d0'
+                                : item.status === 'INVITED'
+                                  ? '#fde047'
+                                  : '#e5e7eb'
                             }`,
                           }}
                         >
@@ -613,7 +742,7 @@ export function UserManagementPage() {
                       </td>
 
                       <td style={{ padding: '14px', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div className="user-table-actions">
                           <button
                             type="button"
                             className="secondary-button"
@@ -627,38 +756,54 @@ export function UserManagementPage() {
                             Edit roles
                           </button>
 
-                          <button
-                            type="button"
-                            className={
-                              item.status === 'ACTIVE'
-                                ? 'secondary-button'
-                                : 'primary-button'
-                            }
-                            disabled={isSelf}
-                            title={
-                              isSelf
-                                ? 'Administrators cannot deactivate their own account'
-                                : item.status === 'ACTIVE'
-                                  ? 'Deactivate account'
-                                  : 'Activate account'
-                            }
-                            style={{
-                              padding: '6px 12px',
-                              fontSize: '0.8rem',
-                              height: 'auto',
-                              color:
-                                item.status === 'ACTIVE' && !isSelf
-                                  ? '#b91c1c'
-                                  : undefined,
-                              borderColor:
-                                item.status === 'ACTIVE' && !isSelf
-                                  ? '#fca5a5'
-                                  : undefined,
-                            }}
-                            onClick={() => openStatusModal(item)}
-                          >
-                            {item.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                          </button>
+                          {item.status === 'INVITED' ? (
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '0.8rem',
+                                height: 'auto',
+                              }}
+                              disabled={isResendingId === item.id}
+                              onClick={() => handleResendInvitation(item)}
+                            >
+                              {isResendingId === item.id ? 'Resending...' : 'Resend invitation'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className={
+                                item.status === 'ACTIVE'
+                                  ? 'secondary-button'
+                                  : 'primary-button'
+                              }
+                              disabled={isSelf}
+                              title={
+                                isSelf
+                                  ? 'Administrators cannot deactivate their own account'
+                                  : item.status === 'ACTIVE'
+                                    ? 'Deactivate account'
+                                    : 'Activate account'
+                              }
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '0.8rem',
+                                height: 'auto',
+                                color:
+                                  item.status === 'ACTIVE' && !isSelf
+                                    ? '#b91c1c'
+                                    : undefined,
+                                borderColor:
+                                  item.status === 'ACTIVE' && !isSelf
+                                    ? '#fca5a5'
+                                    : undefined,
+                              }}
+                              onClick={() => openStatusModal(item)}
+                            >
+                              {item.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -843,6 +988,173 @@ export function UserManagementPage() {
                   disabled={isCreating}
                 >
                   {isCreating ? 'Creating...' : 'Create user'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invite User Modal */}
+      {isInviteModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="invite-user-modal-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              maxWidth: '520px',
+              width: '100%',
+              padding: '28px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            <h2 id="invite-user-modal-title" style={{ marginTop: 0, marginBottom: '8px' }}>
+              Invite user
+            </h2>
+            <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '20px' }}>
+              Send a secure onboarding invitation email. The user will activate their account and choose their own password.
+            </p>
+
+            {inviteError && (
+              <p
+                className="notification-error"
+                style={{ marginBottom: '16px', padding: '10px' }}
+              >
+                {inviteError}
+              </p>
+            )}
+
+            <form onSubmit={handleInviteUserSubmit}>
+              <div style={{ marginBottom: '16px' }}>
+                <label
+                  htmlFor="invite-email"
+                  style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}
+                >
+                  Email address *
+                </label>
+                <input
+                  id="invite-email"
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  required
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <label
+                    htmlFor="invite-first-name"
+                    style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}
+                  >
+                    First name *
+                  </label>
+                  <input
+                    id="invite-first-name"
+                    type="text"
+                    value={inviteFirstName}
+                    onChange={(e) => setInviteFirstName(e.target.value)}
+                    placeholder="Jane"
+                    required
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="invite-last-name"
+                    style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}
+                  >
+                    Last name *
+                  </label>
+                  <input
+                    id="invite-last-name"
+                    type="text"
+                    value={inviteLastName}
+                    onChange={(e) => setInviteLastName(e.target.value)}
+                    placeholder="Doe"
+                    required
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '22px' }}>
+                <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px' }}>
+                  Assign roles *
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {ALL_ROLES.map((role) => (
+                    <label
+                      key={role}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        padding: '6px 8px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        background: inviteRoles.has(role) ? '#ecfdf5' : '#ffffff',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={inviteRoles.has(role)}
+                        onChange={() => toggleInviteRole(role)}
+                      />
+                      <span>{ROLE_LABELS[role]}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '6px',
+                  padding: '12px',
+                  marginBottom: '20px',
+                  fontSize: '0.82rem',
+                  color: '#166534',
+                }}
+              >
+                An invitation link valid for 48 hours will be emailed to the user. No password is set at this stage.
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={isInviting}
+                  onClick={closeInviteModal}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="primary-button"
+                  style={{ background: '#059669', borderColor: '#059669' }}
+                  disabled={isInviting}
+                >
+                  {isInviting ? 'Sending invitation...' : 'Send invitation'}
                 </button>
               </div>
             </form>

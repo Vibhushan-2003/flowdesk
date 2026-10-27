@@ -45,6 +45,9 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'AI_REPLY_DRAFT_GENERATED',
   'AI_RESOLUTION_SUMMARY_DRAFT_GENERATED',
   'AI_SUPPORT_COPILOT_USED',
+  'USER_INVITED',
+  'USER_INVITATION_RESENT',
+  'USER_INVITATION_ACCEPTED',
 ]
 
 export function AuditTrailPage() {
@@ -803,6 +806,13 @@ function getActionLabel(action: AuditAction): string {
       return 'AI resolution summary generated'
     case 'AI_SUPPORT_COPILOT_USED':
       return 'AI support copilot used'
+
+    case 'USER_INVITED':
+      return 'User invited'
+    case 'USER_INVITATION_RESENT':
+      return 'User invitation resent'
+    case 'USER_INVITATION_ACCEPTED':
+      return 'User invitation accepted'
 
     default:
       return formatLabel(action)

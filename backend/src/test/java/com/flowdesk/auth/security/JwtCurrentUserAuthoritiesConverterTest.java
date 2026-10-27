@@ -173,6 +173,24 @@ class JwtCurrentUserAuthoritiesConverterTest {
         assertTrue(authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_EMPLOYEE")));
     }
 
+    @Test
+    void invitedUserMustNotBeAuthorized() {
+        UUID userId = UUID.randomUUID();
+        User user = mock(User.class);
+
+        when(user.getStatus()).thenReturn(UserStatus.INVITED);
+        when(repository.findWithRolesById(userId)).thenReturn(Optional.of(user));
+
+        Jwt testJwt = jwt(userId, "EMPLOYEE", 1L);
+
+        OAuth2AuthenticationException ex = assertThrows(
+                OAuth2AuthenticationException.class,
+                () -> converter.convert(testJwt)
+        );
+        assertEquals("invalid_token", ex.getError().getErrorCode());
+        assertEquals("Account is unavailable", ex.getError().getDescription());
+    }
+
     private Jwt jwt(UUID userId, String role) {
         return jwt(userId, role, 1L);
     }

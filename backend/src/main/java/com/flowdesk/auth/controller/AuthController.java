@@ -1,6 +1,8 @@
 
 package com.flowdesk.auth.controller;
 
+import com.flowdesk.auth.dto.AcceptInvitationRequest;
+import com.flowdesk.auth.dto.AcceptInvitationResponse;
 import com.flowdesk.auth.dto.ChangePasswordRequest;
 import com.flowdesk.auth.dto.ChangePasswordResponse;
 import com.flowdesk.auth.dto.ForgotPasswordRequest;
@@ -10,8 +12,12 @@ import com.flowdesk.auth.dto.LoginResponse;
 import com.flowdesk.auth.dto.MeResponse;
 import com.flowdesk.auth.dto.ResetPasswordRequest;
 import com.flowdesk.auth.dto.ResetPasswordResponse;
+import com.flowdesk.auth.dto.GoogleAuthRequest;
+import com.flowdesk.auth.dto.GoogleOAuthConfigResponse;
 import com.flowdesk.auth.service.AuthService;
+import com.flowdesk.auth.service.GoogleAuthService;
 import com.flowdesk.auth.service.PasswordResetService;
+import com.flowdesk.user.service.UserInvitationService;
 
 import jakarta.validation.Valid;
 
@@ -38,13 +44,19 @@ public class AuthController {
 
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
+    private final UserInvitationService userInvitationService;
+    private final GoogleAuthService googleAuthService;
 
     public AuthController(
             AuthService authService,
-            PasswordResetService passwordResetService
+            PasswordResetService passwordResetService,
+            UserInvitationService userInvitationService,
+            GoogleAuthService googleAuthService
     ) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
+        this.userInvitationService = userInvitationService;
+        this.googleAuthService = googleAuthService;
     }
 
     @PostMapping("/login")
@@ -53,6 +65,31 @@ public class AuthController {
     ) {
         return ResponseEntity.ok(
                 authService.login(request)
+        );
+    }
+
+    @GetMapping("/oauth2/config")
+    public ResponseEntity<GoogleOAuthConfigResponse> getOAuthConfig() {
+        return ResponseEntity.ok(
+                googleAuthService.getOAuthConfig()
+        );
+    }
+
+    @PostMapping("/oauth2/google")
+    public ResponseEntity<LoginResponse> googleLogin(
+            @RequestBody GoogleAuthRequest request
+    ) {
+        return ResponseEntity.ok(
+                googleAuthService.authenticate(request)
+        );
+    }
+
+    @PostMapping("/oauth2/google/link")
+    public ResponseEntity<LoginResponse> completeGoogleLink(
+            @Valid @RequestBody com.flowdesk.auth.dto.GoogleLinkAccountRequest request
+    ) {
+        return ResponseEntity.ok(
+                googleAuthService.completeLinking(request.linkToken(), request.flowDeskPassword())
         );
     }
 
@@ -73,6 +110,16 @@ public class AuthController {
                 passwordResetService.resetPassword(request)
         );
     }
+
+    @PostMapping("/accept-invitation")
+    public ResponseEntity<AcceptInvitationResponse> acceptInvitation(
+            @Valid @RequestBody AcceptInvitationRequest request
+    ) {
+        return ResponseEntity.ok(
+                userInvitationService.acceptInvitation(request)
+        );
+    }
+
 
     @GetMapping("/me")
     public ResponseEntity<MeResponse> me(

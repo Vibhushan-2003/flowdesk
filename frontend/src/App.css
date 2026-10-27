@@ -186,6 +186,66 @@
 }
 
 /* =========================
+   Google OAuth & Auth Elements
+   ========================= */
+
+.google-button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.75rem !important;
+  width: 100% !important;
+  padding: 0.75rem 1rem !important;
+  background: #ffffff !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  font-size: 0.95rem !important;
+  cursor: pointer !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.google-button:hover:not(:disabled) {
+  background: #f9fafb !important;
+  border-color: #9ca3af !important;
+}
+
+.google-button:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
+.google-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  margin: 1.25rem 0;
+  color: #9ca3af;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.auth-divider span {
+  padding: 0 0.75rem;
+}
+
+/* =========================
    Dashboard
    ========================= */
 
@@ -200,7 +260,23 @@
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 2rem;
+  flex-wrap: wrap;
 }
+
+.dashboard-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.user-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
 
 .user-card {
   margin-top: 2rem;

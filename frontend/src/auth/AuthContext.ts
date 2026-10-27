@@ -13,6 +13,7 @@ export interface AuthContextValue {
     email: string,
     password: string,
   ) => Promise<void>
+  setSessionToken: (accessToken: string) => Promise<void>
   signOut: () => void
 }
 

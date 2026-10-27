@@ -130,4 +130,76 @@ public class RateLimiterConfig {
         registration.setEnabled(false);
         return registration;
     }
+
+    @Bean
+    public SlidingWindowRateLimiter acceptInvitationIpLimiter(
+            InvitationRateLimiterProperties properties,
+            Clock rateLimiterClock
+    ) {
+        return new SlidingWindowRateLimiter(
+                properties.getAcceptIpMaxAttempts(),
+                properties.getAcceptIpWindowSeconds(),
+                properties.getMaxTrackedKeys(),
+                rateLimiterClock,
+                new Object()
+        );
+    }
+
+    @Bean
+    public AcceptInvitationRateLimitingFilter acceptInvitationRateLimitingFilter(
+            InvitationRateLimiterProperties properties,
+            SecurityErrorResponseWriter securityErrorResponseWriter,
+            SlidingWindowRateLimiter acceptInvitationIpLimiter
+    ) {
+        return new AcceptInvitationRateLimitingFilter(
+                properties,
+                securityErrorResponseWriter,
+                acceptInvitationIpLimiter
+        );
+    }
+
+    @Bean
+    public FilterRegistrationBean<AcceptInvitationRateLimitingFilter> acceptInvitationRateLimitingFilterRegistration(
+            AcceptInvitationRateLimitingFilter filter
+    ) {
+        FilterRegistrationBean<AcceptInvitationRateLimitingFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public SlidingWindowRateLimiter oauthIpLimiter(
+            OAuthRateLimiterProperties properties,
+            Clock rateLimiterClock
+    ) {
+        return new SlidingWindowRateLimiter(
+                properties.getIpMaxAttempts(),
+                properties.getIpWindowSeconds(),
+                properties.getMaxTrackedKeys(),
+                rateLimiterClock,
+                new Object()
+        );
+    }
+
+    @Bean
+    public OAuthRateLimitingFilter oauthRateLimitingFilter(
+            OAuthRateLimiterProperties properties,
+            SecurityErrorResponseWriter securityErrorResponseWriter,
+            SlidingWindowRateLimiter oauthIpLimiter
+    ) {
+        return new OAuthRateLimitingFilter(
+                properties,
+                securityErrorResponseWriter,
+                oauthIpLimiter
+        );
+    }
+
+    @Bean
+    public FilterRegistrationBean<OAuthRateLimitingFilter> oauthRateLimitingFilterRegistration(
+            OAuthRateLimitingFilter filter
+    ) {
+        FilterRegistrationBean<OAuthRateLimitingFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
 }
