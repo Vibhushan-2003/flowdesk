@@ -147,11 +147,23 @@ public class TicketCommentService {
                     String ticketNumber
             ) {
 
+        String normalizedTicketNumber =
+                normalizeTicketNumber(ticketNumber);
+
         TicketAssignment assignment =
-                findActiveSupportAssignment(
-                        supportEngineerId,
-                        ticketNumber
-                );
+                ticketAssignmentRepository
+                        .findAuthorizedSupportAssignments(
+                                normalizedTicketNumber,
+                                supportEngineerId
+                        )
+                        .stream()
+                        .findFirst()
+                        .orElseThrow(
+                                () -> new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Ticket not found"
+                                )
+                        );
 
         return getComments(
                 assignment.getTicket()

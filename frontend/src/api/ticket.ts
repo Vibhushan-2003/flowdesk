@@ -403,6 +403,57 @@ export async function getMyAssignedTickets(
   >
 }
 
+export async function getSupportTicketHistory(
+  accessToken: string,
+  page = 0,
+  size = 10,
+  filters: TicketListFilters = {},
+): Promise<PageResponse<SupportTicketSummary>> {
+  const query = buildTicketListQuery(
+    page,
+    size,
+    filters,
+  )
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/support/tickets/history?${query}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  )
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        'Your session is no longer valid',
+      )
+    }
+
+    if (response.status === 403) {
+      throw new Error(
+        'You do not have permission to access support tickets',
+      )
+    }
+
+    if (response.status === 400) {
+      throw new Error(
+        'Invalid ticket filters or pagination request',
+      )
+    }
+
+    throw new Error(
+      'Unable to load your ticket history. Please try again.',
+    )
+  }
+
+  return response.json() as Promise<
+    PageResponse<SupportTicketSummary>
+  >
+}
+
 export async function getSupportTicket(
   accessToken: string,
   ticketNumber: string,

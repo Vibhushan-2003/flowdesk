@@ -16,6 +16,7 @@ import org.springframework.data.jpa.repository.Query;
 
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -114,6 +115,94 @@ public interface TicketAssignmentRepository
                     """
     )
     Page<TicketAssignment> searchMyActiveAssignments(
+            @Param("supportEngineerId") UUID supportEngineerId,
+            @Param("searchPattern") String searchPattern,
+            @Param("status") TicketStatus status,
+            @Param("priority") TicketPriority priority,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT assignment
+            FROM TicketAssignment assignment
+            WHERE assignment.ticket.ticketNumber = :ticketNumber
+              AND assignment.assignedToUser.id = :supportEngineerId
+              AND (
+                  assignment.releasedAt IS NULL
+                  OR (
+                      assignment.ticket.status IN (
+                          com.flowdesk.ticket.domain.TicketStatus.RESOLVED,
+                          com.flowdesk.ticket.domain.TicketStatus.CLOSED
+                      )
+                      AND assignment.ticket.resolvedAt IS NOT NULL
+                      AND assignment.assignedAt <= assignment.ticket.resolvedAt
+                      AND (assignment.releasedAt >= assignment.ticket.resolvedAt OR assignment.releasedAt IS NULL)
+                  )
+              )
+            ORDER BY assignment.assignedAt DESC
+            """)
+    List<TicketAssignment> findAuthorizedSupportAssignments(
+            @Param("ticketNumber") String ticketNumber,
+            @Param("supportEngineerId") UUID supportEngineerId
+    );
+
+    @Query(
+            value = """
+                    SELECT assignment
+                    FROM TicketAssignment assignment
+                    WHERE assignment.assignedToUser.id = :supportEngineerId
+                      AND assignment.ticket.status IN (
+                          com.flowdesk.ticket.domain.TicketStatus.RESOLVED,
+                          com.flowdesk.ticket.domain.TicketStatus.CLOSED
+                      )
+                      AND assignment.ticket.resolvedAt IS NOT NULL
+                      AND assignment.assignedAt <= assignment.ticket.resolvedAt
+                      AND (assignment.releasedAt >= assignment.ticket.resolvedAt OR assignment.releasedAt IS NULL)
+                      AND (
+                          :searchPattern IS NULL
+                          OR LOWER(assignment.ticket.ticketNumber)
+                              LIKE :searchPattern ESCAPE '!'
+                          OR LOWER(assignment.ticket.title)
+                              LIKE :searchPattern ESCAPE '!'
+                      )
+                      AND (
+                          :status IS NULL
+                          OR assignment.ticket.status = :status
+                      )
+                      AND (
+                          :priority IS NULL
+                          OR assignment.ticket.priority = :priority
+                      )
+                    """,
+            countQuery = """
+                    SELECT COUNT(assignment)
+                    FROM TicketAssignment assignment
+                    WHERE assignment.assignedToUser.id = :supportEngineerId
+                      AND assignment.ticket.status IN (
+                          com.flowdesk.ticket.domain.TicketStatus.RESOLVED,
+                          com.flowdesk.ticket.domain.TicketStatus.CLOSED
+                      )
+                      AND assignment.ticket.resolvedAt IS NOT NULL
+                      AND assignment.assignedAt <= assignment.ticket.resolvedAt
+                      AND (assignment.releasedAt >= assignment.ticket.resolvedAt OR assignment.releasedAt IS NULL)
+                      AND (
+                          :searchPattern IS NULL
+                          OR LOWER(assignment.ticket.ticketNumber)
+                              LIKE :searchPattern ESCAPE '!'
+                          OR LOWER(assignment.ticket.title)
+                              LIKE :searchPattern ESCAPE '!'
+                      )
+                      AND (
+                          :status IS NULL
+                          OR assignment.ticket.status = :status
+                      )
+                      AND (
+                          :priority IS NULL
+                          OR assignment.ticket.priority = :priority
+                      )
+                    """
+    )
+    Page<TicketAssignment> searchMyHistoryAssignments(
             @Param("supportEngineerId") UUID supportEngineerId,
             @Param("searchPattern") String searchPattern,
             @Param("status") TicketStatus status,

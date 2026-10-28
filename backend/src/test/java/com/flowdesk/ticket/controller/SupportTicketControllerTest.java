@@ -71,6 +71,66 @@ class SupportTicketControllerTest {
     }
 
     @Test
+    void getMyTicketHistoryDelegatesAuthenticatedUser() {
+
+        com.flowdesk.common.dto.PageResponse<com.flowdesk.ticket.dto.SupportTicketSummaryResponse> expectedPage =
+                new com.flowdesk.common.dto.PageResponse<>(
+                        java.util.List.of(),
+                        0,
+                        10,
+                        0,
+                        0,
+                        true,
+                        true
+                );
+
+        when(
+                supportTicketService.getMyTicketHistory(
+                        userId,
+                        0,
+                        10,
+                        "search",
+                        com.flowdesk.ticket.domain.TicketStatus.RESOLVED,
+                        com.flowdesk.ticket.domain.TicketPriority.HIGH,
+                        "newest"
+                )
+        ).thenReturn(expectedPage);
+
+        ResponseEntity<com.flowdesk.common.dto.PageResponse<com.flowdesk.ticket.dto.SupportTicketSummaryResponse>> response =
+                controller.getMyTicketHistory(
+                        jwt,
+                        0,
+                        10,
+                        "search",
+                        com.flowdesk.ticket.domain.TicketStatus.RESOLVED,
+                        com.flowdesk.ticket.domain.TicketPriority.HIGH,
+                        "newest"
+                );
+
+        assertEquals(
+                HttpStatus.OK,
+                response.getStatusCode()
+        );
+
+        assertSame(
+                expectedPage,
+                response.getBody()
+        );
+
+        verify(
+                supportTicketService
+        ).getMyTicketHistory(
+                userId,
+                0,
+                10,
+                "search",
+                com.flowdesk.ticket.domain.TicketStatus.RESOLVED,
+                com.flowdesk.ticket.domain.TicketPriority.HIGH,
+                "newest"
+        );
+    }
+
+    @Test
     void resolveTicketDelegatesAuthenticatedUserTicketAndRequest() {
 
         ResolveTicketRequest request =

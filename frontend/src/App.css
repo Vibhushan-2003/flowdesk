@@ -2873,3 +2873,281 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================
+   Day 51 - Secure Ticket Attachments
+   ========================= */
+
+.ticket-attachments-card {
+  margin-top: 22px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.attachment-quota-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.attachment-alert {
+  margin: 16px 26px 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.attachment-alert-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.attachment-alert-success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.attachment-notice-box {
+  margin: 20px 26px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.attachment-notice-box p {
+  margin: 0;
+}
+
+.attachment-notice-quota {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.attachment-dropzone {
+  margin: 20px 26px;
+  padding: 28px 20px;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  background: #fafafa;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.attachment-dropzone:hover,
+.attachment-dropzone:focus-visible {
+  border-color: #4f46e5;
+  background: #f5f3ff;
+}
+
+.attachment-dropzone-active {
+  border-color: #4f46e5;
+  background: #ede9fe;
+}
+
+.attachment-dropzone-uploading {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.attachment-hidden-input {
+  display: none;
+}
+
+.attachment-dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.attachment-dropzone-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.attachment-dropzone-text {
+  margin: 0;
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.attachment-dropzone-text strong {
+  color: #4f46e5;
+}
+
+.attachment-dropzone-hint {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.attachment-list-wrapper {
+  padding: 0 26px 24px;
+}
+
+.attachment-loading-state,
+.attachment-empty-state {
+  padding: 28px 20px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.attachment-empty-state p {
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.attachment-empty-state span {
+  font-size: 0.85rem;
+}
+
+.attachment-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.attachment-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.attachment-item-leading {
+  flex-shrink: 0;
+}
+
+.attachment-file-icon {
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.attachment-item-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.attachment-item-name {
+  display: block;
+  font-size: 0.92rem;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-item-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.attachment-meta-dot {
+  color: #9ca3af;
+}
+
+.attachment-item-actions {
+  flex-shrink: 0;
+}
+
+.attachment-download-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.attachment-download-button:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  color: #111827;
+}
+
+.attachment-download-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* Day 51 Phase 5A: Support ticket history navigation tabs */
+.support-nav-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.support-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.support-nav-tab:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.support-nav-tab.active {
+  background: #111827;
+  border-color: #111827;
+  color: #ffffff;
+}

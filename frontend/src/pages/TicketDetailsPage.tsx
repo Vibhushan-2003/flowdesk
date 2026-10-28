@@ -28,6 +28,7 @@ import {
   formatOptionalDate,
   formatSlaStatus,
 } from '../utils/formatters'
+import { TicketAttachmentSection } from '../components/tickets/TicketAttachmentSection'
 
 export function TicketDetailsPage() {
   const { accessToken } = useAuth()
@@ -443,6 +444,12 @@ export function TicketDetailsPage() {
                 </section>
               )}
             </article>
+
+            <TicketAttachmentSection
+              ticketNumber={ticket.ticketNumber}
+              ticketStatus={ticket.status}
+              persona="employee"
+            />
 
             <section className="ticket-conversation-card">
               <header className="ticket-conversation-header">

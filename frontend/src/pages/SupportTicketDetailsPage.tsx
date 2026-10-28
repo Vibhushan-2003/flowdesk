@@ -29,6 +29,7 @@ import { useAuth } from '../auth/useAuth'
 
 import { AiTriageCard } from '../components/AiTriageCard'
 import { AiSupportCopilotCard } from '../components/AiSupportCopilotCard'
+import { TicketAttachmentSection } from '../components/tickets/TicketAttachmentSection'
 
 import type {
   SupportTicketResponse,
@@ -1195,6 +1196,12 @@ export function SupportTicketDetailsPage() {
               </div>
             </aside>
           </div>
+
+          <TicketAttachmentSection
+            ticketNumber={ticket.ticketNumber}
+            ticketStatus={ticket.status}
+            persona="support"
+          />
 
           <section className="support-conversation-card">
             <header className="ticket-conversation-header">

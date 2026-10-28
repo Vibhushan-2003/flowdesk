@@ -138,6 +138,78 @@ public class SupportTicketService {
         return toPageResponse(assignments);
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<SupportTicketSummaryResponse>
+            getMyTicketHistory(
+                    UUID supportEngineerId,
+                    int page,
+                    int size
+            ) {
+        return getMyTicketHistory(
+                supportEngineerId,
+                page,
+                size,
+                null,
+                null,
+                null,
+                "newest"
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<SupportTicketSummaryResponse>
+            getMyTicketHistory(
+                    UUID supportEngineerId,
+                    int page,
+                    int size,
+                    String search,
+                    TicketStatus status,
+                    TicketPriority priority,
+                    String sort
+            ) {
+
+        if (page < 0 || size < 1 || size > 100) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid pagination"
+            );
+        }
+
+        String normalizedSort =
+                sort == null || sort.isBlank()
+                        ? "newest"
+                        : sort.trim().toLowerCase(Locale.ROOT);
+
+        Sort.Direction direction = switch (normalizedSort) {
+            case "newest" -> Sort.Direction.DESC;
+            case "oldest" -> Sort.Direction.ASC;
+            default -> throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Sort must be newest or oldest"
+            );
+        };
+
+        String searchPattern = buildSearchPattern(search);
+
+        PageRequest pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(direction, "ticket.resolvedAt")
+                        .and(Sort.by(direction, "id"))
+        );
+
+        Page<TicketAssignment> assignments =
+                ticketAssignmentRepository.searchMyHistoryAssignments(
+                        supportEngineerId,
+                        searchPattern,
+                        status,
+                        priority,
+                        pageable
+                );
+
+        return toPageResponse(assignments);
+    }
+
     private PageResponse<SupportTicketSummaryResponse>
             toPageResponse(
                     Page<TicketAssignment> assignments
@@ -191,10 +263,12 @@ public class SupportTicketService {
 
         TicketAssignment assignment =
                 ticketAssignmentRepository
-                        .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
+                        .findAuthorizedSupportAssignments(
                                 normalizedTicketNumber,
                                 supportEngineerId
                         )
+                        .stream()
+                        .findFirst()
                         .orElseThrow(
                                 () -> new ResponseStatusException(
                                         HttpStatus.NOT_FOUND,

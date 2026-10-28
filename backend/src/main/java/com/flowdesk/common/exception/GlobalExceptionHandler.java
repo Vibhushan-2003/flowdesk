@@ -23,7 +23,12 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.flowdesk.attachment.storage.StorageException;
+import com.flowdesk.attachment.storage.StoragePathTraversalException;
+import com.flowdesk.attachment.validation.FileValidationException;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -164,6 +169,59 @@ public class GlobalExceptionHandler {
         return buildError(
                 status,
                 message,
+                request,
+                Map.of()
+        );
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleMaxUploadSizeExceeded(
+            MaxUploadSizeExceededException exception,
+            HttpServletRequest request
+    ) {
+        return buildError(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "Uploaded file exceeds maximum permitted size limit",
+                request,
+                Map.of()
+        );
+    }
+
+    @ExceptionHandler(FileValidationException.class)
+    public ResponseEntity<ApiError> handleFileValidation(
+            FileValidationException exception,
+            HttpServletRequest request
+    ) {
+        return buildError(
+                HttpStatus.BAD_REQUEST,
+                exception.getMessage(),
+                request,
+                Map.of()
+        );
+    }
+
+    @ExceptionHandler(StoragePathTraversalException.class)
+    public ResponseEntity<ApiError> handleStoragePathTraversal(
+            StoragePathTraversalException exception,
+            HttpServletRequest request
+    ) {
+        return buildError(
+                HttpStatus.BAD_REQUEST,
+                "Invalid storage reference",
+                request,
+                Map.of()
+        );
+    }
+
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<ApiError> handleStorageException(
+            StorageException exception,
+            HttpServletRequest request
+    ) {
+        log.error("Storage operation failure: {}", exception.getMessage(), exception);
+        return buildError(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Storage operation failed",
                 request,
                 Map.of()
         );
