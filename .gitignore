@@ -10,3 +10,6 @@ backend/target/
 .vscode/
 
 !.env.example
+
+# Private attachment local storage
+data/

@@ -167,6 +167,107 @@ class SupportTicketServiceTest {
     }
 
     @Test
+    void getMyTicketHistoryReturnsAuthorizedHistory() {
+
+        UUID supportEngineerId =
+                UUID.randomUUID();
+
+        TicketAssignment assignment =
+                createAssignedTicketAssignment();
+        Ticket ticket = assignment.getTicket();
+        ticket.transitionSupportStatus(TicketStatus.IN_PROGRESS);
+        ticket.resolve("Fixed");
+        assignment.release();
+
+        when(
+                ticketAssignmentRepository
+                        .searchMyHistoryAssignments(
+                                eq(supportEngineerId),
+                                eq("%printer%"),
+                                eq(TicketStatus.RESOLVED),
+                                eq(TicketPriority.MEDIUM),
+                                org.mockito.ArgumentMatchers.any(Pageable.class)
+                        )
+        ).thenReturn(
+                new PageImpl<>(
+                        List.of(assignment),
+                        PageRequest.of(0, 10),
+                        1
+                )
+        );
+
+        PageResponse<SupportTicketSummaryResponse> response =
+                supportTicketService.getMyTicketHistory(
+                        supportEngineerId,
+                        0,
+                        10,
+                        "  printer  ",
+                        TicketStatus.RESOLVED,
+                        TicketPriority.MEDIUM,
+                        "newest"
+                );
+
+        assertEquals(
+                1,
+                response.totalElements()
+        );
+        assertEquals(
+                "FD-TEST-001",
+                response.content().get(0).ticketNumber()
+        );
+        assertEquals(
+                TicketStatus.RESOLVED,
+                response.content().get(0).status()
+        );
+    }
+
+    @Test
+    void getMyTicketHistoryRejectsInvalidPaginationAndSort() {
+
+        UUID supportEngineerId =
+                UUID.randomUUID();
+
+        assertThrows(
+                ResponseStatusException.class,
+                () -> supportTicketService.getMyTicketHistory(
+                        supportEngineerId,
+                        -1,
+                        10,
+                        null,
+                        null,
+                        null,
+                        "newest"
+                )
+        );
+
+        assertThrows(
+                ResponseStatusException.class,
+                () -> supportTicketService.getMyTicketHistory(
+                        supportEngineerId,
+                        0,
+                        101,
+                        null,
+                        null,
+                        null,
+                        "newest"
+                )
+        );
+
+        assertThrows(
+                ResponseStatusException.class,
+                () -> supportTicketService.getMyTicketHistory(
+                        supportEngineerId,
+                        0,
+                        10,
+                        null,
+                        null,
+                        null,
+                        "invalid_sort"
+                )
+        );
+    }
+
+    @Test
     void getMyAssignedTicketNormalizesTicketNumber() {
 
         UUID supportEngineerId =
@@ -177,12 +278,12 @@ class SupportTicketServiceTest {
 
         when(
                 ticketAssignmentRepository
-                        .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
+                        .findAuthorizedSupportAssignments(
                                 "FD-TEST-001",
                                 supportEngineerId
                         )
         ).thenReturn(
-                Optional.of(
+                List.of(
                         assignment
                 )
         );
@@ -206,26 +307,26 @@ class SupportTicketServiceTest {
 
         verify(
                 ticketAssignmentRepository
-        ).findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
+        ).findAuthorizedSupportAssignments(
                 "FD-TEST-001",
                 supportEngineerId
         );
     }
 
     @Test
-    void engineerCannotViewTicketWithoutActiveOwnership() {
+    void engineerCannotViewTicketWithoutAuthorization() {
 
         UUID supportEngineerId =
                 UUID.randomUUID();
 
         when(
                 ticketAssignmentRepository
-                        .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
+                        .findAuthorizedSupportAssignments(
                                 "FD-TEST-001",
                                 supportEngineerId
                         )
         ).thenReturn(
-                Optional.empty()
+                List.of()
         );
 
         ResponseStatusException exception =
@@ -242,6 +343,55 @@ class SupportTicketServiceTest {
         assertEquals(
                 HttpStatus.NOT_FOUND,
                 exception.getStatusCode()
+        );
+    }
+
+    @Test
+    void resolvingEngineerCanViewResolvedTicketDetails() {
+
+        UUID supportEngineerId =
+                UUID.randomUUID();
+
+        TicketAssignment assignment =
+                createAssignedTicketAssignment();
+        Ticket ticket = assignment.getTicket();
+        ticket.transitionSupportStatus(TicketStatus.IN_PROGRESS);
+        ticket.resolve("Service restored successfully.");
+        assignment.release();
+
+        when(
+                ticketAssignmentRepository
+                        .findAuthorizedSupportAssignments(
+                                "FD-TEST-001",
+                                supportEngineerId
+                        )
+        ).thenReturn(
+                List.of(
+                        assignment
+                )
+        );
+
+        SupportTicketResponse response =
+                supportTicketService
+                        .getMyAssignedTicket(
+                                supportEngineerId,
+                                "FD-TEST-001"
+                        );
+
+        assertEquals(
+                "FD-TEST-001",
+                response.ticketNumber()
+        );
+        assertEquals(
+                TicketStatus.RESOLVED,
+                response.status()
+        );
+        assertEquals(
+                "Service restored successfully.",
+                response.resolutionSummary()
+        );
+        assertNotNull(
+                response.resolvedAt()
         );
     }
 

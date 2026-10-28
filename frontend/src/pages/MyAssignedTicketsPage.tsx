@@ -1,10 +1,10 @@
-
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTicketListUrlFilters } from '../hooks/useTicketListUrlFilters'
 
 import {
   getMyAssignedTickets,
+  getSupportTicketHistory,
 } from '../api/ticket'
 import { useAuth } from '../auth/useAuth'
 import { TicketListOverview } from '../components/TicketListOverview'
@@ -22,13 +22,26 @@ import '../styles/ticket-list-overview.css'
 
 const PAGE_SIZE = 10
 
-const STATUSES: TicketStatus[] = [
-  'PENDING_APPROVAL', 'OPEN', 'ASSIGNED', 'IN_PROGRESS',
-  'WAITING_FOR_USER', 'RESOLVED', 'CLOSED', 'CANCELLED',
+type SupportViewMode = 'active' | 'resolved' | 'history'
+
+const ACTIVE_STATUSES: TicketStatus[] = [
+  'ASSIGNED',
+  'IN_PROGRESS',
+  'WAITING_FOR_USER',
+  'RESOLVED',
+  'CLOSED',
+]
+
+const HISTORY_STATUSES: TicketStatus[] = [
+  'RESOLVED',
+  'CLOSED',
 ]
 
 const PRIORITIES: TicketPriority[] = [
-  'LOW', 'MEDIUM', 'HIGH', 'CRITICAL',
+  'LOW',
+  'MEDIUM',
+  'HIGH',
+  'CRITICAL',
 ]
 
 function formatLabel(value: string) {
@@ -45,10 +58,14 @@ function formatDate(value: string | null) {
 
 function formatSlaStatus(status: SlaStatus) {
   switch (status) {
-    case 'MET': return 'Met'
-    case 'BREACHED': return 'Breached'
-    case 'PENDING': return 'Pending'
-    case 'UNKNOWN': return 'Unknown'
+    case 'MET':
+      return 'Met'
+    case 'BREACHED':
+      return 'Breached'
+    case 'PENDING':
+      return 'Pending'
+    case 'UNKNOWN':
+      return 'Unknown'
   }
 }
 
@@ -61,15 +78,37 @@ function getStatusClass(status: string) {
 export function MyAssignedTicketsPage() {
   const { accessToken } = useAuth()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const {
-    page, setPage, appliedFilters,
-    searchText, setSearchText,
-    selectedStatus, setSelectedStatus,
-    selectedPriority, setSelectedPriority,
-    selectedSort, setSelectedSort,
-    applyFilters, resetFilters,
+    page,
+    setPage,
+    appliedFilters,
+    searchText,
+    setSearchText,
+    selectedStatus,
+    setSelectedStatus,
+    selectedPriority,
+    setSelectedPriority,
+    selectedSort,
+    setSelectedSort,
+    applyFilters,
+    resetFilters,
   } = useTicketListUrlFilters()
+
+  const viewParam = searchParams.get('view')
+  const isResolvedStatus = appliedFilters.status === 'RESOLVED'
+  const isClosedStatus = appliedFilters.status === 'CLOSED'
+
+  let currentView: SupportViewMode = 'active'
+  if (viewParam === 'history' || isClosedStatus) {
+    currentView = 'history'
+  } else if (viewParam === 'resolved' || isResolvedStatus) {
+    currentView = 'resolved'
+  }
+
+  const isHistoryQuery =
+    currentView === 'resolved' || currentView === 'history'
 
   const [ticketPage, setTicketPage] =
     useState<PageResponse<SupportTicketSummary> | null>(null)
@@ -80,6 +119,36 @@ export function MyAssignedTicketsPage() {
 
   function refreshTickets() {
     setRefreshVersion((version) => version + 1)
+  }
+
+  function handleViewChange(newView: SupportViewMode) {
+    const newParams = new URLSearchParams()
+    if (appliedFilters.search) {
+      newParams.set('search', appliedFilters.search)
+    }
+    if (appliedFilters.priority) {
+      newParams.set('priority', appliedFilters.priority)
+    }
+    if (appliedFilters.sort === 'oldest') {
+      newParams.set('sort', 'oldest')
+    }
+
+    if (newView === 'resolved') {
+      newParams.set('status', 'RESOLVED')
+    } else if (newView === 'history') {
+      newParams.set('view', 'history')
+    }
+    setSearchParams(newParams)
+  }
+
+  function handleResetFilters() {
+    if (currentView === 'resolved') {
+      setSearchParams(new URLSearchParams({ status: 'RESOLVED' }))
+    } else if (currentView === 'history') {
+      setSearchParams(new URLSearchParams({ view: 'history' }))
+    } else {
+      resetFilters()
+    }
   }
 
   useEffect(() => {
@@ -99,12 +168,22 @@ export function MyAssignedTicketsPage() {
       setError(null)
 
       try {
-        const response = await getMyAssignedTickets(
-          accessToken,
-          page,
-          PAGE_SIZE,
-          appliedFilters,
-        )
+        const response = isHistoryQuery
+          ? await getSupportTicketHistory(
+              accessToken,
+              page,
+              PAGE_SIZE,
+              currentView === 'resolved'
+                ? { ...appliedFilters, status: 'RESOLVED' }
+                : appliedFilters,
+            )
+          : await getMyAssignedTickets(
+              accessToken,
+              page,
+              PAGE_SIZE,
+              appliedFilters,
+            )
+
         if (!cancelled) {
           setTicketPage(response)
         }
@@ -114,7 +193,9 @@ export function MyAssignedTicketsPage() {
           setError(
             caughtError instanceof Error
               ? caughtError.message
-              : 'Unable to load assigned tickets',
+              : isHistoryQuery
+                ? 'Unable to load ticket history'
+                : 'Unable to load assigned tickets',
           )
         }
       } finally {
@@ -127,24 +208,47 @@ export function MyAssignedTicketsPage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, page, appliedFilters, refreshVersion])
+  }, [
+    accessToken,
+    page,
+    appliedFilters,
+    currentView,
+    isHistoryQuery,
+    refreshVersion,
+  ])
 
   const hasFilters = Boolean(
     appliedFilters.search ||
-    appliedFilters.status ||
-    appliedFilters.priority,
+      appliedFilters.priority ||
+      (currentView === 'history' && appliedFilters.status) ||
+      (currentView === 'active' && appliedFilters.status),
   )
+
+  const availableStatuses =
+    currentView === 'history'
+      ? HISTORY_STATUSES
+      : currentView === 'resolved'
+        ? (['RESOLVED'] as TicketStatus[])
+        : ACTIVE_STATUSES
 
   return (
     <main className="support-work-page">
       <header className="support-page-header">
         <div>
           <p className="eyebrow">FlowDesk Operations</p>
-          <h1>My assigned tickets</h1>
+          <h1>
+            {currentView === 'resolved'
+              ? 'Resolved tickets'
+              : currentView === 'history'
+                ? 'Ticket history'
+                : 'My assigned tickets'}
+          </h1>
           <p className="support-page-description">
-            Your active support workload. Open a ticket
-            to start work, wait for the requester,
-            resume work, or resolve the issue.
+            {currentView === 'resolved'
+              ? 'Tickets you have successfully resolved. Review resolution details and diagnostic attachments.'
+              : currentView === 'history'
+                ? 'Your historical record of completed and closed tickets.'
+                : 'Your active support workload. Open a ticket to start work, wait for the requester, resume work, or resolve the issue.'}
           </p>
         </div>
 
@@ -166,6 +270,40 @@ export function MyAssignedTicketsPage() {
         </div>
       </header>
 
+      {/* Day 51 Phase 5A: Support navigation tabs */}
+      <nav
+        className="support-nav-tabs"
+        aria-label="Support ticket navigation"
+      >
+        <button
+          type="button"
+          className={`support-nav-tab ${
+            currentView === 'active' ? 'active' : ''
+          }`}
+          onClick={() => handleViewChange('active')}
+        >
+          Active Tickets
+        </button>
+        <button
+          type="button"
+          className={`support-nav-tab ${
+            currentView === 'resolved' ? 'active' : ''
+          }`}
+          onClick={() => handleViewChange('resolved')}
+        >
+          Resolved Tickets
+        </button>
+        <button
+          type="button"
+          className={`support-nav-tab ${
+            currentView === 'history' ? 'active' : ''
+          }`}
+          onClick={() => handleViewChange('history')}
+        >
+          Ticket History
+        </button>
+      </nav>
+
       <form
         onSubmit={applyFilters}
         aria-label="Assigned ticket filters"
@@ -186,15 +324,24 @@ export function MyAssignedTicketsPage() {
         <label>
           Status
           <select
-            value={selectedStatus}
+            value={
+              currentView === 'resolved'
+                ? 'RESOLVED'
+                : selectedStatus
+            }
+            disabled={currentView === 'resolved'}
             onChange={(event) =>
               setSelectedStatus(
                 event.target.value as TicketStatus | '',
               )
             }
           >
-            <option value="">All statuses</option>
-            {STATUSES.map((status) => (
+            <option value="">
+              {currentView === 'history'
+                ? 'All historical statuses'
+                : 'All statuses'}
+            </option>
+            {availableStatuses.map((status) => (
               <option key={status} value={status}>
                 {formatLabel(status)}
               </option>
@@ -237,7 +384,10 @@ export function MyAssignedTicketsPage() {
         </label>
 
         <button type="submit">Apply filters</button>
-        <button type="button" onClick={resetFilters}>
+        <button
+          type="button"
+          onClick={handleResetFilters}
+        >
           Clear
         </button>
       </form>
@@ -256,7 +406,13 @@ export function MyAssignedTicketsPage() {
 
       <section className="support-overview">
         <article>
-          <span>Active assignments</span>
+          <span>
+            {currentView === 'resolved'
+              ? 'Resolved tickets'
+              : currentView === 'history'
+                ? 'Historical tickets'
+                : 'Active assignments'}
+          </span>
           <strong>
             {error ? '—' : ticketPage?.totalElements ?? 0}
           </strong>
@@ -267,7 +423,11 @@ export function MyAssignedTicketsPage() {
         </article>
         <article>
           <span>Workflow</span>
-          <strong>Assignment based</strong>
+          <strong>
+            {isHistoryQuery
+              ? 'Resolution history'
+              : 'Assignment based'}
+          </strong>
         </article>
       </section>
 
@@ -283,7 +443,11 @@ export function MyAssignedTicketsPage() {
       {isLoading && (
         <section className="support-loading-state">
           <div className="support-loading-dot" />
-          <p>Loading your assigned tickets...</p>
+          <p>
+            {isHistoryQuery
+              ? 'Loading ticket history...'
+              : 'Loading your assigned tickets...'}
+          </p>
         </section>
       )}
 
@@ -295,20 +459,32 @@ export function MyAssignedTicketsPage() {
             <div className="support-empty-mark">✓</div>
             <h2>
               {hasFilters
-                ? 'No matching assignments'
-                : 'No active assignments'}
+                ? currentView === 'resolved'
+                  ? 'No matching resolved tickets'
+                  : currentView === 'history'
+                    ? 'No matching historical tickets'
+                    : 'No matching assignments'
+                : currentView === 'resolved'
+                  ? 'No resolved tickets'
+                  : currentView === 'history'
+                    ? 'No ticket history'
+                    : 'No active assignments'}
             </h2>
             <p>
               {hasFilters
                 ? 'Try changing your search or filters.'
-                : 'You currently have no tickets assigned to you. Open the support queue when you are ready to take another issue.'}
+                : currentView === 'resolved'
+                  ? 'You have not resolved any tickets yet.'
+                  : currentView === 'history'
+                    ? 'You have no completed or closed ticket history.'
+                    : 'You currently have no tickets assigned to you. Open the support queue when you are ready to take another issue.'}
             </p>
             <button
               type="button"
               className="primary-button"
               onClick={() =>
                 hasFilters
-                  ? resetFilters()
+                  ? handleResetFilters()
                   : navigate('/support/queue')
               }
             >
@@ -417,7 +593,10 @@ export function MyAssignedTicketsPage() {
                       )
                     }
                   >
-                    Open ticket
+                    {ticket.status === 'RESOLVED' ||
+                    ticket.status === 'CLOSED'
+                      ? 'View details'
+                      : 'Open ticket'}
                   </button>
                 </div>
               </article>

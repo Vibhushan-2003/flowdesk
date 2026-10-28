@@ -84,6 +84,37 @@ public class SupportTicketController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/history")
+    public ResponseEntity<PageResponse<SupportTicketSummaryResponse>>
+            getMyTicketHistory(
+                    @AuthenticationPrincipal Jwt jwt,
+                    @RequestParam(defaultValue = "0") int page,
+                    @RequestParam(defaultValue = "10") int size,
+                    @RequestParam(required = false) String search,
+                    @RequestParam(required = false) TicketStatus status,
+                    @RequestParam(required = false) TicketPriority priority,
+                    @RequestParam(defaultValue = "newest") String sort
+            ) {
+
+        validatePagination(page, size);
+
+        UUID authenticatedUserId =
+                UUID.fromString(jwt.getSubject());
+
+        PageResponse<SupportTicketSummaryResponse> response =
+                supportTicketService.getMyTicketHistory(
+                        authenticatedUserId,
+                        page,
+                        size,
+                        search,
+                        status,
+                        priority,
+                        sort
+                );
+
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/{ticketNumber}/comments")
     public ResponseEntity<List<TicketCommentResponse>>
             getTicketComments(

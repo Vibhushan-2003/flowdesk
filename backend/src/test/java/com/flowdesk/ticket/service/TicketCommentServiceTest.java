@@ -313,12 +313,12 @@ class TicketCommentServiceTest {
                 .thenReturn(ticket);
 
         when(ticketAssignmentRepository
-                .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
+                .findAuthorizedSupportAssignments(
                         "FD-000004",
                         engineerId
                 ))
                 .thenReturn(
-                        Optional.of(assignment)
+                        List.of(assignment)
                 );
 
         when(ticketCommentRepository
@@ -351,11 +351,11 @@ class TicketCommentServiceTest {
                 UUID.randomUUID();
 
         when(ticketAssignmentRepository
-                .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
+                .findAuthorizedSupportAssignments(
                         "FD-000005",
                         engineerId
                 ))
-                .thenReturn(Optional.empty());
+                .thenReturn(List.of());
 
         ResponseStatusException exception =
                 assertThrows(
@@ -370,6 +370,116 @@ class TicketCommentServiceTest {
 
         assertEquals(
                 HttpStatus.NOT_FOUND,
+                exception.getStatusCode()
+        );
+    }
+
+    @Test
+    void resolvingEngineerCanReadCommentsOnResolvedTicket() {
+
+        UUID engineerId =
+                UUID.randomUUID();
+
+        UUID ticketId =
+                UUID.randomUUID();
+
+        Ticket ticket =
+                org.mockito.Mockito.mock(
+                        Ticket.class
+                );
+
+        TicketAssignment assignment =
+                org.mockito.Mockito.mock(
+                        TicketAssignment.class
+                );
+
+        when(ticket.getId())
+                .thenReturn(ticketId);
+
+        when(assignment.getTicket())
+                .thenReturn(ticket);
+
+        when(ticketAssignmentRepository
+                .findAuthorizedSupportAssignments(
+                        "FD-000004",
+                        engineerId
+                ))
+                .thenReturn(
+                        List.of(assignment)
+                );
+
+        when(ticketCommentRepository
+                .findByTicket_IdOrderByCreatedAtAsc(
+                        ticketId
+                ))
+                .thenReturn(List.of());
+
+        List<TicketCommentResponse> result =
+                ticketCommentService
+                        .getSupportComments(
+                                engineerId,
+                                "FD-000004"
+                        );
+
+        assertTrue(
+                result.isEmpty()
+        );
+
+        verify(ticketCommentRepository)
+                .findByTicket_IdOrderByCreatedAtAsc(
+                        ticketId
+                );
+    }
+
+    @Test
+    void supportEngineerCannotAddCommentToResolvedTicket() {
+
+        UUID engineerId =
+                UUID.randomUUID();
+
+        Ticket ticket =
+                org.mockito.Mockito.mock(
+                        Ticket.class
+                );
+
+        TicketAssignment assignment =
+                org.mockito.Mockito.mock(
+                        TicketAssignment.class
+                );
+
+        when(assignment.getTicket())
+                .thenReturn(ticket);
+
+        when(ticket.getStatus())
+                .thenReturn(
+                        TicketStatus.RESOLVED
+                );
+
+        when(ticketAssignmentRepository
+                .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
+                        "FD-000006",
+                        engineerId
+                ))
+                .thenReturn(
+                        Optional.of(assignment)
+                );
+
+        ResponseStatusException exception =
+                assertThrows(
+                        ResponseStatusException.class,
+                        () ->
+                                ticketCommentService
+                                        .addSupportComment(
+                                                engineerId,
+                                                "FD-000006",
+                                                new CreateTicketCommentRequest(
+                                                        "Testing mutation rejection"
+                                                )
+                                        )
+                );
+
+        assertEquals(
+                HttpStatus.CONFLICT,
                 exception.getStatusCode()
         );
     }
