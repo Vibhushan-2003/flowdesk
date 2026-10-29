@@ -9,6 +9,7 @@ import type {
   TicketType,
 } from '../types/ticket'
 import { formatLabel } from '../utils/formatters'
+import { TicketDeflectionCard } from '../components/tickets/TicketDeflectionCard'
 
 export function CreateTicketPage() {
   const { accessToken } = useAuth()
@@ -122,6 +123,8 @@ export function CreateTicketPage() {
               required
             />
           </label>
+
+          <TicketDeflectionCard title={title} onDeflected={() => navigate('/dashboard')} />
 
           <label>
             Description

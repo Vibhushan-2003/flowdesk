@@ -6,5 +6,9 @@ public enum AuditTargetType {
 
     APPROVAL,
 
-    USER
+    USER,
+
+    KB_ARTICLE,
+
+    KB_CATEGORY
 }

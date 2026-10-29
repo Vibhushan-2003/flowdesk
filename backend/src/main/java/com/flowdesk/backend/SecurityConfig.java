@@ -171,6 +171,16 @@ public class SecurityConfig {
                         )
                         .hasRole("ADMIN")
 
+                        // Knowledge base category management - Team Lead and Admin
+                        .requestMatchers(
+                                "/api/admin/kb/categories",
+                                "/api/admin/kb/categories/**"
+                        )
+                        .hasAnyRole(
+                                "TEAM_LEAD",
+                                "ADMIN"
+                        )
+
                         // User management - ADMIN only
                         .requestMatchers(
                                 "/api/admin/**"
@@ -200,6 +210,16 @@ public class SecurityConfig {
                                 "/api/tickets/*/claim"
                         )
                         .hasRole("SUPPORT_ENGINEER")
+
+                        // Knowledge base authoring and management - Support Engineer, Team Lead, and Admin
+                        .requestMatchers(
+                                "/api/support/kb/**"
+                        )
+                        .hasAnyRole(
+                                "SUPPORT_ENGINEER",
+                                "TEAM_LEAD",
+                                "ADMIN"
+                        )
 
                         // Support engineer workbench
                         .requestMatchers(

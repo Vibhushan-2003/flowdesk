@@ -25,6 +25,9 @@ import { SupportQueuePage } from './pages/SupportQueuePage'
 import { SupportTicketDetailsPage } from './pages/SupportTicketDetailsPage'
 import { TicketDetailsPage } from './pages/TicketDetailsPage'
 import { UserManagementPage } from './pages/UserManagementPage'
+import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
+import { ArticleViewPage } from './pages/ArticleViewPage'
+import { ArticleEditorPage } from './pages/ArticleEditorPage'
 
 function App() {
   return (
@@ -91,6 +94,37 @@ function App() {
             <SupportTicketDetailsPage />
           }
         />
+
+        <Route
+          path="/kb"
+          element={<KnowledgeBasePage />}
+        />
+
+        <Route
+          path="/kb/articles/:slug"
+          element={<ArticleViewPage />}
+        />
+
+        <Route
+          element={
+            <RoleProtectedRoute
+              allowedRoles={[
+                'SUPPORT_ENGINEER',
+                'TEAM_LEAD',
+                'ADMIN',
+              ]}
+            />
+          }
+        >
+          <Route
+            path="/support/kb/articles/new"
+            element={<ArticleEditorPage />}
+          />
+          <Route
+            path="/support/kb/articles/:id/edit"
+            element={<ArticleEditorPage />}
+          />
+        </Route>
 
         <Route
           element={
