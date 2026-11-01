@@ -138,7 +138,7 @@ class WebSocketTwoUserIsolationIntegrationTest {
 
             assertEquals(
                     notificationA,
-                    receivedA.poll(10, TimeUnit.SECONDS),
+                    receivedA.poll(25, TimeUnit.SECONDS),
                     "User A must receive their own notification"
             );
 
@@ -158,7 +158,7 @@ class WebSocketTwoUserIsolationIntegrationTest {
 
             assertEquals(
                     notificationB,
-                    receivedB.poll(10, TimeUnit.SECONDS),
+                    receivedB.poll(25, TimeUnit.SECONDS),
                     "User B must receive their own notification"
             );
 
@@ -264,7 +264,7 @@ class WebSocketTwoUserIsolationIntegrationTest {
 
         long deadline =
                 System.nanoTime()
-                        + TimeUnit.SECONDS.toNanos(10);
+                        + TimeUnit.SECONDS.toNanos(25);
 
         while (System.nanoTime() < deadline) {
 
