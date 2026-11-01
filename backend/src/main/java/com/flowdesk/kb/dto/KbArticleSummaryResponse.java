@@ -18,9 +18,29 @@ public record KbArticleSummaryResponse(
         UUID authorId,
         String authorName,
         int viewCount,
+        int deflectionCount,
         Instant publishedAt,
         Instant updatedAt
 ) {
+    public KbArticleSummaryResponse(
+            UUID id,
+            String title,
+            String slug,
+            String summary,
+            ArticleStatus status,
+            UUID categoryId,
+            String categoryName,
+            String categorySlug,
+            UUID authorId,
+            String authorName,
+            int viewCount,
+            Instant publishedAt,
+            Instant updatedAt
+    ) {
+        this(id, title, slug, summary, status, categoryId, categoryName, categorySlug,
+                authorId, authorName, viewCount, 0, publishedAt, updatedAt);
+    }
+
     public static KbArticleSummaryResponse from(KbArticle article) {
         String authorName = article.getAuthor() != null
                 ? article.getAuthor().getFirstName() + " " + article.getAuthor().getLastName()
@@ -38,6 +58,7 @@ public record KbArticleSummaryResponse(
                 article.getAuthor() != null ? article.getAuthor().getId() : null,
                 authorName,
                 article.getViewCount(),
+                article.getDeflectionCount(),
                 article.getPublishedAt(),
                 article.getUpdatedAt()
         );

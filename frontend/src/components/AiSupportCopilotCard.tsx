@@ -26,6 +26,7 @@ const toolLabels: Record<AiSupportCopilotTool, string> = {
   GET_TICKET_OVERVIEW: 'Ticket overview',
   GET_PUBLIC_CONVERSATION: 'Public conversation',
   GET_SLA_SNAPSHOT: 'SLA snapshot',
+  SEARCH_KNOWLEDGE_BASE: 'Knowledge Base search',
 }
 
 export function AiSupportCopilotCard({

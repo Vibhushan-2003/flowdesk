@@ -112,6 +112,21 @@ export async function getDeflectionSuggestions(
   return handleResponse<KbArticleDeflection[]>(response)
 }
 
+export async function recordArticleDeflection(token: string, articleId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/kb/articles/${encodeURIComponent(articleId)}/deflect`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (!response.ok) {
+    if (response.status === 401) {
+      notifySessionExpired()
+      throw new Error('Your session is no longer valid')
+    }
+  }
+}
+
 // ----------------------------------------------------------------------------
 // Support Engineer / Team Lead / Admin Endpoints
 // ----------------------------------------------------------------------------

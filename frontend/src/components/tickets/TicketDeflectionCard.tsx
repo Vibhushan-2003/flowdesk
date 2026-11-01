@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getDeflectionSuggestions } from '../../api/kb'
+import { getDeflectionSuggestions, recordArticleDeflection } from '../../api/kb'
 import { useAuth } from '../../auth/useAuth'
 import type { KbArticleDeflection } from '../../types/kb'
 import type { TicketType } from '../../types/ticket'
@@ -24,6 +24,7 @@ export function TicketDeflectionCard({
   const navigate = useNavigate()
   const [suggestions, setSuggestions] = useState<KbArticleDeflection[]>([])
   const [solved, setSolved] = useState(false)
+  const [isSubmittingDeflection, setIsSubmittingDeflection] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -133,15 +134,21 @@ export function TicketDeflectionCard({
               <button
                 type="button"
                 className="kb-deflection-solved-btn"
+                disabled={isSubmittingDeflection}
                 onClick={() => {
+                  if (isSubmittingDeflection) return
+                  setIsSubmittingDeflection(true)
                   sessionStorage.removeItem('flowdesk_ticket_draft')
+                  if (accessToken && article.id) {
+                    void recordArticleDeflection(accessToken, article.id).catch(() => {})
+                  }
                   setSolved(true)
                   if (onSolved) {
                     onSolved()
                   }
                 }}
               >
-                Solved My Issue
+                {isSubmittingDeflection ? 'Resolving...' : 'Solved My Issue'}
               </button>
             </div>
           </div>

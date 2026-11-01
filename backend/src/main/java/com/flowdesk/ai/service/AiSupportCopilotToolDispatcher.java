@@ -105,6 +105,13 @@ public class AiSupportCopilotToolDispatcher {
                                     authenticatedUserId,
                                     ticketNumber
                             );
+
+            case SEARCH_KNOWLEDGE_BASE ->
+                    toolService
+                            .getKnowledgeBaseSuggestions(
+                                    authenticatedUserId,
+                                    ticketNumber
+                            );
         };
     }
 }

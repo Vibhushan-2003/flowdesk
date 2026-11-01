@@ -13,6 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -65,5 +66,19 @@ public class KnowledgeBaseController {
             @RequestParam(required = false) String query
     ) {
         return ResponseEntity.ok(kbService.getDeflectionSuggestions(query));
+    }
+
+    @PostMapping("/articles/{id}/deflect")
+    public ResponseEntity<Void> recordDeflection(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID id
+    ) {
+        User user = null;
+        if (jwt != null) {
+            UUID userId = UUID.fromString(jwt.getSubject());
+            user = userRepository.findById(userId).orElse(null);
+        }
+        kbService.recordDeflection(id, user);
+        return ResponseEntity.noContent().build();
     }
 }
