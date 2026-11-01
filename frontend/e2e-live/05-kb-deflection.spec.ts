@@ -57,7 +57,9 @@ test.describe('Real-Stack Live: Knowledge Base & Self-Service Deflection', () =>
 
     // Successfully deflected banner is shown
     await expect(
-      page.getByText(/glad.*solved|return to dashboard/i),
+      page.getByRole('heading', { name: /issue resolved via knowledge base/i }),
     ).toBeVisible()
+    await expect(page.locator('.ticket-deflected-message')).toBeVisible()
+    await expect(page.getByRole('button', { name: /return to dashboard/i })).toBeVisible()
   })
 })
