@@ -9,12 +9,14 @@ export interface AuthContextValue {
   accessToken: string | null
   isAuthenticated: boolean
   isAuthLoading: boolean
+  sessionExpiredMessage: string | null
   signIn: (
     email: string,
     password: string,
   ) => Promise<void>
   setSessionToken: (accessToken: string) => Promise<void>
-  signOut: () => void
+  signOut: (message?: string) => void
+  clearSessionExpiredMessage: () => void
 }
 
 export const AuthContext =

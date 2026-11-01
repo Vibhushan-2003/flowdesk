@@ -12,6 +12,7 @@ export function ProtectedRoute() {
   const {
     isAuthenticated,
     isAuthLoading,
+    sessionExpiredMessage,
   } =
     useAuth()
 
@@ -37,6 +38,8 @@ export function ProtectedRoute() {
         replace
         state={{
           from: location,
+          sessionExpired: Boolean(sessionExpiredMessage),
+          message: sessionExpiredMessage,
         }}
       />
     )

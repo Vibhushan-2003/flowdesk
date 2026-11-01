@@ -15,23 +15,29 @@ import '../styles/kb.css'
 const TICKET_DRAFT_KEY = 'flowdesk_ticket_draft'
 
 interface TicketDraftState {
+  userId?: string
   type: TicketType
   title: string
   description: string
 }
 
-function getStoredTicketDraft(): TicketDraftState | null {
+function getStoredTicketDraft(currentUserId?: string): TicketDraftState | null {
   try {
     const raw = sessionStorage.getItem(TICKET_DRAFT_KEY)
     if (!raw) return null
-    return JSON.parse(raw) as TicketDraftState
+    const parsed = JSON.parse(raw) as TicketDraftState
+    if (parsed.userId && currentUserId && parsed.userId !== currentUserId) {
+      sessionStorage.removeItem(TICKET_DRAFT_KEY)
+      return null
+    }
+    return parsed
   } catch {
     return null
   }
 }
 
 export function CreateTicketPage() {
-  const { accessToken } = useAuth()
+  const { accessToken, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -41,7 +47,7 @@ export function CreateTicketPage() {
     } | null
   )?.ticketDraft
 
-  const initialDraft = locationDraft ?? getStoredTicketDraft()
+  const initialDraft = locationDraft ?? getStoredTicketDraft(user?.userId)
 
   const [type, setType] = useState<TicketType>(initialDraft?.type ?? 'INCIDENT')
   const [title, setTitle] = useState(initialDraft?.title ?? '')
@@ -61,10 +67,10 @@ export function CreateTicketPage() {
     if (!isSolved && (title.trim() || description.trim())) {
       sessionStorage.setItem(
         TICKET_DRAFT_KEY,
-        JSON.stringify({ type, title, description }),
+        JSON.stringify({ userId: user?.userId, type, title, description }),
       )
     }
-  }, [type, title, description, isSolved])
+  }, [type, title, description, isSolved, user?.userId])
 
   function handleStartNewTicket() {
     setIsSolved(false)

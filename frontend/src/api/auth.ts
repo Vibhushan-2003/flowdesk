@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './config'
+import { notifySessionExpired } from '../auth/sessionEvents'
 import type {
   AcceptInvitationRequest,
   AcceptInvitationResponse,
@@ -58,6 +59,7 @@ export async function getCurrentUser(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error('Your session is no longer valid')
     }
 

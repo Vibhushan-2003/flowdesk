@@ -1,3 +1,4 @@
+import { notifySessionExpired } from '../auth/sessionEvents'
 import { API_BASE_URL } from './config'
 import type {
   AdminCreateUserRequest,
@@ -11,6 +12,10 @@ import type {
 } from '../types/userManagement'
 
 async function extractErrorMessage(response: Response, defaultMessage: string): Promise<string> {
+  if (response.status === 401) {
+    notifySessionExpired()
+    return "Your session is no longer valid"
+  }
   try {
     const errorBody = await response.json()
     if (errorBody && typeof errorBody.message === 'string' && errorBody.message.trim()) {

@@ -1,5 +1,6 @@
 import { API_BASE_URL } from './config'
 import type { DashboardMetricsResponse } from '../types/dashboard'
+import { notifySessionExpired } from '../auth/sessionEvents'
 
 export async function getDashboardStats(
   accessToken: string,
@@ -13,6 +14,7 @@ export async function getDashboardStats(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error('Your session is no longer valid')
     }
     throw new Error('Unable to load operational dashboard statistics')
@@ -20,4 +22,3 @@ export async function getDashboardStats(
 
   return response.json() as Promise<DashboardMetricsResponse>
 }
-

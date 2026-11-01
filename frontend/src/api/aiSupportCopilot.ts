@@ -1,5 +1,6 @@
 
 import { API_BASE_URL } from './config'
+import { notifySessionExpired } from '../auth/sessionEvents'
 import type { AiSupportCopilotResponse } from '../types/aiSupportCopilot'
 
 export class AiSupportCopilotApiError extends Error {
@@ -39,6 +40,9 @@ export async function askAiSupportCopilot(
   )
 
   if (!response.ok) {
+    if (response.status === 401) {
+      notifySessionExpired()
+    }
     const messages: Record<number, string> = {
       400: 'Enter a valid question of no more than 1000 characters.',
       401: 'Your session is no longer valid.',

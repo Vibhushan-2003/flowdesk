@@ -16,6 +16,38 @@ import { useAuth } from '../auth/useAuth'
 import type { GoogleOAuthConfigResponse } from '../types/auth'
 import { generateCodeChallenge, generateRandomString } from '../utils/pkce'
 
+function getSafeRedirectPath(rawPath?: unknown): string {
+  let candidate: string | null = null
+
+  if (typeof rawPath === 'string') {
+    candidate = rawPath
+  } else if (
+    rawPath &&
+    typeof rawPath === 'object' &&
+    'pathname' in rawPath &&
+    typeof (rawPath as { pathname?: unknown }).pathname === 'string'
+  ) {
+    candidate = (rawPath as { pathname: string }).pathname
+  }
+
+  if (!candidate) {
+    return '/dashboard'
+  }
+
+  const trimmed = candidate.trim()
+  if (
+    trimmed.startsWith('/') &&
+    !trimmed.startsWith('//') &&
+    !trimmed.startsWith('/\\') &&
+    !trimmed.includes('\\') &&
+    !trimmed.includes(':')
+  ) {
+    return trimmed
+  }
+
+  return '/dashboard'
+}
+
 export function LoginPage() {
   const {
     signIn,
@@ -32,7 +64,19 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [googleConfig, setGoogleConfig] = useState<GoogleOAuthConfigResponse | null>(null)
 
-  const successNotice = (location.state as { message?: string } | null)?.message
+  const locationState = location.state as {
+    message?: string
+    sessionExpired?: boolean
+    from?: { pathname?: string } | string
+  } | null
+
+  const targetPath = getSafeRedirectPath(locationState?.from)
+
+  const isSessionExpired = Boolean(locationState?.sessionExpired)
+  const sessionNotice = isSessionExpired
+    ? (locationState?.message || 'Your session has expired. Please sign in again.')
+    : null
+  const successNotice = !isSessionExpired ? locationState?.message : null
 
   useEffect(() => {
     async function loadConfig() {
@@ -49,7 +93,7 @@ export function LoginPage() {
   }, [])
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to={targetPath} replace />
   }
 
   async function handleGoogleLogin() {
@@ -87,12 +131,14 @@ export function LoginPage() {
     try {
       await signIn(email, password)
 
-      navigate('/dashboard', {
+      const targetPath = getSafeRedirectPath(locationState?.from)
+
+      navigate(targetPath, {
         replace: true,
       })
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message)
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setError(caughtError.message)
       } else {
         setError('Unable to sign in')
       }
@@ -113,6 +159,15 @@ export function LoginPage() {
             Sign in to manage your IT service requests.
           </p>
         </div>
+
+        {sessionNotice && (
+          <p
+            className="form-error"
+            role="alert"
+          >
+            {sessionNotice}
+          </p>
+        )}
 
         {successNotice && (
           <p
