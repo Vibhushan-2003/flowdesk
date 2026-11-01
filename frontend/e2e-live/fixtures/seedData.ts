@@ -229,7 +229,17 @@ export async function ensureE2eAccountsProvisioned(baseUrl?: string): Promise<vo
 
   if (categoryId) {
     const supportToken = await loginAndGetToken(targetUrl, E2E_SUPPORT_ENGINEER)
-    const createArticleRes = await fetch(`${targetUrl}/api/support/kb/articles`, {
+    const checkArticlesRes = await fetch(`${targetUrl}/api/kb/articles?search=VPN`, {
+      headers: { Authorization: `Bearer ${supportToken}` },
+    })
+    let articleAlreadyExists = false
+    if (checkArticlesRes.ok) {
+      const searchData = (await checkArticlesRes.json()) as { content?: Array<{ title: string }> }
+      articleAlreadyExists = (searchData.content || []).some((a) => a.title === 'VPN Troubleshooting Guide')
+    }
+
+    if (!articleAlreadyExists) {
+      const createArticleRes = await fetch(`${targetUrl}/api/support/kb/articles`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -262,6 +272,7 @@ export async function ensureE2eAccountsProvisioned(baseUrl?: string): Promise<vo
           `Failed to publish E2E Knowledge Base article (HTTP ${statusRes.status})`,
         )
       }
+    }
     }
   }
 

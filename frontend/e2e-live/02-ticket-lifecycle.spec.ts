@@ -35,11 +35,9 @@ test.describe('Real-Stack Live: Ticket Creation & Idempotency Lifecycle', () => 
 
     // Confirmation page displays generated ticket number (format: FD-XXXXXX)
     await expect(page.getByRole('heading', { name: /ticket created successfully/i })).toBeVisible()
-    const ticketNumberLocator = page.locator('.ticket-success-number, strong, code').filter({
-      hasText: /FD-\d{6}/,
-    })
-    await expect(ticketNumberLocator.first()).toBeVisible()
-    const ticketNumber = (await ticketNumberLocator.first().innerText()).trim()
+    const ticketNumberLocator = page.locator('.ticket-success-number strong')
+    await expect(ticketNumberLocator).toBeVisible()
+    const ticketNumber = (await ticketNumberLocator.innerText()).trim()
     expect(ticketNumber).toMatch(/^FD-\d{6}$/)
 
     // Direct navigation to the ticket confirms real backend persistence
@@ -65,11 +63,9 @@ test.describe('Real-Stack Live: Ticket Creation & Idempotency Lifecycle', () => 
 
     // Successfully creates exactly one ticket
     await expect(page.getByRole('heading', { name: /ticket created successfully/i })).toBeVisible()
-    const ticketNumberLocator = page.locator('.ticket-success-number, strong, code').filter({
-      hasText: /FD-\d{6}/,
-    })
-    await expect(ticketNumberLocator.first()).toBeVisible()
-    const ticketNumber = (await ticketNumberLocator.first().innerText()).trim()
+    const ticketNumberLocator = page.locator('.ticket-success-number strong')
+    await expect(ticketNumberLocator).toBeVisible()
+    const ticketNumber = (await ticketNumberLocator.innerText()).trim()
     expect(ticketNumber).toMatch(/^FD-\d{6}$/)
   })
 

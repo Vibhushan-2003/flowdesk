@@ -29,11 +29,11 @@ test.describe('Real-Stack Live: Knowledge Base & Self-Service Deflection', () =>
     await searchInput.fill('VPN')
 
     // Expect published article to appear in live search results
-    await expect(page.getByText('VPN Troubleshooting Guide')).toBeVisible()
+    await expect(page.getByText('VPN Troubleshooting Guide').first()).toBeVisible()
 
     // Click article card to navigate to detail view
-    await page.getByText('VPN Troubleshooting Guide').click()
-    await expect(page.getByRole('heading', { name: 'VPN Troubleshooting Guide' })).toBeVisible()
+    await page.getByText('VPN Troubleshooting Guide').first().click()
+    await expect(page.getByRole('heading', { name: 'VPN Troubleshooting Guide' }).first()).toBeVisible()
     await expect(page.getByText(/restart the vpn client/i)).toBeVisible()
   })
 
@@ -48,7 +48,7 @@ test.describe('Real-Stack Live: Knowledge Base & Self-Service Deflection', () =>
 
     // Deflection card shows suggested article
     await expect(page.locator('.kb-deflection-card')).toBeVisible()
-    await expect(page.getByText('VPN Troubleshooting Guide')).toBeVisible()
+    await expect(page.locator('.kb-deflection-card').getByText('VPN Troubleshooting Guide').first()).toBeVisible()
 
     // Click "Solved My Issue" button
     const solvedButton = page.getByRole('button', { name: /solved my issue/i })
