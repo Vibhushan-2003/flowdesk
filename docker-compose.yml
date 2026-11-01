@@ -1,0 +1,145 @@
+services:
+  # ----------------------------------------------------------------------------
+  # Service 1: PostgreSQL Relational Database
+  # Completely isolated from host-installed PostgreSQL instance (port 5432 unmapped)
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: flowdesk-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-flowdesk}
+      POSTGRES_USER: ${DB_USER:-flowdesk_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Database password must be provided in environment file}
+    volumes:
+      - flowdesk_db_data:/var/lib/postgresql/data
+    networks:
+      - flowdesk_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-flowdesk_app} -d $${POSTGRES_DB:-flowdesk}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ----------------------------------------------------------------------------
+  # Service 2: Mailpit Mock SMTP & Web UI
+  # Captures outbound system emails (invitations, password resets) for local testing
+  # ----------------------------------------------------------------------------
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: flowdesk-compose-mailpit
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 5000
+    ports:
+      # Mailpit Web UI (default to host port 8026 to avoid collision if 8025 is busy)
+      - "${MAILPIT_WEB_PORT:-8026}:8025"
+    networks:
+      - flowdesk_network
+
+  # ----------------------------------------------------------------------------
+  # Service 3: Spring Boot Backend Application
+  # Runs as non-root user 'flowdesk' with dedicated attachment storage volume.
+  # Port 8080 remains internal; all browser REST & WebSocket traffic routes via Nginx.
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flowdesk-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment:
+      # Database connection (internal Docker service hostname)
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-flowdesk}
+      DB_USERNAME: ${DB_USER:-flowdesk_app}
+      DB_PASSWORD: ${DB_PASSWORD:?Database password must be provided in environment file}
+
+      # Authentication & Security
+      JWT_SECRET: ${JWT_SECRET:?JWT secret must be provided in environment file}
+
+      # Outbound Email (Mailpit container integration)
+      FLOWDESK_MAIL_ENABLED: "true"
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_AUTH: "false"
+      SMTP_STARTTLS: "false"
+      SMTP_SSL: "false"
+      FLOWDESK_MAIL_FROM_ADDRESS: ${FLOWDESK_MAIL_FROM_ADDRESS:-noreply@flowdesk.internal}
+      FLOWDESK_MAIL_FROM_NAME: ${FLOWDESK_MAIL_FROM_NAME:-FlowDesk}
+
+      # Frontend Origin (for CORS and reset/invitation email links)
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      FLOWDESK_FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+
+      # Attachment Storage (mapped to dedicated persistent volume)
+      ATTACHMENT_STORAGE_DIR: /app/data/attachments
+
+      # Diagnostic logging & Spring profile (default profile for local Docker demo)
+      SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
+
+      # Optional AI triage integration
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+
+      # Dormant bootstrap for long-running web application
+      FLOWDESK_BOOTSTRAP_ADMIN_ENABLED: "false"
+    volumes:
+      - flowdesk_attachments:/app/data/attachments
+    networks:
+      - flowdesk_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ----------------------------------------------------------------------------
+  # Service 4: React / Vite Frontend (Nginx Reverse Proxy)
+  # Serves static SPA, proxies /api and /ws, enforces security headers
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-http://localhost:3000}
+    container_name: flowdesk-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      # Frontend web port (safe host port 3000 to avoid conflict with Vite dev 5173)
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - flowdesk_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+# ------------------------------------------------------------------------------
+# Persistent Volumes (Isolated and project-scoped)
+# ------------------------------------------------------------------------------
+volumes:
+  flowdesk_db_data:
+    name: flowdesk_db_data
+  flowdesk_attachments:
+    name: flowdesk_attachments
+
+# ------------------------------------------------------------------------------
+# Isolated Bridge Network
+# ------------------------------------------------------------------------------
+networks:
+  flowdesk_network:
+    name: flowdesk_network
+    driver: bridge
