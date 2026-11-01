@@ -238,6 +238,13 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
+                        // Operational dashboard stats
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/dashboard/stats"
+                        )
+                        .authenticated()
+
                         // All remaining endpoints require JWT
                         .anyRequest()
                         .authenticated()

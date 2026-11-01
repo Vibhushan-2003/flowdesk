@@ -1,4 +1,3 @@
-
 package com.flowdesk.ticket.repository;
 
 import com.flowdesk.ticket.domain.TicketAssignment;
@@ -16,6 +15,8 @@ import org.springframework.data.jpa.repository.Query;
 
 import org.springframework.data.repository.query.Param;
 
+import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +40,46 @@ public interface TicketAssignmentRepository
                     String ticketNumber,
                     UUID assignedToUserId
             );
+
+    @Query("""
+            SELECT COUNT(assignment)
+            FROM TicketAssignment assignment
+            WHERE assignment.assignedToUser.id = :supportEngineerId
+              AND assignment.releasedAt IS NULL
+              AND assignment.ticket.status IN :activeStatuses
+            """)
+    long countActiveAssignments(
+            @Param("supportEngineerId") UUID supportEngineerId,
+            @Param("activeStatuses") Collection<TicketStatus> activeStatuses
+    );
+
+    @Query("""
+            SELECT COUNT(assignment)
+            FROM TicketAssignment assignment
+            WHERE assignment.assignedToUser.id = :supportEngineerId
+              AND assignment.releasedAt IS NULL
+              AND assignment.ticket.status IN :activeStatuses
+              AND (
+                    (
+                        assignment.ticket.status IN :responseStatuses
+                        AND assignment.ticket.firstRespondedAt IS NULL
+                        AND assignment.ticket.responseDueAt IS NOT NULL
+                        AND assignment.ticket.responseDueAt < :evaluatedAt
+                    )
+                    OR
+                    (
+                        assignment.ticket.resolvedAt IS NULL
+                        AND assignment.ticket.resolutionDueAt IS NOT NULL
+                        AND assignment.ticket.resolutionDueAt < :evaluatedAt
+                    )
+              )
+            """)
+    long countActiveAssignmentSlaBreaches(
+            @Param("supportEngineerId") UUID supportEngineerId,
+            @Param("evaluatedAt") OffsetDateTime evaluatedAt,
+            @Param("activeStatuses") Collection<TicketStatus> activeStatuses,
+            @Param("responseStatuses") Collection<TicketStatus> responseStatuses
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

@@ -38,6 +38,10 @@ public interface ApprovalRequestRepository
                     Pageable pageable
             );
 
+    long countByStatus(
+            ApprovalStatus status
+    );
+
     @Lock(
             LockModeType.PESSIMISTIC_WRITE
     )

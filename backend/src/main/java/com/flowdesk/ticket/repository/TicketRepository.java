@@ -21,8 +21,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-
-
 public interface TicketRepository
         extends JpaRepository<Ticket, UUID> {
 
@@ -36,6 +34,7 @@ public interface TicketRepository
             UUID createdByUserId,
             Pageable pageable
     );
+
     @Query(
         value = """
                 SELECT ticket
@@ -77,15 +76,14 @@ public interface TicketRepository
                       OR ticket.priority = :priority
                   )
                 """
-)
-Page<Ticket> searchMyTickets(
-        @Param("createdByUserId") UUID createdByUserId,
-        @Param("searchPattern") String searchPattern,
-        @Param("status") TicketStatus status,
-        @Param("priority") TicketPriority priority,
-        Pageable pageable
-);
-
+    )
+    Page<Ticket> searchMyTickets(
+            @Param("createdByUserId") UUID createdByUserId,
+            @Param("searchPattern") String searchPattern,
+            @Param("status") TicketStatus status,
+            @Param("priority") TicketPriority priority,
+            Pageable pageable
+    );
 
     Optional<Ticket> findByTicketNumberAndCreatedByUser_Id(
             String ticketNumber,
@@ -97,8 +95,22 @@ Page<Ticket> searchMyTickets(
             Pageable pageable
     );
 
+    long countByStatus(
+            TicketStatus status
+    );
+
     long countByStatusIn(
             Collection<TicketStatus> statuses
+    );
+
+    long countByCreatedByUser_IdAndStatusIn(
+            UUID createdByUserId,
+            Collection<TicketStatus> statuses
+    );
+
+    long countByCreatedByUser_IdAndStatus(
+            UUID createdByUserId,
+            TicketStatus status
     );
 
     @Query("""
@@ -123,6 +135,31 @@ Page<Ticket> searchMyTickets(
     long countCurrentResolutionSlaBreaches(
             @Param("evaluatedAt") OffsetDateTime evaluatedAt,
             @Param("statuses") Collection<TicketStatus> statuses
+    );
+
+    @Query("""
+            SELECT COUNT(ticket)
+            FROM Ticket ticket
+            WHERE ticket.status IN :activeStatuses
+              AND (
+                    (
+                        ticket.status IN :responseStatuses
+                        AND ticket.firstRespondedAt IS NULL
+                        AND ticket.responseDueAt IS NOT NULL
+                        AND ticket.responseDueAt < :evaluatedAt
+                    )
+                    OR
+                    (
+                        ticket.resolvedAt IS NULL
+                        AND ticket.resolutionDueAt IS NOT NULL
+                        AND ticket.resolutionDueAt < :evaluatedAt
+                    )
+              )
+            """)
+    long countCurrentActiveSlaBreaches(
+            @Param("evaluatedAt") OffsetDateTime evaluatedAt,
+            @Param("activeStatuses") Collection<TicketStatus> activeStatuses,
+            @Param("responseStatuses") Collection<TicketStatus> responseStatuses
     );
 
     @Query("""
