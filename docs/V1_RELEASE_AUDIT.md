@@ -1,9 +1,9 @@
 # FlowDesk V1 — Release Readiness & Verification Audit
 
 **Date**: November 2026  
-**Branch**: `feat/day56-session-e2e-release-audit`  
-**Base Commit**: `61e8e92`  
-**Scope**: Comprehensive capability, security, test tier classification, and release gate verification.
+**Branch**: `feat/day57-real-stack-e2e`  
+**Base Commit**: `7c9bbf7`  
+**Scope**: Comprehensive capability, security, test tier classification, and real-stack release gate acceptance.
 
 ---
 
@@ -18,7 +18,7 @@ To avoid false confidence in deployment readiness, FlowDesk explicitly different
 [ Tier 2: Mocked Browser Integration Tests (Playwright) ]
                          │
                          ▼
-[ Tier 3: Real Backend / Database E2E Verification ]  <-- REQUIRED RELEASE GATE
+[ Tier 3: Real Backend / Database E2E Verification ]  <-- REQUIRED RELEASE GATE (IMPLEMENTED; VERIFICATION PENDING CI RUNTIME)
                          │
                          ▼
 [ Tier 4: Local / Demo Deployment Readiness ]
@@ -41,16 +41,35 @@ To avoid false confidence in deployment readiness, FlowDesk explicitly different
 - **Explicit Boundary**: *Tier 2 does NOT prove live backend or database integration.*
 
 ### Tier 3 — Real Backend & Database End-to-End Verification
-- **Status**: **REQUIRED RELEASE ACCEPTANCE CHECK (Pending Automated Live-Stack Suite)**
-- **Definition**: Automated browser tests executing against a real running Spring Boot backend connected to a real PostgreSQL database with actual data persistence and WebSocket broker delivery.
-- **Current Position**: Manual API and staging verification passed on Day 54/55, but an automated, headless real-stack E2E suite in CI has not yet been established.
-- **Release Mandate**: *Production deployment cannot be claimed as fully verified solely because Tier 1 backend tests and Tier 2 mocked browser tests pass independently. Tier 3 live verification is a non-negotiable acceptance prerequisite before any general release.*
+- **Status**: **IMPLEMENTED (VERIFICATION PENDING CI RUNTIME EXECUTION)**
+- **Definition**: Automated browser tests executing against a real running Spring Boot backend connected to a real PostgreSQL database with actual data persistence, Flyway V1–V21 migrations, and WebSocket broker delivery.
+- **Implementation**:
+  - **Suite**: 12 end-to-end scenarios across 6 test specifications in `frontend/e2e-live/` executed via Chromium.
+  - **Isolation**: Dedicated Compose topology (`docker-compose.e2e.yml`) and CI job with isolated volumes (`flowdesk_e2e_db_data`, `flowdesk_e2e_attachments`), separate database (`flowdesk_e2e`), and disjoint ports (`3001` frontend, `8089` backend, `8027` mailpit, `5433` postgres).
+  - **Deterministic Seeding**: Automated test account provisioning (`admin@flowdesk.test`, `employee.e2e@flowdesk.test`, `employee2.e2e@flowdesk.test`, `support.e2e@flowdesk.test`) and Knowledge Base articles via authenticated REST APIs without manual database seeding or test-only endpoints.
+  - **Fail-Closed CI Release Gate**: The suite strictly enforces backend reachability; in CI (`CI=true` or `STRICT_LIVE_E2E=true`), an offline or unreachable stack causes immediate test and job failure (fail-closed).
+  - **Local Development Opt-Out**: Local execution gracefully skips only when Docker runtime is offline, preventing accidental fallback to development (`flowdesk`) or test (`flowdesk_test`) databases.
+  - **CI Workflow**: Dedicated `e2e-live` job in `.github/workflows/ci.yml` running on `ubuntu-latest` with a real PostgreSQL 18 service container, live Spring Boot application, and Vite preview server.
+- **Target Acceptance Coverage**:
+  1. Real employee authentication, JWT session storage, and clean logout.
+  2. Invalid credential rejection and protected route enforcement.
+  3. Real ticket creation persisted with sequential numbering (`FD-XXXXXX`) in PostgreSQL.
+  4. Rapid double-click button debouncing preventing duplicate database records.
+  5. Idempotency key replay returning identical response with zero row duplication.
+  6. Employee dashboard displaying real live personal metrics from PostgreSQL (`/api/dashboard/stats`).
+  7. Administrator dashboard displaying real live system-wide operational counts.
+  8. Cross-employee data privacy and access control isolation.
+  9. Knowledge base article search and retrieval against live database records.
+  10. Ticket deflection flow via "Solved My Issue" avoiding ticket creation.
+  11. Real attachment upload, persistence, and authorized byte-identical download (`/download`).
+  12. Real session expiration detection, UI banner notification, and safe re-login.
+- **Release Mandate**: *Tier 3 remains pending actual runtime execution in GitHub Actions CI. Passing skipped tests locally does not constitute verification.*
 
 ### Tier 4 — Local & Demo Readiness
-- **Status**: **VERIFIED & OPERATIONAL**
+- **Status**: **CONDITIONAL (Pending Tier 3 CI Acceptance)**
 - **Topology**: Fully containerized multi-stage Docker Compose stack (`flowdesk-frontend`, `flowdesk-backend`, `flowdesk-postgres`, `flowdesk-compose-mailpit`).
 - **Security & Isolation**: Backend runs unprivileged (`flowdesk:10001`), database port `5432` and backend port `8080` remain purely internal to `flowdesk_network`, attachments are isolated in `flowdesk_attachments` volume, and host database instances are untouched.
-- **Suitability**: Ready for internal team demonstrations, local operator evaluation, and developer environments.
+- **Suitability**: Ready for internal team demonstrations and local operator evaluation once CI confirms real-stack E2E pass.
 
 ### Tier 5 — Internet-Facing Production Readiness
 - **Status**: **CONDITIONAL / BLOCKED (Requires Remediation)**
@@ -69,7 +88,7 @@ To avoid false confidence in deployment readiness, FlowDesk explicitly different
 | **5. Knowledge Base & Deflection** | **Production-Ready** | Public vs internal article scoping, full-text search, "Solved My Issue" deflection counting with ticket creation avoidance. | No AI vector semantic search; keyword-based matching only. |
 | **6. Approvals & Workflows** | **Production-Ready** | Role-gated approval actions (`TEAM_LEAD`, `ADMIN`), approval status transitions, audit log recording. | Fixed single-level approval hierarchy; custom multi-tier dynamic approval workflows not yet supported. |
 | **7. Docker Containerization** | **Production-Ready** | Multi-stage distroless/Alpine builds, non-root user `10001`, health checks across all four services, secret segregation via `.env.docker`, internal-only backend/database ports. | Single-host Compose architecture; Kubernetes Helm charts / container orchestration manifests not included in V1. |
-| **8. Automated Test Suite & CI** | **Production-Ready** | 862 backend tests, 12 Playwright mocked browser tests, GitHub Actions CI running both suites with report/trace artifacts on failure. | Real-stack automated browser test suite (Tier 3) needs to be integrated into CI. |
+| **8. Automated Test Suite & CI** | **Production-Ready** | 862 backend tests, 12 Playwright mocked browser tests (Tier 2), 12 Playwright real-stack tests (Tier 3), GitHub Actions CI running all suites with report/trace artifacts on failure. | Real-stack tests require containerized or live environment; fails closed in CI if backend is unreachable. |
 | **9. User Management & RBAC** | **Production-Ready** | Four discrete roles (`EMPLOYEE`, `SUPPORT_ENGINEER`, `TEAM_LEAD`, `ADMIN`), secure invitation tokens, password complexity validation, bootstrap admin script with mandatory initial rotation. | No SAML 2.0 / Enterprise SSO (only Google OAuth2 PKCE supported). |
 
 ---
@@ -79,7 +98,7 @@ To avoid false confidence in deployment readiness, FlowDesk explicitly different
 Before exposing FlowDesk to public production traffic, the following blockers must be addressed:
 
 1. **Automated Tier 3 Real-Stack E2E Suite**:
-   Establish a CI job running Playwright against a live containerized FlowDesk backend and database to validate end-to-end network, transaction, and WebSocket boundaries without mocks.
+   **IMPLEMENTED & GATED (Pending CI Execution)** — Implemented 12 real-stack browser acceptance scenarios in `frontend/e2e-live/`, dedicated isolated Compose topology (`docker-compose.e2e.yml`), and fail-closed `e2e-live` job in GitHub Actions CI with zero mocks. Certified upon first passing CI run.
 2. **TLS Termination & Ingress Controller**:
    Deploy FlowDesk behind an enterprise reverse proxy or Cloud Load Balancer (e.g., Cloudflare, AWS ALB, Nginx Ingress) providing HTTPS with TLS 1.3, HSTS, and DDoS mitigation.
 3. **Session Management Modernization**:
@@ -88,3 +107,4 @@ Before exposing FlowDesk to public production traffic, the following blockers mu
    Integrate ClamAV or cloud virus scanning API into the `AttachmentService` pipeline prior to saving attachments to disk or serving them to users.
 5. **Distributed Scheduler Locking**:
    Add `ShedLock` to SLA evaluation schedulers if deploying more than one backend replica to prevent concurrent duplicate SLA notifications.
+
