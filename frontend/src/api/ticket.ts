@@ -1,3 +1,4 @@
+import { notifySessionExpired } from '../auth/sessionEvents'
 
 import { API_BASE_URL } from './config'
 
@@ -78,6 +79,7 @@ export async function createTicket(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -127,6 +129,7 @@ export async function getMyTickets(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -166,6 +169,7 @@ export async function getTicket(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -201,6 +205,7 @@ export async function getTicketComments(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -241,6 +246,7 @@ export async function addTicketComment(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -289,6 +295,7 @@ export async function getSupportQueue(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -334,6 +341,7 @@ export async function claimTicket(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -389,6 +397,7 @@ export async function getMyAssignedTickets(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -440,6 +449,7 @@ export async function getSupportTicketHistory(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -485,6 +495,7 @@ export async function getSupportTicket(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -530,6 +541,7 @@ export async function getSupportTicketComments(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -578,6 +590,7 @@ export async function addSupportTicketComment(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -642,6 +655,7 @@ export async function updateSupportTicketStatus(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )
@@ -706,6 +720,7 @@ export async function resolveSupportTicket(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )

@@ -1,3 +1,4 @@
+import { notifySessionExpired } from '../auth/sessionEvents'
 import {
   API_BASE_URL,
 } from './config'
@@ -46,6 +47,7 @@ export async function getAuditEvents(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error(
         'Your session is no longer valid',
       )

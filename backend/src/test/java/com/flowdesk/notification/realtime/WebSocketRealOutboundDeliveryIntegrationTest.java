@@ -129,7 +129,7 @@ class WebSocketRealOutboundDeliveryIntegrationTest {
         when(jwtDecoder.decode(tokenValue))
                 .thenReturn(jwt);
 
-        when(authenticationConverter.convert(jwt))
+        when(authenticationConverter.convert(org.mockito.ArgumentMatchers.argThat(j -> j != null && userId.equals(j.getSubject()))))
                 .thenReturn(authentication);
 
         /*

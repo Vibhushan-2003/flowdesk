@@ -1,3 +1,4 @@
+import { notifySessionExpired } from '../auth/sessionEvents'
 import { API_BASE_URL } from "./config";
 
 import type {
@@ -22,7 +23,8 @@ export async function getMyNotifications(
   );
 
   if (response.status === 401) {
-    throw new Error("Your session has expired. Please log in again.");
+      notifySessionExpired()
+      throw new Error("Your session has expired. Please log in again.");
   }
 
   if (response.status === 400) {
@@ -50,7 +52,8 @@ export async function getUnreadNotificationCount(
   );
 
   if (response.status === 401) {
-    throw new Error("Your session has expired. Please log in again.");
+      notifySessionExpired()
+      throw new Error("Your session has expired. Please log in again.");
   }
 
   if (!response.ok) {
@@ -78,7 +81,8 @@ export async function markNotificationAsRead(
   );
 
   if (response.status === 401) {
-    throw new Error("Your session has expired. Please log in again.");
+      notifySessionExpired()
+      throw new Error("Your session has expired. Please log in again.");
   }
 
   if (response.status === 404) {

@@ -1,3 +1,4 @@
+import { notifySessionExpired } from '../auth/sessionEvents'
 import { API_BASE_URL } from './config'
 import type {
   ArticleStatus,
@@ -15,6 +16,7 @@ import type {
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error('Your session is no longer valid')
     }
     if (response.status === 403) {

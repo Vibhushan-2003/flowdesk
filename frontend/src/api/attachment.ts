@@ -1,3 +1,4 @@
+import { notifySessionExpired } from '../auth/sessionEvents'
 import { API_BASE_URL } from './config'
 import type { TicketAttachmentResponse } from '../types/attachment'
 
@@ -39,6 +40,7 @@ export async function uploadAttachment(
     const backendMessage = errorBody?.message
 
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error('Your session is no longer valid. Please sign in again.')
     }
     if (response.status === 403) {
@@ -89,6 +91,7 @@ export async function listAttachments(
     const backendMessage = errorBody?.message
 
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error('Your session is no longer valid. Please sign in again.')
     }
     if (response.status === 403) {
@@ -132,6 +135,7 @@ export async function downloadAttachment(
     const backendMessage = errorBody?.message
 
     if (response.status === 401) {
+      notifySessionExpired()
       throw new Error('Your session is no longer valid. Please sign in again.')
     }
     if (response.status === 403) {

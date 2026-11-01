@@ -95,10 +95,10 @@ class WebSocketTwoUserIsolationIntegrationTest {
         when(jwtDecoder.decode(tokenA)).thenReturn(jwtA);
         when(jwtDecoder.decode(tokenB)).thenReturn(jwtB);
 
-        when(authenticationConverter.convert(jwtA))
+        when(authenticationConverter.convert(org.mockito.ArgumentMatchers.argThat(j -> j != null && userA.equals(j.getSubject()))))
                 .thenReturn(authA);
 
-        when(authenticationConverter.convert(jwtB))
+        when(authenticationConverter.convert(org.mockito.ArgumentMatchers.argThat(j -> j != null && userB.equals(j.getSubject()))))
                 .thenReturn(authB);
 
         BlockingQueue<String> receivedA =

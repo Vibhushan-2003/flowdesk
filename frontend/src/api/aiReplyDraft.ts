@@ -1,3 +1,4 @@
+import { notifySessionExpired } from '../auth/sessionEvents'
 import { API_BASE_URL } from './config'
 
 import type {
@@ -36,6 +37,7 @@ export async function generateAiReplyDraft(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new AiReplyDraftApiError(
         'Your session is no longer valid',
         response.status,

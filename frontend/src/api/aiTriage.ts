@@ -1,3 +1,4 @@
+import { notifySessionExpired } from '../auth/sessionEvents'
 import { API_BASE_URL } from './config'
 
 import type {
@@ -41,6 +42,7 @@ export async function getAiTriageRecommendation(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new AiTriageApiError(
         'Your session is no longer valid',
         response.status,
@@ -83,6 +85,7 @@ export async function generateAiTriageRecommendation(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new AiTriageApiError(
         'Your session is no longer valid',
         response.status,
@@ -146,6 +149,7 @@ export async function applyAiTriageRecommendation(
 
   if (!response.ok) {
     if (response.status === 401) {
+      notifySessionExpired()
       throw new AiTriageApiError(
         'Your session is no longer valid',
         response.status,
