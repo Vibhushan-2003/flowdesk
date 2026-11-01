@@ -16,6 +16,8 @@ import com.flowdesk.sla.repository.SlaPolicyRepository;
 
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.TicketIdempotencyRecord;
+import com.flowdesk.ticket.domain.TicketIdempotencyStatus;
 import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketStatus;
 import com.flowdesk.ticket.domain.TicketType;
@@ -26,6 +28,7 @@ import com.flowdesk.ticket.dto.TicketResponse;
 import com.flowdesk.ticket.dto.TicketSummaryResponse;
 
 import com.flowdesk.ticket.repository.TicketAssignmentRepository;
+import com.flowdesk.ticket.repository.TicketIdempotencyRepository;
 import com.flowdesk.ticket.repository.TicketRepository;
 
 import com.flowdesk.user.domain.RoleCode;
@@ -34,6 +37,7 @@ import com.flowdesk.user.repository.UserRepository;
 
 import jakarta.transaction.Transactional;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -45,37 +49,29 @@ import org.springframework.stereotype.Service;
 
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class TicketService {
 
-    private final TicketRepository
-            ticketRepository;
-
-    private final TicketAssignmentRepository
-            ticketAssignmentRepository;
-
-    private final UserRepository
-            userRepository;
-
-    private final SlaPolicyRepository
-            slaPolicyRepository;
-
-    private final ApprovalRequestRepository
-            approvalRequestRepository;
-
-    private final ApprovalNotificationService
-            approvalNotificationService;
-
-    private final AuditService
-            auditService;
+    private final TicketRepository ticketRepository;
+    private final TicketAssignmentRepository ticketAssignmentRepository;
+    private final UserRepository userRepository;
+    private final SlaPolicyRepository slaPolicyRepository;
+    private final ApprovalRequestRepository approvalRequestRepository;
+    private final ApprovalNotificationService approvalNotificationService;
+    private final AuditService auditService;
+    private final TicketIdempotencyRepository ticketIdempotencyRepository;
 
     public TicketService(
             TicketRepository ticketRepository,
@@ -86,30 +82,169 @@ public class TicketService {
             ApprovalNotificationService approvalNotificationService,
             AuditService auditService
     ) {
-        this.ticketRepository =
-                ticketRepository;
+        this(
+                ticketRepository,
+                ticketAssignmentRepository,
+                userRepository,
+                slaPolicyRepository,
+                approvalRequestRepository,
+                approvalNotificationService,
+                auditService,
+                null
+        );
+    }
 
-        this.ticketAssignmentRepository =
-                ticketAssignmentRepository;
-
-        this.userRepository =
-                userRepository;
-
-        this.slaPolicyRepository =
-                slaPolicyRepository;
-
-        this.approvalRequestRepository =
-                approvalRequestRepository;
-
-        this.approvalNotificationService =
-                approvalNotificationService;
-
-        this.auditService =
-                auditService;
+    @Autowired
+    public TicketService(
+            TicketRepository ticketRepository,
+            TicketAssignmentRepository ticketAssignmentRepository,
+            UserRepository userRepository,
+            SlaPolicyRepository slaPolicyRepository,
+            ApprovalRequestRepository approvalRequestRepository,
+            ApprovalNotificationService approvalNotificationService,
+            AuditService auditService,
+            @Autowired(required = false)
+            TicketIdempotencyRepository ticketIdempotencyRepository
+    ) {
+        this.ticketRepository = ticketRepository;
+        this.ticketAssignmentRepository = ticketAssignmentRepository;
+        this.userRepository = userRepository;
+        this.slaPolicyRepository = slaPolicyRepository;
+        this.approvalRequestRepository = approvalRequestRepository;
+        this.approvalNotificationService = approvalNotificationService;
+        this.auditService = auditService;
+        this.ticketIdempotencyRepository = ticketIdempotencyRepository;
     }
 
     @Transactional
     public TicketResponse createTicket(
+            UUID authenticatedUserId,
+            CreateTicketRequest request
+    ) {
+        return createTicket(authenticatedUserId, request, null);
+    }
+
+    @Transactional
+    public TicketResponse createTicket(
+            UUID authenticatedUserId,
+            CreateTicketRequest request,
+            String idempotencyKey
+    ) {
+        if (idempotencyKey == null || idempotencyKey.isBlank() || ticketIdempotencyRepository == null) {
+            return executeCreateTicket(authenticatedUserId, request);
+        }
+
+        String trimmedKey = idempotencyKey.trim();
+        if (trimmedKey.length() > 128) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Idempotency-Key must not exceed 128 characters"
+            );
+        }
+
+        String requestHash = computeRequestHash(request);
+
+        Optional<TicketIdempotencyRecord> existingOpt =
+                ticketIdempotencyRepository
+                        .findByUserIdAndIdempotencyKey(
+                                authenticatedUserId,
+                                trimmedKey
+                        );
+
+        if (existingOpt.isPresent()) {
+            TicketIdempotencyRecord existing = existingOpt.get();
+            if (!existing.getRequestHash().equals(requestHash)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Idempotency key has already been used with a different request payload"
+                );
+            }
+            if (existing.getStatus() == TicketIdempotencyStatus.COMPLETED && existing.getTicket() != null) {
+                return toResponse(existing.getTicket());
+            }
+            if (existing.getStatus() == TicketIdempotencyStatus.IN_PROGRESS) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "A request with this idempotency key is currently in progress"
+                );
+            }
+        }
+
+        TicketResponse response = executeCreateTicket(authenticatedUserId, request);
+        Ticket savedTicket = ticketRepository.findById(response.id())
+                .orElseThrow(() -> new IllegalStateException("Created ticket not found"));
+
+        TicketIdempotencyRecord record = new TicketIdempotencyRecord(
+                authenticatedUserId,
+                trimmedKey,
+                requestHash,
+                TicketIdempotencyStatus.COMPLETED
+        );
+        record.markCompleted(savedTicket);
+        ticketIdempotencyRepository.saveAndFlush(record);
+
+        return response;
+    }
+
+    @Transactional
+    public TicketResponse resolveIdempotentTicket(
+            UUID authenticatedUserId,
+            String idempotencyKey,
+            String expectedRequestHash
+    ) {
+        if (ticketIdempotencyRepository == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Idempotency repository is not configured"
+            );
+        }
+
+        TicketIdempotencyRecord record = ticketIdempotencyRepository
+                .findByUserIdAndIdempotencyKey(authenticatedUserId, idempotencyKey)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Concurrent ticket creation conflict. Please retry."
+                ));
+
+        if (!record.getRequestHash().equals(expectedRequestHash)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Idempotency key has already been used with a different request payload"
+            );
+        }
+
+        if (record.getStatus() == TicketIdempotencyStatus.COMPLETED && record.getTicket() != null) {
+            return toResponse(record.getTicket());
+        }
+
+        throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Concurrent ticket creation with this idempotency key is in progress. Please retry."
+        );
+    }
+
+    public static String computeRequestHash(CreateTicketRequest request) {
+        String normalized = (request.type() != null ? request.type().name() : "")
+                + "|" + (request.title() != null ? request.title().trim() : "")
+                + "|" + (request.description() != null ? request.description().trim() : "");
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(normalized.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm unavailable", e);
+        }
+    }
+
+    private TicketResponse executeCreateTicket(
             UUID authenticatedUserId,
             CreateTicketRequest request
     ) {

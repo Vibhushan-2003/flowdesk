@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -48,6 +48,9 @@ export function CreateTicketPage() {
   const [description, setDescription] = useState(initialDraft?.description ?? '')
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const isSubmittingRef = useRef(false)
+  const idempotencyKeyRef = useRef<string | null>(null)
+
   const [isSolved, setIsSolved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [createdTicket, setCreatedTicket] =
@@ -71,6 +74,7 @@ export function CreateTicketPage() {
     setDescription('')
     setError(null)
     sessionStorage.removeItem(TICKET_DRAFT_KEY)
+    idempotencyKeyRef.current = null
   }
 
   async function handleSubmit(
@@ -78,8 +82,8 @@ export function CreateTicketPage() {
   ) {
     event.preventDefault()
 
-    // Prevent submission while solved or already submitting
-    if (isSolved || isSubmitting) {
+    // Prevent submission while solved or already submitting (synchronous ref check prevents rapid double-clicks)
+    if (isSolved || isSubmitting || isSubmittingRef.current) {
       return
     }
 
@@ -99,7 +103,16 @@ export function CreateTicketPage() {
       return
     }
 
+    isSubmittingRef.current = true
     setIsSubmitting(true)
+
+    // Generate or reuse idempotency key for this submission attempt
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `ticket-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`
+    }
 
     try {
       const response = await createTicket(
@@ -109,8 +122,11 @@ export function CreateTicketPage() {
           description: trimmedDescription,
         },
         accessToken,
+        idempotencyKeyRef.current,
       )
 
+      // On successful creation, reset idempotency key so next ticket gets a fresh key
+      idempotencyKeyRef.current = null
       sessionStorage.removeItem(TICKET_DRAFT_KEY)
       setCreatedTicket(response)
 
@@ -118,12 +134,14 @@ export function CreateTicketPage() {
       setTitle('')
       setDescription('')
     } catch (caughtError) {
+      // Retain the same idempotency key on failure so retrying sends the same key
       if (caughtError instanceof Error) {
         setError(caughtError.message)
       } else {
         setError('Unable to create ticket')
       }
     } finally {
+      isSubmittingRef.current = false
       setIsSubmitting(false)
     }
   }
@@ -242,9 +260,10 @@ export function CreateTicketPage() {
 
               <select
                 value={type}
-                onChange={(event) =>
+                onChange={(event) => {
                   setType(event.target.value as TicketType)
-                }
+                  idempotencyKeyRef.current = null
+                }}
                 disabled={isSubmitting}
               >
                 <option value="INCIDENT">
@@ -263,9 +282,15 @@ export function CreateTicketPage() {
               <input
                 type="text"
                 value={title}
-                onChange={(event) =>
+                onChange={(event) => {
                   setTitle(event.target.value)
-                }
+                  idempotencyKeyRef.current = null
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (isSubmitting || isSubmittingRef.current)) {
+                    e.preventDefault()
+                  }
+                }}
                 maxLength={200}
                 placeholder="Example: VPN is not working"
                 disabled={isSubmitting}
@@ -294,9 +319,10 @@ export function CreateTicketPage() {
 
               <textarea
                 value={description}
-                onChange={(event) =>
+                onChange={(event) => {
                   setDescription(event.target.value)
-                }
+                  idempotencyKeyRef.current = null
+                }}
                 maxLength={5000}
                 placeholder="Describe the issue or request"
                 rows={6}
@@ -317,6 +343,7 @@ export function CreateTicketPage() {
             <button
               type="submit"
               disabled={isSubmitting}
+              aria-busy={isSubmitting}
             >
               {isSubmitting
                 ? 'Creating ticket...'

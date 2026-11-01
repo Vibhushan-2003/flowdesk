@@ -56,15 +56,22 @@ function buildTicketListQuery(
 export async function createTicket(
   request: CreateTicketRequest,
   accessToken: string,
+  idempotencyKey?: string,
 ): Promise<TicketResponse> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${accessToken}`,
+  }
+
+  if (idempotencyKey && idempotencyKey.trim()) {
+    headers['Idempotency-Key'] = idempotencyKey.trim()
+  }
+
   const response = await fetch(
     `${API_BASE_URL}/api/tickets`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers,
       body: JSON.stringify(request),
     },
   )
@@ -73,6 +80,12 @@ export async function createTicket(
     if (response.status === 401) {
       throw new Error(
         'Your session is no longer valid',
+      )
+    }
+
+    if (response.status === 409) {
+      throw new Error(
+        'A ticket submission with these details is already being processed or conflicting with an earlier submission. Please check your tickets.',
       )
     }
 

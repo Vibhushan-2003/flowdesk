@@ -3151,3 +3151,80 @@
   border-color: #111827;
   color: #ffffff;
 }
+
+/* Day 55: Operational Dashboard KPI Metrics */
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+  margin: 16px 0 20px;
+}
+
+.dashboard-kpi-chip {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  text-align: left;
+}
+
+.dashboard-kpi-chip-alert {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.dashboard-kpi-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.dashboard-kpi-chip-alert .dashboard-kpi-value {
+  color: #b91c1c;
+}
+
+.dashboard-kpi-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.dashboard-metrics-loading {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-metrics-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: #991b1b;
+  font-size: 0.875rem;
+}
+
+.dashboard-metrics-error button {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  background: #ffffff;
+  border: 1px solid #f87171;
+  color: #b91c1c;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.dashboard-metrics-error button:hover {
+  background: #fef2f2;
+}

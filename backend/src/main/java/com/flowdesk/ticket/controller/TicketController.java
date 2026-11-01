@@ -1,4 +1,3 @@
-
 package com.flowdesk.ticket.controller;
 
 import com.flowdesk.common.dto.PageResponse;
@@ -18,6 +17,7 @@ import com.flowdesk.ticket.service.TicketService;
 
 import jakarta.validation.Valid;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -55,20 +56,37 @@ public class TicketController {
     @PostMapping
     public ResponseEntity<TicketResponse> createTicket(
             @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody CreateTicketRequest request
     ) {
         UUID authenticatedUserId =
                 UUID.fromString(jwt.getSubject());
 
-        TicketResponse response =
-                ticketService.createTicket(
-                        authenticatedUserId,
-                        request
-                );
+        try {
+            TicketResponse response =
+                    ticketService.createTicket(
+                            authenticatedUserId,
+                            request,
+                            idempotencyKey
+                    );
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(response);
+        } catch (DataIntegrityViolationException dive) {
+            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+                TicketResponse response =
+                        ticketService.resolveIdempotentTicket(
+                                authenticatedUserId,
+                                idempotencyKey.trim(),
+                                TicketService.computeRequestHash(request)
+                        );
+                return ResponseEntity
+                        .status(HttpStatus.CREATED)
+                        .body(response);
+            }
+            throw dive;
+        }
     }
 
     @GetMapping("/my")
@@ -176,8 +194,8 @@ public class TicketController {
                 );
 
         return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
+                    .status(HttpStatus.CREATED)
+                    .body(response);
     }
 
     @GetMapping("/{ticketNumber}")
