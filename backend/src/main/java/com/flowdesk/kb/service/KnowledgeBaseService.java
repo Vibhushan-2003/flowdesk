@@ -134,6 +134,31 @@ public class KnowledgeBaseService {
         return KbArticleResponse.from(article);
     }
 
+    @Transactional
+    public void recordDeflection(UUID articleId, User user) {
+        KbArticle article = articleRepository.findById(articleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Article not found"));
+        article.incrementDeflectionCount();
+        if (user != null) {
+            auditService.recordUserAction(
+                    user,
+                    AuditAction.KB_ARTICLE_DEFLECTED,
+                    AuditTargetType.KB_ARTICLE,
+                    article.getId(),
+                    article.getSlug(),
+                    Map.of("title", article.getTitle(), "deflectionCount", article.getDeflectionCount())
+            );
+        } else {
+            auditService.recordSystemAction(
+                    AuditAction.KB_ARTICLE_DEFLECTED,
+                    AuditTargetType.KB_ARTICLE,
+                    article.getId(),
+                    article.getSlug(),
+                    Map.of("title", article.getTitle(), "deflectionCount", article.getDeflectionCount())
+            );
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<KbArticleDeflectionResponse> getDeflectionSuggestions(String query) {
         if (query == null || query.trim().length() < 3) {

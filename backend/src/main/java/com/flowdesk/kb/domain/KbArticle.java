@@ -54,6 +54,9 @@ public class KbArticle {
     @Column(name = "view_count", nullable = false)
     private int viewCount = 0;
 
+    @Column(name = "deflection_count", nullable = false)
+    private int deflectionCount = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -75,6 +78,7 @@ public class KbArticle {
         this.author = Objects.requireNonNull(author, "author must not be null");
         this.status = ArticleStatus.DRAFT;
         this.viewCount = 0;
+        this.deflectionCount = 0;
     }
 
     @PrePersist
@@ -95,6 +99,10 @@ public class KbArticle {
 
     public void incrementViewCount() {
         this.viewCount++;
+    }
+
+    public void incrementDeflectionCount() {
+        this.deflectionCount++;
     }
 
     public void update(String title, String summary, String contentMarkdown, KbCategory category) {
@@ -184,6 +192,14 @@ public class KbArticle {
 
     public void setViewCount(int viewCount) {
         this.viewCount = viewCount;
+    }
+
+    public int getDeflectionCount() {
+        return deflectionCount;
+    }
+
+    public void setDeflectionCount(int deflectionCount) {
+        this.deflectionCount = deflectionCount;
     }
 
     public Instant getCreatedAt() {

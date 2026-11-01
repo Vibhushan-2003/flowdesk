@@ -199,6 +199,16 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
+                        // Operational reporting - Team Lead and Admin only
+                        .requestMatchers(
+                                "/api/reports",
+                                "/api/reports/**"
+                        )
+                        .hasAnyRole(
+                                "TEAM_LEAD",
+                                "ADMIN"
+                        )
+
                         // Support engineer queue
                         .requestMatchers(
                                 HttpMethod.GET,

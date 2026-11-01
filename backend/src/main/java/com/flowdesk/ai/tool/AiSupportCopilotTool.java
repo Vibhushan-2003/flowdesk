@@ -6,5 +6,7 @@ public enum AiSupportCopilotTool {
 
     GET_PUBLIC_CONVERSATION,
 
-    GET_SLA_SNAPSHOT
+    GET_SLA_SNAPSHOT,
+
+    SEARCH_KNOWLEDGE_BASE
 }

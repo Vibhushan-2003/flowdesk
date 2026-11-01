@@ -8,11 +8,13 @@ import com.flowdesk.ticket.domain.TicketComment;
 
 import com.flowdesk.ticket.repository.TicketAssignmentRepository;
 import com.flowdesk.ticket.repository.TicketCommentRepository;
+import com.flowdesk.kb.repository.KbArticleRepository;
 
 import com.flowdesk.user.domain.User;
 
 import org.springframework.http.HttpStatus;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -38,15 +40,30 @@ public class AiSupportCopilotToolService {
     private final TicketCommentRepository
             ticketCommentRepository;
 
+    private final KbArticleRepository
+            kbArticleRepository;
+
     public AiSupportCopilotToolService(
             TicketAssignmentRepository ticketAssignmentRepository,
             TicketCommentRepository ticketCommentRepository
+    ) {
+        this(ticketAssignmentRepository, ticketCommentRepository, null);
+    }
+
+    @Autowired
+    public AiSupportCopilotToolService(
+            TicketAssignmentRepository ticketAssignmentRepository,
+            TicketCommentRepository ticketCommentRepository,
+            KbArticleRepository kbArticleRepository
     ) {
         this.ticketAssignmentRepository =
                 ticketAssignmentRepository;
 
         this.ticketCommentRepository =
                 ticketCommentRepository;
+
+        this.kbArticleRepository =
+                kbArticleRepository;
     }
 
     /*
@@ -213,6 +230,48 @@ public class AiSupportCopilotToolService {
      * reasoning, a later tool call must not continue
      * reading the ticket for the previous engineer.
      */
+    /*
+     * READ-ONLY TOOL 4
+     *
+     * Searches published Knowledge Base articles relevant to the
+     * ticket topic for verified enterprise troubleshooting guides.
+     */
+    @Transactional(readOnly = true)
+    public List<AiSupportCopilotKbArticleSummary>
+            getKnowledgeBaseSuggestions(
+                    UUID authenticatedUserId,
+                    String ticketNumber
+            ) {
+
+        TicketAssignment assignment =
+                findActiveAssignment(
+                        authenticatedUserId,
+                        ticketNumber
+                );
+
+        Ticket ticket =
+                assignment.getTicket();
+
+        String query =
+                ticket.getTitle();
+
+        return kbArticleRepository
+                .findDeflectionSuggestions(query, 3)
+                .stream()
+                .map(
+                        article ->
+                                new AiSupportCopilotKbArticleSummary(
+                                        article.getTitle(),
+                                        article.getSummary(),
+                                        article.getSlug(),
+                                        article.getCategory() != null
+                                                ? article.getCategory().getName()
+                                                : "General"
+                                )
+                )
+                .toList();
+    }
+
     private TicketAssignment
             findActiveAssignment(
                     UUID authenticatedUserId,

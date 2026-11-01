@@ -361,6 +361,18 @@ export function DashboardPage() {
               >
                 Open SLA dashboard
               </button>
+
+              <button
+                type="button"
+                className="dashboard-secondary-button"
+                onClick={() =>
+                  navigate(
+                    '/reports',
+                  )
+                }
+              >
+                Operational reports
+              </button>
             </div>
           </article>
         )}

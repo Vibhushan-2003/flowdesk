@@ -259,7 +259,7 @@ class GeminiAiSupportCopilotClientTest {
                 "tools");
 
         assertEquals(
-                3,
+                4,
                 tools.size());
 
         Set<String> toolNames = tools
@@ -277,7 +277,8 @@ class GeminiAiSupportCopilotClientTest {
                 Set.of(
                         "get_ticket_overview",
                         "get_public_conversation",
-                        "get_sla_snapshot"),
+                        "get_sla_snapshot",
+                        "search_knowledge_base"),
                 toolNames);
 
         for (Object toolValue : tools) {
