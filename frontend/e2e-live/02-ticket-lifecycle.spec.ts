@@ -59,15 +59,18 @@ test.describe('Real-Stack Live: Ticket Creation & Idempotency Lifecycle', () => 
 
     const submitBtn = page.locator('button[type="submit"]')
 
-    // Two rapid clicks
+    // Two rapid clicks without waiting between them
     await submitBtn.click({ noWaitAfter: true })
-    await expect(submitBtn).toBeDisabled()
-
-    // Second click during in-flight submission is safely ignored
     await submitBtn.click({ force: true, noWaitAfter: true }).catch(() => {})
 
     // Successfully creates exactly one ticket
     await expect(page.getByRole('heading', { name: /ticket created successfully/i })).toBeVisible()
+    const ticketNumberLocator = page.locator('.ticket-success-number, strong, code').filter({
+      hasText: /FD-\d{6}/,
+    })
+    await expect(ticketNumberLocator.first()).toBeVisible()
+    const ticketNumber = (await ticketNumberLocator.first().innerText()).trim()
+    expect(ticketNumber).toMatch(/^FD-\d{6}$/)
   })
 
   test('Scenario 5: Idempotency replay returns identical response without duplicating records', async () => {

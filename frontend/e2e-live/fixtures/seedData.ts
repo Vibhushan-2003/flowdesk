@@ -99,12 +99,19 @@ export async function assertLiveStackReady(): Promise<boolean> {
   return true
 }
 
+const tokenCache = new Map<string, string>()
+
 export async function loginAndGetToken(
   baseUrl: string,
   account: TestAccount,
 ): Promise<string> {
   const targetUrl = resolvedBackendUrl || baseUrl || getResolvedBackendUrl()
   assertSafeE2eTarget(targetUrl)
+
+  const cacheKey = `${targetUrl}:${account.email}`
+  if (tokenCache.has(cacheKey)) {
+    return tokenCache.get(cacheKey)!
+  }
 
   const res = await fetch(`${targetUrl}/api/auth/login`, {
     method: 'POST',
@@ -122,10 +129,16 @@ export async function loginAndGetToken(
   }
 
   const data = (await res.json()) as { accessToken: string }
+  tokenCache.set(cacheKey, data.accessToken)
   return data.accessToken
 }
 
+let accountsProvisioned = false
+
 export async function ensureE2eAccountsProvisioned(baseUrl?: string): Promise<void> {
+  if (accountsProvisioned) {
+    return
+  }
   const targetUrl = resolvedBackendUrl || baseUrl || getResolvedBackendUrl()
   assertSafeE2eTarget(targetUrl)
 
@@ -251,6 +264,8 @@ export async function ensureE2eAccountsProvisioned(baseUrl?: string): Promise<vo
       }
     }
   }
+
+  accountsProvisioned = true
 }
 
 export async function loginViaUi(page: Page, account: TestAccount): Promise<void> {

@@ -103,6 +103,8 @@ services:
       FLOWDESK_FRONTEND_ORIGIN: http://localhost:${E2E_FRONTEND_PORT:-3001}
       ATTACHMENT_STORAGE_DIR: /app/data/attachments
       FLOWDESK_BOOTSTRAP_ADMIN_ENABLED: "false"
+      RATE_LIMIT_LOGIN_IP_EMAIL_MAX: "100"
+      RATE_LIMIT_LOGIN_IP_MAX: "100"
     ports:
       - "${E2E_BACKEND_PORT:-8089}:8080"
     volumes:
