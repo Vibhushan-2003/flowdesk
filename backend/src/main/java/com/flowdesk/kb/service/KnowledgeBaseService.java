@@ -108,10 +108,17 @@ public class KnowledgeBaseService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Article not found"));
 
         if (article.getStatus() != ArticleStatus.PUBLISHED) {
-            boolean hasStaffAccess = currentUser != null && currentUser.getRoles().stream()
-                    .anyMatch(r -> r.getCode() == RoleCode.SUPPORT_ENGINEER ||
-                            r.getCode() == RoleCode.TEAM_LEAD ||
-                            r.getCode() == RoleCode.ADMIN);
+            boolean hasStaffAccess = false;
+            if (currentUser != null) {
+                try {
+                    hasStaffAccess = currentUser.getRoles().stream()
+                            .anyMatch(r -> r.getCode() == RoleCode.SUPPORT_ENGINEER ||
+                                    r.getCode() == RoleCode.TEAM_LEAD ||
+                                    r.getCode() == RoleCode.ADMIN);
+                } catch (Exception ex) {
+                    hasStaffAccess = false;
+                }
+            }
 
             if (!hasStaffAccess) {
                 // Security cloaking: unpublished articles return 404 to employees

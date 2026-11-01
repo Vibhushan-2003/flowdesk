@@ -66,13 +66,26 @@ public interface KbArticleRepository extends JpaRepository<KbArticle, UUID> {
         WHERE a.status = 'PUBLISHED'
           AND (
               a.search_vector @@ plainto_tsquery('english', :query) OR
+              (
+                  CASE
+                    WHEN plainto_tsquery('english', :query)::text <> ''
+                    THEN a.search_vector @@ (replace(plainto_tsquery('english', :query)::text, ' & ', ' | '))::tsquery
+                    ELSE false
+                  END
+              ) OR
               LOWER(a.title) LIKE LOWER(CONCAT('%', :query, '%')) OR
               LOWER(a.summary) LIKE LOWER(CONCAT('%', :query, '%'))
           )
         ORDER BY
-          CASE WHEN a.search_vector @@ plainto_tsquery('english', :query)
-               THEN ts_rank_cd(a.search_vector, plainto_tsquery('english', :query))
-               ELSE 0.1 END DESC,
+          CASE
+            WHEN a.search_vector @@ plainto_tsquery('english', :query)
+              THEN 10.0 + ts_rank_cd(a.search_vector, plainto_tsquery('english', :query))
+            WHEN plainto_tsquery('english', :query)::text <> '' AND a.search_vector @@ (replace(plainto_tsquery('english', :query)::text, ' & ', ' | '))::tsquery
+              THEN ts_rank_cd(a.search_vector, (replace(plainto_tsquery('english', :query)::text, ' & ', ' | '))::tsquery)
+            WHEN LOWER(a.title) LIKE LOWER(CONCAT('%', :query, '%'))
+              THEN 1.0
+            ELSE 0.1
+          END DESC,
           a.view_count DESC
         LIMIT :limit
         """,

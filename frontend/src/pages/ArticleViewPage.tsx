@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { getArticleBySlug } from '../api/kb'
 import { useAuth } from '../auth/useAuth'
@@ -11,6 +11,19 @@ export function ArticleViewPage() {
   const { slug } = useParams<{ slug: string }>()
   const { accessToken, user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const navState = location.state as {
+    fromTicket?: boolean
+    ticketDraft?: {
+      type: string
+      title: string
+      description: string
+    }
+  } | null
+
+  const isFromTicket = Boolean(navState?.fromTicket)
+  const ticketDraft = navState?.ticketDraft
 
   const [article, setArticle] = useState<KbArticle | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -70,14 +83,24 @@ export function ArticleViewPage() {
     return (
       <main className="kb-container">
         <div style={{ margin: '2rem 0' }}>
-          <button
-            type="button"
-            className="dashboard-secondary-button"
-            onClick={() => navigate('/kb')}
-            style={{ marginBottom: '1.5rem' }}
-          >
-            ← Back to Knowledge Base
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+            {isFromTicket && (
+              <button
+                type="button"
+                className="dashboard-primary-button"
+                onClick={() => navigate('/tickets/new', { state: { ticketDraft } })}
+              >
+                ← Return to Ticket Form
+              </button>
+            )}
+            <button
+              type="button"
+              className="dashboard-secondary-button"
+              onClick={() => navigate('/kb')}
+            >
+              ← Back to Knowledge Base
+            </button>
+          </div>
 
           <div className="error-banner" style={{ padding: '2rem', textAlign: 'center' }}>
             <h2 style={{ marginBottom: '0.5rem', color: '#991b1b' }}>Article Unavailable</h2>
@@ -100,6 +123,30 @@ export function ArticleViewPage() {
         <span>/</span>
         <span style={{ color: '#0f172a', fontWeight: 500 }}>{article.title}</span>
       </nav>
+
+      {/* Return to Ticket Banner if navigated from ticket deflection */}
+      {isFromTicket && (
+        <aside className="kb-ticket-return-bar" aria-label="Return to ticket submission">
+          <div className="kb-ticket-return-content">
+            <span className="kb-ticket-return-icon">💡</span>
+            <span>
+              Reviewing suggested guide for your ticket:{' '}
+              <strong>{ticketDraft?.title || 'Draft ticket'}</strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            className="kb-ticket-return-btn"
+            onClick={() =>
+              navigate('/tickets/new', {
+                state: { ticketDraft },
+              })
+            }
+          >
+            ← Return to Ticket Form
+          </button>
+        </aside>
+      )}
 
       {/* Header */}
       <header className="kb-view-header">
@@ -149,9 +196,28 @@ export function ArticleViewPage() {
       {/* Helpful Feedback Box */}
       <section className="kb-feedback-box">
         {feedbackGiven ? (
-          <p style={{ color: '#059669', fontWeight: 600, margin: 0 }}>
-            Thank you for your feedback! This helps us improve our knowledge base guides.
-          </p>
+          <div>
+            <p style={{ color: '#059669', fontWeight: 600, margin: 0 }}>
+              Thank you for your feedback! This helps us improve our knowledge base guides.
+            </p>
+            {isFromTicket && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <p style={{ color: '#047857', fontSize: '0.875rem', margin: '0 0 0.5rem 0' }}>
+                  No ticket was submitted. You can safely return to your dashboard.
+                </p>
+                <button
+                  type="button"
+                  className="dashboard-secondary-button"
+                  onClick={() => {
+                    sessionStorage.removeItem('flowdesk_ticket_draft')
+                    navigate('/dashboard')
+                  }}
+                >
+                  Return to Dashboard
+                </button>
+              </div>
+            )}
+          </div>
         ) : (
           <div>
             <p style={{ fontWeight: 600, color: '#334155', margin: '0 0 0.5rem 0' }}>
@@ -161,7 +227,10 @@ export function ArticleViewPage() {
               <button
                 type="button"
                 className="kb-feedback-btn"
-                onClick={() => setFeedbackGiven('yes')}
+                onClick={() => {
+                  sessionStorage.removeItem('flowdesk_ticket_draft')
+                  setFeedbackGiven('yes')
+                }}
               >
                 👍 Yes, this solved my issue
               </button>
@@ -173,12 +242,41 @@ export function ArticleViewPage() {
                 👎 No, I still need help
               </button>
             </div>
+            {isFromTicket && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="dashboard-secondary-button"
+                  style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+                  onClick={() =>
+                    navigate('/tickets/new', {
+                      state: { ticketDraft },
+                    })
+                  }
+                >
+                  ← Return to Ticket Form
+                </button>
+              </div>
+            )}
           </div>
         )}
       </section>
 
-      {/* Back button */}
-      <div style={{ marginTop: '2.5rem' }}>
+      {/* Navigation footer */}
+      <div className="kb-view-footer-nav">
+        {isFromTicket && (
+          <button
+            type="button"
+            className="dashboard-primary-button"
+            onClick={() =>
+              navigate('/tickets/new', {
+                state: { ticketDraft },
+              })
+            }
+          >
+            ← Return to Ticket Form
+          </button>
+        )}
         <button
           type="button"
           className="dashboard-secondary-button"

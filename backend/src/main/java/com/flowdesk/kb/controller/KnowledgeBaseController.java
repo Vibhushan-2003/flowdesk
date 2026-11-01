@@ -55,7 +55,7 @@ public class KnowledgeBaseController {
         User user = null;
         if (jwt != null) {
             UUID userId = UUID.fromString(jwt.getSubject());
-            user = userRepository.findById(userId).orElse(null);
+            user = userRepository.findWithRolesById(userId).orElse(null);
         }
         return ResponseEntity.ok(kbService.getArticleBySlug(slug, user));
     }

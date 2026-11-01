@@ -179,8 +179,8 @@ export function ArticleEditorPage() {
   return (
     <main className="kb-container">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <div>
+      <header className="kb-editor-header">
+        <div className="kb-editor-header-title">
           <button
             type="button"
             className="dashboard-secondary-button"
@@ -189,7 +189,7 @@ export function ArticleEditorPage() {
           >
             ← Back to Knowledge Base
           </button>
-          <h1 style={{ fontSize: '1.85rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+          <h1>
             {isEditing ? `Edit Article: ${existingArticle?.title ?? ''}` : 'Create Knowledge Base Article'}
           </h1>
           {existingArticle && (
@@ -203,7 +203,7 @@ export function ArticleEditorPage() {
         </div>
 
         {/* Action Controls */}
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div className="kb-editor-header-actions">
           <button
             type="button"
             className="dashboard-secondary-button"
@@ -289,7 +289,7 @@ export function ArticleEditorPage() {
             </>
           )}
         </div>
-      </div>
+      </header>
 
       {/* Notifications */}
       {errorMessage && (

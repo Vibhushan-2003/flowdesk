@@ -17,7 +17,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -89,6 +91,11 @@ class KnowledgeBaseSecurityAndControllerTest {
         when(userRepository.findById(supportId)).thenReturn(Optional.of(supportUser));
         when(userRepository.findById(teamLeadId)).thenReturn(Optional.of(teamLeadUser));
         when(userRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
+
+        when(userRepository.findWithRolesById(employeeId)).thenReturn(Optional.of(employeeUser));
+        when(userRepository.findWithRolesById(supportId)).thenReturn(Optional.of(supportUser));
+        when(userRepository.findWithRolesById(teamLeadId)).thenReturn(Optional.of(teamLeadUser));
+        when(userRepository.findWithRolesById(adminId)).thenReturn(Optional.of(adminUser));
     }
 
     @Test
@@ -143,6 +150,49 @@ class KnowledgeBaseSecurityAndControllerTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("VPN Troubleshooting"));
+    }
+
+    @Test
+    @DisplayName("Employee GET published article returns 200 with article details")
+    void employeeGetPublishedArticleReturns200() throws Exception {
+        UUID articleId = UUID.randomUUID();
+        when(kbService.getArticleBySlug(eq("vpn-guide"), any())).thenReturn(
+                new KbArticleResponse(articleId, "VPN Guide", "vpn-guide", "Summary",
+                        "# Connect to VPN", ArticleStatus.PUBLISHED, UUID.randomUUID(), "Network", "network",
+                        supportId, "Bob Support", 5, Instant.now(), Instant.now(), Instant.now())
+        );
+
+        mockMvc.perform(get("/api/kb/articles/vpn-guide")
+                        .with(jwt().jwt(j -> j.subject(employeeId.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("VPN Guide"))
+                .andExpect(jsonPath("$.status").value("PUBLISHED"));
+    }
+
+    @Test
+    @DisplayName("Employee GET unpublished draft returns 404 security cloaking")
+    void employeeGetDraftArticleReturns404Cloaked() throws Exception {
+        when(kbService.getArticleBySlug(eq("secret-draft-sop"), any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Article not found"));
+
+        mockMvc.perform(get("/api/kb/articles/secret-draft-sop")
+                        .with(jwt().jwt(j -> j.subject(employeeId.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Article not found"));
+    }
+
+    @Test
+    @DisplayName("Employee GET nonexistent slug returns 404 Not Found")
+    void employeeGetNonexistentSlugReturns404() throws Exception {
+        when(kbService.getArticleBySlug(eq("does-not-exist"), any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Article not found"));
+
+        mockMvc.perform(get("/api/kb/articles/does-not-exist")
+                        .with(jwt().jwt(j -> j.subject(employeeId.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isNotFound());
     }
 
     @Test
