@@ -104,6 +104,18 @@ export function DashboardPage() {
             >
               My tickets
             </button>
+
+            <button
+              type="button"
+              className="dashboard-secondary-button"
+              onClick={() =>
+                navigate(
+                  '/kb',
+                )
+              }
+            >
+              Knowledge Base
+            </button>
           </div>
         </article>
 
@@ -145,6 +157,18 @@ export function DashboardPage() {
                 }
               >
                 Support queue
+              </button>
+
+              <button
+                type="button"
+                className="dashboard-secondary-button"
+                onClick={() =>
+                  navigate(
+                    '/kb',
+                  )
+                }
+              >
+                Knowledge Base
               </button>
             </div>
           </article>

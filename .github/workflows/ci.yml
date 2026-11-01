@@ -19,19 +19,20 @@ jobs:
       postgres:
         image: postgres:18
         env:
-          POSTGRES_DB: flowdesk
+          POSTGRES_DB: flowdesk_test
           POSTGRES_USER: flowdesk_app
           POSTGRES_PASSWORD: flowdesk_ci_password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U flowdesk_app -d flowdesk"
+          --health-cmd="pg_isready -U flowdesk_app -d flowdesk_test"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     env:
-      DB_URL: jdbc:postgresql://localhost:5432/flowdesk
+      DB_URL: jdbc:postgresql://localhost:5432/flowdesk_test
+      DB_TEST_URL: jdbc:postgresql://localhost:5432/flowdesk_test
       DB_USERNAME: flowdesk_app
       DB_PASSWORD: flowdesk_ci_password
       SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "2"
