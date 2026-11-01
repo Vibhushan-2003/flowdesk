@@ -15,6 +15,7 @@ dist-ssr
 # Playwright test outputs
 test-results/
 playwright-report/
+playwright-live-report/
 blob-report/
 playwright/.cache/
 .vscode/*

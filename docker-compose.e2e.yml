@@ -1,0 +1,157 @@
+# ==============================================================================
+# FlowDesk Real-Stack E2E Testing Topology (Day 57)
+# Completely isolated from local dev, test databases, and standard Compose volumes.
+# ==============================================================================
+name: flowdesk-e2e
+
+services:
+  # ----------------------------------------------------------------------------
+  # Service 1: Dedicated E2E PostgreSQL Database
+  # Completely separate database volume (flowdesk_e2e_db_data) and database name (flowdesk_e2e)
+  # ----------------------------------------------------------------------------
+  postgres-e2e:
+    image: postgres:16-alpine
+    container_name: flowdesk-e2e-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${E2E_DB_NAME:-flowdesk_e2e}
+      POSTGRES_USER: ${E2E_DB_USER:-flowdesk_app}
+      POSTGRES_PASSWORD: ${E2E_DB_PASSWORD:-flowdesk_e2e_password}
+    ports:
+      # Optional external exposure on port 5433 (avoids host 5432 collision)
+      - "${E2E_DB_PORT:-5433}:5432"
+    volumes:
+      - flowdesk_e2e_db_data:/var/lib/postgresql/data
+    networks:
+      - flowdesk_e2e_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-flowdesk_app} -d $${POSTGRES_DB:-flowdesk_e2e}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ----------------------------------------------------------------------------
+  # Service 2: Dedicated E2E Mailpit Mock SMTP & Web UI
+  # ----------------------------------------------------------------------------
+  mailpit-e2e:
+    image: axllent/mailpit:latest
+    container_name: flowdesk-e2e-mailpit
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 5000
+    ports:
+      # Mailpit Web UI mapped to host port 8027 (avoids collision with 8025/8026)
+      - "${E2E_MAILPIT_WEB_PORT:-8027}:8025"
+    networks:
+      - flowdesk_e2e_network
+
+  # ----------------------------------------------------------------------------
+  # Service 3: Ephemeral Admin Bootstrap Provisioner
+  # Runs one-off non-web process to seed Flyway migrations & initial admin account
+  # ----------------------------------------------------------------------------
+  admin-bootstrap-e2e:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flowdesk-e2e-bootstrap
+    restart: "no"
+    depends_on:
+      postgres-e2e:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres-e2e:5432/${E2E_DB_NAME:-flowdesk_e2e}
+      DB_USERNAME: ${E2E_DB_USER:-flowdesk_app}
+      DB_PASSWORD: ${E2E_DB_PASSWORD:-flowdesk_e2e_password}
+      JWT_SECRET: ${E2E_JWT_SECRET:-e2e-super-secret-jwt-signing-key-flowdesk-day57-isolated-256bit}
+      FLOWDESK_BOOTSTRAP_ADMIN_ENABLED: "true"
+      FLOWDESK_BOOTSTRAP_ADMIN_EMAIL: "admin@flowdesk.test"
+      FLOWDESK_BOOTSTRAP_ADMIN_PASSWORD: "AdminTestPassword123!"
+      FLOWDESK_BOOTSTRAP_ADMIN_FIRST_NAME: "System"
+      FLOWDESK_BOOTSTRAP_ADMIN_LAST_NAME: "Administrator"
+    command: ["--flowdesk.bootstrap.admin"]
+    networks:
+      - flowdesk_e2e_network
+
+  # ----------------------------------------------------------------------------
+  # Service 4: Real Spring Boot Backend Instance
+  # Runs unprivileged with dedicated attachments volume and isolated E2E database
+  # ----------------------------------------------------------------------------
+  backend-e2e:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flowdesk-e2e-backend
+    restart: unless-stopped
+    depends_on:
+      admin-bootstrap-e2e:
+        condition: service_completed_successfully
+      mailpit-e2e:
+        condition: service_started
+    environment:
+      DB_URL: jdbc:postgresql://postgres-e2e:5432/${E2E_DB_NAME:-flowdesk_e2e}
+      DB_USERNAME: ${E2E_DB_USER:-flowdesk_app}
+      DB_PASSWORD: ${E2E_DB_PASSWORD:-flowdesk_e2e_password}
+      JWT_SECRET: ${E2E_JWT_SECRET:-e2e-super-secret-jwt-signing-key-flowdesk-day57-isolated-256bit}
+      FLOWDESK_MAIL_ENABLED: "true"
+      SMTP_HOST: mailpit-e2e
+      SMTP_PORT: 1025
+      SMTP_AUTH: "false"
+      SMTP_STARTTLS: "false"
+      SMTP_SSL: "false"
+      FRONTEND_ORIGIN: http://localhost:${E2E_FRONTEND_PORT:-3001}
+      FLOWDESK_FRONTEND_ORIGIN: http://localhost:${E2E_FRONTEND_PORT:-3001}
+      ATTACHMENT_STORAGE_DIR: /app/data/attachments
+      FLOWDESK_BOOTSTRAP_ADMIN_ENABLED: "false"
+      RATE_LIMIT_LOGIN_IP_EMAIL_MAX: "100"
+      RATE_LIMIT_LOGIN_IP_MAX: "100"
+    ports:
+      - "${E2E_BACKEND_PORT:-8089}:8080"
+    volumes:
+      - flowdesk_e2e_attachments:/app/data/attachments
+    networks:
+      - flowdesk_e2e_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ----------------------------------------------------------------------------
+  # Service 5: Real Frontend Instance (Nginx Reverse Proxy)
+  # Bound to distinct host port 3001 (avoids conflict with dev 5173 and standard docker 3000)
+  # ----------------------------------------------------------------------------
+  frontend-e2e:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:${E2E_FRONTEND_PORT:-3001}
+    container_name: flowdesk-e2e-frontend
+    restart: unless-stopped
+    depends_on:
+      backend-e2e:
+        condition: service_healthy
+    ports:
+      - "${E2E_FRONTEND_PORT:-3001}:80"
+    networks:
+      - flowdesk_e2e_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  flowdesk_e2e_db_data:
+    name: flowdesk_e2e_db_data
+  flowdesk_e2e_attachments:
+    name: flowdesk_e2e_attachments
+
+networks:
+  flowdesk_e2e_network:
+    name: flowdesk_e2e_network
+    driver: bridge
+

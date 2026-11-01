@@ -11,6 +11,7 @@ backend/target/
 
 !.env.example
 !.env.docker.example
+!.env.e2e.example
 
 # Private attachment local storage
 data/

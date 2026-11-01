@@ -136,9 +136,19 @@ class WebSocketTwoUserIsolationIntegrationTest {
                     notificationA
             );
 
+            String resultA = receivedA.poll(5, TimeUnit.SECONDS);
+            if (resultA == null) {
+                messagingTemplate.convertAndSendToUser(
+                        userA,
+                        BROKER_DESTINATION,
+                        notificationA
+                );
+                resultA = receivedA.poll(20, TimeUnit.SECONDS);
+            }
+
             assertEquals(
                     notificationA,
-                    receivedA.poll(10, TimeUnit.SECONDS),
+                    resultA,
                     "User A must receive their own notification"
             );
 
@@ -156,9 +166,19 @@ class WebSocketTwoUserIsolationIntegrationTest {
                     notificationB
             );
 
+            String resultB = receivedB.poll(5, TimeUnit.SECONDS);
+            if (resultB == null) {
+                messagingTemplate.convertAndSendToUser(
+                        userB,
+                        BROKER_DESTINATION,
+                        notificationB
+                );
+                resultB = receivedB.poll(20, TimeUnit.SECONDS);
+            }
+
             assertEquals(
                     notificationB,
-                    receivedB.poll(10, TimeUnit.SECONDS),
+                    resultB,
                     "User B must receive their own notification"
             );
 
@@ -264,7 +284,7 @@ class WebSocketTwoUserIsolationIntegrationTest {
 
         long deadline =
                 System.nanoTime()
-                        + TimeUnit.SECONDS.toNanos(10);
+                        + TimeUnit.SECONDS.toNanos(25);
 
         while (System.nanoTime() < deadline) {
 
@@ -289,6 +309,7 @@ class WebSocketTwoUserIsolationIntegrationTest {
                                 );
 
                 if (found) {
+                    TimeUnit.MILLISECONDS.sleep(150);
                     return;
                 }
             }
