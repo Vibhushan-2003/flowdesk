@@ -1,13 +1,18 @@
 package com.flowdesk.sla.scheduler;
 
 import com.flowdesk.sla.service.SlaMonitoringService;
-
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**
+ * Periodically evaluates SLA response and resolution deadlines for open tickets.
+ * <p>
+ * Uses PostgreSQL distributed locking (@SchedulerLock) to guarantee single-instance
+ * execution in multi-instance deployments while remaining fully functional on single instances.
+ */
 @Component
 public class SlaMonitoringScheduler {
 
@@ -42,6 +47,11 @@ public class SlaMonitoringScheduler {
                     "${flowdesk.sla.monitoring.fixed-delay-ms:60000}",
             initialDelayString =
                     "${flowdesk.sla.monitoring.initial-delay-ms:60000}"
+    )
+    @SchedulerLock(
+            name = "SlaMonitoringScheduler_monitorSlaBreaches",
+            lockAtMostFor = "${flowdesk.sla.monitoring.lock-at-most-for:5m}",
+            lockAtLeastFor = "${flowdesk.sla.monitoring.lock-at-least-for:30s}"
     )
     public void monitorSlaBreaches() {
         try {

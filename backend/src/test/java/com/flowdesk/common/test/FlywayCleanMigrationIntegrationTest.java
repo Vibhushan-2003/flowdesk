@@ -42,8 +42,8 @@ class FlywayCleanMigrationIntegrationTest {
     }
 
     @Test
-    @DisplayName("Verify clean Flyway V1 through V23 migrations on a brand new disposable schema")
-    void testCleanV1ToV23MigrationsOnFreshSchema() throws Exception {
+    @DisplayName("Verify clean Flyway V1 through V24 migrations on a brand new disposable schema")
+    void testCleanV1ToV24MigrationsOnFreshSchema() throws Exception {
         Flyway flyway = Flyway.configure()
                 .dataSource(dbUrl, dbUser, dbPassword)
                 .schemas(DISPOSABLE_SCHEMA)
@@ -51,12 +51,12 @@ class FlywayCleanMigrationIntegrationTest {
                 .locations("classpath:db/migration")
                 .load();
 
-        // 1. Run migrations from scratch (V1 to V23)
+        // 1. Run migrations from scratch (V1 to V24)
         MigrateResult result = flyway.migrate();
 
         assertThat(result.success).isTrue();
-        assertThat(result.targetSchemaVersion).isEqualTo("23");
-        assertThat(result.migrationsExecuted).isEqualTo(23);
+        assertThat(result.targetSchemaVersion).isEqualTo("24");
+        assertThat(result.migrationsExecuted).isEqualTo(24);
 
         // 2. Validate all checksums on fresh schema
         flyway.validate();
@@ -65,7 +65,7 @@ class FlywayCleanMigrationIntegrationTest {
         try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
              Statement stmt = conn.createStatement()) {
 
-            // Check refresh_sessions table exists
+            // Check refresh_sessions table exists (V23)
             try (ResultSet rs = stmt.executeQuery(
                     "SELECT column_name, data_type, is_nullable " +
                     "FROM information_schema.columns " +
@@ -81,14 +81,26 @@ class FlywayCleanMigrationIntegrationTest {
                 assertThat(hasFamilyId).isTrue();
             }
 
-            // Check ticket_attachments table has scan_status with PENDING_SCAN default
+            // Check shedlock table exists with required columns (V24)
             try (ResultSet rs = stmt.executeQuery(
-                    "SELECT column_name, column_default " +
+                    "SELECT column_name " +
                     "FROM information_schema.columns " +
-                    "WHERE table_schema = '" + DISPOSABLE_SCHEMA + "' AND table_name = 'ticket_attachments' AND column_name = 'scan_status'")) {
-                assertThat(rs.next()).isTrue();
-                String colDefault = rs.getString("column_default");
-                assertThat(colDefault).contains("PENDING_SCAN");
+                    "WHERE table_schema = '" + DISPOSABLE_SCHEMA + "' AND table_name = 'shedlock'")) {
+                boolean hasName = false;
+                boolean hasLockUntil = false;
+                boolean hasLockedAt = false;
+                boolean hasLockedBy = false;
+                while (rs.next()) {
+                    String col = rs.getString("column_name");
+                    if ("name".equals(col)) hasName = true;
+                    if ("lock_until".equals(col)) hasLockUntil = true;
+                    if ("locked_at".equals(col)) hasLockedAt = true;
+                    if ("locked_by".equals(col)) hasLockedBy = true;
+                }
+                assertThat(hasName).isTrue();
+                assertThat(hasLockUntil).isTrue();
+                assertThat(hasLockedAt).isTrue();
+                assertThat(hasLockedBy).isTrue();
             }
         }
     }

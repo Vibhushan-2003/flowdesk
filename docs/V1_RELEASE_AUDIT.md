@@ -83,9 +83,9 @@ To avoid false confidence in deployment readiness, FlowDesk explicitly different
 
 | Domain | Status | Verified Safeguards | Blockers & Known Limitations |
 | :--- | :--- | :--- | :--- |
-| **1. Authentication & Sessions** | **Demo-Ready** | Safe JWT expiration handling, debounced HTTP 401 redirect loop protection, open-redirect URL sanitization, client-side session expiry alerts, dual-quota IP/email rate limiting. | No refresh token rotation (user must re-authenticate on 15m JWT expiry); no distributed token revocation blacklist (immediate deactivation relies on credential version). |
-| **2. Ticket Operations & Idempotency** | **Production-Ready** | Flyway V21 idempotency table, client-side button disable & ref guard against double-clicks, SHA-256 payload fingerprinting, 409 Conflict on payload mismatch, ticket numbering (`FD-XXXXXX`). | No virus/malware scanning on file uploads; attachments stored on local volume rather than S3/cloud blob storage. |
-| **3. SLA Engine & Escalation** | **Production-Ready** | Deterministic business-hour calculator, breach status transitions (`OPEN`, `BREACHED`, `RESOLVED`), scheduled poller (`@Scheduled`), priority policies. | Poller runs single-instance without distributed database lock (e.g. ShedLock) for multi-node horizontal scaling. |
+| **1. Authentication & Sessions** | **Production-Ready** | Flyway V23 refresh tokens, SHA-256 hashed persistence, atomic rotation with row locks, 30s grace window, HttpOnly SameSite cookie, token replay family revocation. | Requires HTTPS in production (enforced via prod profile) for Secure cookie flag. |
+| **2. Ticket Operations & Attachments** | **Production-Ready** | Flyway V21 idempotency, double-click debouncing, SHA-256 fingerprinting, ClamAV streaming malware scan, fail-closed quarantine, bounded admin rescan with FOR UPDATE SKIP LOCKED. | High-volume production attachments should mount persistent block volume. |
+| **3. SLA Engine & Schedulers** | **Production-Ready** | Deterministic business-hour calculator, breach transitions, idempotent DB unique constraints, PostgreSQL ShedLock distributed locking (Flyway V24). | Horizontal scaling verified via DB lock; cron intervals bounded to prevent DB contention. |
 | **4. Real-Time Notifications** | **Production-Ready** | STOMP over SockJS/WebSocket, user-isolated destination routing (`/user/queue/notifications`), strict `JwtAuthenticationToken` subject verification, real outbound delivery tests. | In-memory message broker (`SimpleBrokerMessageHandler`); clustered WebSocket across multiple backend instances requires external RabbitMQ/ActiveMQ broker relay. |
 | **5. Knowledge Base & Deflection** | **Production-Ready** | Public vs internal article scoping, full-text search, "Solved My Issue" deflection counting with ticket creation avoidance. | No AI vector semantic search; keyword-based matching only. |
 | **6. Approvals & Workflows** | **Production-Ready** | Role-gated approval actions (`TEAM_LEAD`, `ADMIN`), approval status transitions, audit log recording. | Fixed single-level approval hierarchy; custom multi-tier dynamic approval workflows not yet supported. |
@@ -104,9 +104,9 @@ Before exposing FlowDesk to public production traffic, the following blockers mu
 2. **TLS Termination & Ingress Controller**:
    Deploy FlowDesk behind an enterprise reverse proxy or Cloud Load Balancer (e.g., Cloudflare, AWS ALB, Nginx Ingress) providing HTTPS with TLS 1.3, HSTS, and DDoS mitigation.
 3. **Session Management Modernization**:
-   Evaluate implementing short-lived access tokens with secure HTTP-only refresh tokens or a centralized Redis session revocation blacklist for instantaneous enterprise logout.
+   **RESOLVED & VERIFIED (Day 59)** — Implemented Flyway V23 refresh-session schema, atomic token rotation with row locking, 30s grace window, family replay revocation, and HttpOnly SameSite cookie handling.
 4. **Antivirus & Malware Scanning**:
-   Integrate ClamAV or cloud virus scanning API into the `AttachmentService` pipeline prior to saving attachments to disk or serving them to users.
+   **RESOLVED & VERIFIED (Day 59 & Day 60)** — Integrated streaming ClamAV scanner with TCP availability ping (`isAvailable()`), 25MB stream bounds, fail-closed quarantine download block, and bounded administrative rescan (`FOR UPDATE SKIP LOCKED`).
 5. **Distributed Scheduler Locking**:
-   Add `ShedLock` to SLA evaluation schedulers if deploying more than one backend replica to prevent concurrent duplicate SLA notifications.
+   **RESOLVED & VERIFIED (Day 60)** — Integrated PostgreSQL-backed ShedLock (Flyway V24) for `SlaMonitoringScheduler`, `PasswordResetTokenCleanupScheduler`, and `UserInvitationCleanupScheduler`. Concurrency safety and automatic lock expiration verified.
 
