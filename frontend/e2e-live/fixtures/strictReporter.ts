@@ -24,9 +24,9 @@ export default class StrictReleaseGateReporter implements Reporter {
         result.status = 'failed'
         process.exitCode = 1
       }
-      if (this.passed < 12) {
+      if (this.passed < 15) {
         console.error(
-          `\n[Strict Release Gate Violation]: Expected 12 passing live tests, but only ${this.passed} passed (failed: ${this.failed})!`,
+          `\n[Strict Release Gate Violation]: Expected 15 passing live tests, but only ${this.passed} passed (failed: ${this.failed})!`,
         )
         result.status = 'failed'
         process.exitCode = 1

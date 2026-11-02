@@ -246,6 +246,11 @@ export function TicketAttachmentSection({
       return
     }
 
+    if (attachment.scanStatus && attachment.scanStatus !== 'CLEAN') {
+      setError('This file is quarantined and cannot be downloaded.')
+      return
+    }
+
     setDownloadingId(attachment.id)
     setError(null)
 
@@ -395,27 +400,48 @@ export function TicketAttachmentSection({
                     <span>Uploaded by {item.uploadedByName}</span>
                     <span className="attachment-meta-dot">•</span>
                     <time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time>
+                    {item.scanStatus && (
+                      <>
+                        <span className="attachment-meta-dot">•</span>
+                        <span className={`attachment-scan-badge attachment-scan-${item.scanStatus.toLowerCase()}`}>
+                          {item.scanStatus === 'CLEAN' && '✓ Clean'}
+                          {item.scanStatus === 'INFECTED' && '⚠️ Quarantined (Malware)'}
+                          {item.scanStatus === 'SCAN_FAILED' && '⚠️ Quarantined (Scan Failed)'}
+                          {item.scanStatus === 'PENDING_SCAN' && '⏳ Scanning...'}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 <div className="attachment-item-actions">
-                  <button
-                    type="button"
-                    className="attachment-download-button"
-                    onClick={() => void handleDownload(item)}
-                    disabled={downloadingId === item.id}
-                    aria-label={`Download ${item.filename}`}
-                  >
-                    {downloadingId === item.id ? (
-                      <>
-                        <span aria-hidden="true">⏳</span> Downloading...
-                      </>
-                    ) : (
-                      <>
-                        <span aria-hidden="true">⬇️</span> Download
-                      </>
-                    )}
-                  </button>
+                  {item.scanStatus === 'INFECTED' || item.scanStatus === 'SCAN_FAILED' ? (
+                    <span className="attachment-quarantine-notice" title={item.scanDetails || 'Download blocked for quarantined file'}>
+                      Blocked (Quarantined)
+                    </span>
+                  ) : item.scanStatus === 'PENDING_SCAN' ? (
+                    <span className="attachment-scanning-notice">
+                      Scan Pending
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="attachment-download-button"
+                      onClick={() => void handleDownload(item)}
+                      disabled={downloadingId === item.id}
+                      aria-label={`Download ${item.filename}`}
+                    >
+                      {downloadingId === item.id ? (
+                        <>
+                          <span aria-hidden="true">⏳</span> Downloading...
+                        </>
+                      ) : (
+                        <>
+                          <span aria-hidden="true">⬇️</span> Download
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </li>
             ))}

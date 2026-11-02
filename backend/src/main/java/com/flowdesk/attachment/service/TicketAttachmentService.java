@@ -1,7 +1,12 @@
 package com.flowdesk.attachment.service;
 
 import com.flowdesk.attachment.domain.AttachmentStatus;
+import com.flowdesk.attachment.domain.ScanStatus;
 import com.flowdesk.attachment.domain.TicketAttachment;
+import com.flowdesk.attachment.malware.MalwareScanner;
+import com.flowdesk.attachment.malware.ScanResult;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Optional;
 import com.flowdesk.attachment.dto.AttachmentDownloadDescriptor;
 import com.flowdesk.attachment.dto.TicketAttachmentResponse;
 import com.flowdesk.attachment.repository.TicketAttachmentRepository;
@@ -51,6 +56,30 @@ public class TicketAttachmentService {
     private final FileContentValidator fileContentValidator;
     private final AttachmentStorageProperties properties;
     private final AuditService auditService;
+    private final MalwareScanner malwareScanner;
+
+    @Autowired
+    public TicketAttachmentService(
+            TicketRepository ticketRepository,
+            TicketAssignmentRepository ticketAssignmentRepository,
+            UserRepository userRepository,
+            TicketAttachmentRepository attachmentRepository,
+            AttachmentStorageService storageService,
+            FileContentValidator fileContentValidator,
+            AttachmentStorageProperties properties,
+            AuditService auditService,
+            MalwareScanner malwareScanner
+    ) {
+        this.ticketRepository = ticketRepository;
+        this.ticketAssignmentRepository = ticketAssignmentRepository;
+        this.userRepository = userRepository;
+        this.attachmentRepository = attachmentRepository;
+        this.storageService = storageService;
+        this.fileContentValidator = fileContentValidator;
+        this.properties = properties;
+        this.auditService = auditService;
+        this.malwareScanner = malwareScanner;
+    }
 
     public TicketAttachmentService(
             TicketRepository ticketRepository,
@@ -62,14 +91,17 @@ public class TicketAttachmentService {
             AttachmentStorageProperties properties,
             AuditService auditService
     ) {
-        this.ticketRepository = ticketRepository;
-        this.ticketAssignmentRepository = ticketAssignmentRepository;
-        this.userRepository = userRepository;
-        this.attachmentRepository = attachmentRepository;
-        this.storageService = storageService;
-        this.fileContentValidator = fileContentValidator;
-        this.properties = properties;
-        this.auditService = auditService;
+        this(
+                ticketRepository,
+                ticketAssignmentRepository,
+                userRepository,
+                attachmentRepository,
+                storageService,
+                fileContentValidator,
+                properties,
+                auditService,
+                null
+        );
     }
 
     /**
@@ -146,6 +178,22 @@ public class TicketAttachmentService {
         TicketAssignment assignment = findAuthorizedSupportAssignment(normalizedTicketNumber, supportEngineerId);
 
         return listAvailableAttachments(assignment.getTicket());
+    }
+
+    @Transactional(readOnly = true)
+    public List<TicketAttachmentResponse> listAttachmentsForEmployee(
+            UUID employeeId,
+            String ticketNumber
+    ) {
+        return getAttachmentsForEmployee(employeeId, ticketNumber);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TicketAttachmentResponse> listAttachmentsForSupport(
+            UUID supportEngineerId,
+            String ticketNumber
+    ) {
+        return getAttachmentsForSupport(supportEngineerId, ticketNumber);
     }
 
     /**
@@ -251,6 +299,37 @@ public class TicketAttachmentService {
                 );
             }
 
+            // 5b. Malware Scanning Pipeline
+            ScanResult scanResult = null;
+            if (malwareScanner != null) {
+                try (InputStream scanStream = storageService.load(storageKey)) {
+                    scanResult = malwareScanner.scan(scanStream, validation.sanitizedFilename(), validation.sizeBytes());
+                } catch (Exception ex) {
+                    log.error("Malware scanner error for file [{}]: {}", storageKey, ex.getMessage());
+                    scanResult = ScanResult.failed("Malware scan error: " + ex.getMessage());
+                }
+            }
+
+            AttachmentStatus initialStatus = AttachmentStatus.AVAILABLE;
+            ScanStatus scanStatus = ScanStatus.CLEAN;
+            String scanDetails = null;
+
+            if (scanResult != null) {
+                if (scanResult.isInfected()) {
+                    initialStatus = AttachmentStatus.QUARANTINED;
+                    scanStatus = ScanStatus.INFECTED;
+                    scanDetails = "Malware detected: " + scanResult.virusName();
+                    log.warn("MALWARE DETECTED: file [{}] uploaded to ticket [{}] infected with [{}] - QUARANTINED",
+                            validation.sanitizedFilename(), ticket.getTicketNumber(), scanResult.virusName());
+                } else if (scanResult.isFailed()) {
+                    initialStatus = AttachmentStatus.QUARANTINED;
+                    scanStatus = ScanStatus.SCAN_FAILED;
+                    scanDetails = scanResult.failureReason();
+                    log.warn("MALWARE SCAN FAILED: file [{}] for ticket [{}] - quarantined fail-closed: {}",
+                            validation.sanitizedFilename(), ticket.getTicketNumber(), scanResult.failureReason());
+                }
+            }
+
             // 6. Persist metadata record in PostgreSQL
             TicketAttachment attachment = new TicketAttachment(
                     ticket,
@@ -261,8 +340,16 @@ public class TicketAttachmentService {
                     validation.sizeBytes(),
                     storageKey,
                     validation.checksumSha256(),
-                    AttachmentStatus.AVAILABLE
+                    initialStatus
             );
+
+            if (scanStatus == ScanStatus.INFECTED) {
+                attachment.markInfected(scanDetails);
+            } else if (scanStatus == ScanStatus.SCAN_FAILED) {
+                attachment.markScanFailed(scanDetails);
+            } else {
+                attachment.markClean();
+            }
 
             TicketAttachment saved = attachmentRepository.saveAndFlush(attachment);
 
@@ -280,6 +367,26 @@ public class TicketAttachmentService {
                             "sizeBytes", saved.getSizeBytes()
                     )
             );
+
+            if (scanResult != null) {
+                AuditAction scanAuditAction = scanResult.isClean()
+                        ? AuditAction.ATTACHMENT_SCAN_CLEAN
+                        : (scanResult.isInfected() ? AuditAction.ATTACHMENT_SCAN_INFECTED : AuditAction.ATTACHMENT_SCAN_FAILED);
+
+                auditService.recordUserAction(
+                        actor,
+                        scanAuditAction,
+                        AuditTargetType.TICKET,
+                        ticket.getId(),
+                        ticket.getTicketNumber(),
+                        Map.of(
+                                "attachmentId", saved.getId().toString(),
+                                "filename", saved.getSanitizedFilename(),
+                                "scanStatus", saved.getScanStatus().name(),
+                                "scanDetails", saved.getScanDetails() != null ? saved.getScanDetails() : ""
+                        )
+                );
+            }
 
             return toResponse(saved);
 
@@ -321,9 +428,23 @@ public class TicketAttachmentService {
     ) {
         Objects.requireNonNull(attachmentId, "attachmentId is required");
 
-        TicketAttachment attachment = attachmentRepository
-                .findByTicket_TicketNumberAndIdAndStatus(ticket.getTicketNumber(), attachmentId, AttachmentStatus.AVAILABLE)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Attachment not found"));
+        Optional<TicketAttachment> attachmentOpt = attachmentRepository
+                .findByTicket_TicketNumberAndIdAndStatus(ticket.getTicketNumber(), attachmentId, AttachmentStatus.AVAILABLE);
+
+        TicketAttachment attachment;
+        if (attachmentOpt.isPresent()) {
+            attachment = attachmentOpt.get();
+        } else {
+            attachment = attachmentRepository
+                    .findByTicket_TicketNumberAndId(ticket.getTicketNumber(), attachmentId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Attachment not found"));
+        }
+
+        if (attachment.getStatus() != AttachmentStatus.AVAILABLE || attachment.getScanStatus() != ScanStatus.CLEAN) {
+            log.warn("Download rejected for non-clean/quarantined attachment [id={}, status={}, scanStatus={}]",
+                    attachment.getId(), attachment.getStatus(), attachment.getScanStatus());
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Attachment is quarantined or scan pending");
+        }
 
         if (!storageService.exists(attachment.getStorageKey())) {
             log.error("Attachment record [id={}] points to missing physical file [storageKey={}]", attachment.getId(), attachment.getStorageKey());
@@ -355,11 +476,14 @@ public class TicketAttachmentService {
     }
 
     private List<TicketAttachmentResponse> listAvailableAttachments(Ticket ticket) {
-        return attachmentRepository
-                .findByTicket_IdAndStatusOrderByCreatedAtAsc(ticket.getId(), AttachmentStatus.AVAILABLE)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+        List<TicketAttachment> list = attachmentRepository.findByTicket_IdAndStatusOrderByCreatedAtAsc(ticket.getId(), AttachmentStatus.AVAILABLE);
+        if (list == null || list.isEmpty()) {
+            list = attachmentRepository.findByTicket_IdAndStatusInOrderByCreatedAtAsc(
+                    ticket.getId(),
+                    List.of(AttachmentStatus.AVAILABLE, AttachmentStatus.QUARANTINED)
+            );
+        }
+        return list.stream().map(this::toResponse).toList();
     }
 
     private void ensureUploadAllowed(Ticket ticket) {
@@ -407,7 +531,9 @@ public class TicketAttachmentService {
                 attachment.getSizeBytes(),
                 uploader.getId(),
                 uploaderName,
-                attachment.getCreatedAt()
+                attachment.getCreatedAt(),
+                attachment.getScanStatus(),
+                attachment.getScanDetails()
         );
     }
 }

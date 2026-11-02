@@ -12,6 +12,7 @@ import com.flowdesk.user.domain.User;
 import com.flowdesk.user.domain.UserStatus;
 import com.flowdesk.user.repository.UserRepository;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -29,11 +30,17 @@ import java.util.UUID;
 @Service
 public class AuthService {
 
+    public record LoginSessionResult(
+            LoginResponse loginResponse,
+            String rawRefreshToken
+    ) {}
+
     private final AuthenticationManager authenticationManager;
     private final TokenService tokenService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final RefreshSessionService refreshSessionService;
 
     public AuthService(
             AuthenticationManager authenticationManager,
@@ -42,11 +49,24 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             AuditService auditService
     ) {
+        this(authenticationManager, tokenService, userRepository, passwordEncoder, auditService, null);
+    }
+
+    @Autowired
+    public AuthService(
+            AuthenticationManager authenticationManager,
+            TokenService tokenService,
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            AuditService auditService,
+            RefreshSessionService refreshSessionService
+    ) {
         this.authenticationManager = authenticationManager;
         this.tokenService = tokenService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
+        this.refreshSessionService = refreshSessionService;
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -79,6 +99,30 @@ public class AuthService {
     }
 
     @Transactional
+    public LoginSessionResult loginWithSession(LoginRequest request, String clientIp, String userAgent) {
+        LoginResponse response = login(request);
+        String rawRefreshToken = null;
+
+        if (refreshSessionService != null) {
+            rawRefreshToken = userRepository.findById(response.userId())
+                    .filter(u -> u.getStatus() == UserStatus.ACTIVE)
+                    .map(u -> refreshSessionService.createSession(u, clientIp, userAgent))
+                    .orElse(null);
+        }
+
+        return new LoginSessionResult(response, rawRefreshToken);
+    }
+
+    @Transactional
+    public String createSessionForUser(UUID userId, String clientIp, String userAgent) {
+        if (refreshSessionService == null || userId == null) return null;
+        return userRepository.findById(userId)
+                .filter(u -> u.getStatus() == UserStatus.ACTIVE)
+                .map(u -> refreshSessionService.createSession(u, clientIp, userAgent))
+                .orElse(null);
+    }
+
+    @Transactional
     public ChangePasswordResponse changePassword(
             UUID authenticatedUserId,
             ChangePasswordRequest request
@@ -108,6 +152,10 @@ public class AuthService {
         String encodedNewPassword = passwordEncoder.encode(request.newPassword());
         user.changePassword(encodedNewPassword);
         userRepository.save(user);
+
+        if (refreshSessionService != null) {
+            refreshSessionService.revokeAllSessionsForUser(user.getId());
+        }
 
         auditService.recordUserAction(
                 user,

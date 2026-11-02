@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react'
 
@@ -11,6 +12,8 @@ import type {
 import {
   getCurrentUser,
   login as loginRequest,
+  logoutApi,
+  refreshToken as refreshSessionRequest,
 } from '../api/auth'
 
 import type {
@@ -22,16 +25,17 @@ import {
 } from './AuthContext'
 
 import {
+  getJwtExpiresAtMs,
   isJwtExpired,
   SESSION_EXPIRED_EVENT,
+  TOKEN_REFRESHED_EVENT,
 } from './sessionEvents'
 
 interface AuthProviderProps {
   children: ReactNode
 }
 
-const ACCESS_TOKEN_STORAGE_KEY =
-  'flowdesk_access_token'
+const ACCESS_TOKEN_STORAGE_KEY = 'flowdesk_access_token'
 
 function isStoredTokenExpired(): boolean {
   const storedToken = sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
@@ -39,16 +43,9 @@ function isStoredTokenExpired(): boolean {
 }
 
 function getStoredAccessToken(): string | null {
-  const storedToken =
-    sessionStorage.getItem(
-      ACCESS_TOKEN_STORAGE_KEY,
-    )
+  const storedToken = sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
 
-  if (
-    !storedToken ||
-    !storedToken.trim() ||
-    isJwtExpired(storedToken)
-  ) {
+  if (!storedToken || !storedToken.trim() || isJwtExpired(storedToken)) {
     return null
   }
 
@@ -58,78 +55,140 @@ function getStoredAccessToken(): string | null {
 export function AuthProvider({
   children,
 }: AuthProviderProps) {
-  const [
-    accessToken,
-    setAccessToken,
-  ] =
-    useState<string | null>(
-      getStoredAccessToken,
-    )
-
-  const [
-    user,
-    setUser,
-  ] =
-    useState<MeResponse | null>(
-      null,
-    )
-
-  const [
-    isAuthLoading,
-    setIsAuthLoading,
-  ] =
-    useState(
-      () =>
-        getStoredAccessToken() !== null,
-    )
-
-  const [
-    sessionExpiredMessage,
-    setSessionExpiredMessage,
-  ] =
-    useState<string | null>(() => {
-      if (isStoredTokenExpired()) {
-        return 'Your session has expired. Please sign in again.'
-      }
-      return null
-    })
-
-  // Clean up any stale expired token on initial mount
-  useEffect(() => {
+  const [accessToken, setAccessToken] = useState<string | null>(getStoredAccessToken)
+  const [user, setUser] = useState<MeResponse | null>(null)
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true)
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(() => {
     if (isStoredTokenExpired()) {
-      sessionStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY)
+      return 'Your session has expired. Please sign in again.'
     }
+    return null
+  })
+
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearSessionExpiredMessage = useCallback(() => {
+    setSessionExpiredMessage(null)
   }, [])
 
   const signOut = useCallback((message?: string): void => {
-    sessionStorage.removeItem(
-      ACCESS_TOKEN_STORAGE_KEY,
-    )
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current)
+      refreshTimeoutRef.current = null
+    }
+
+    sessionStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY)
     sessionStorage.removeItem('flowdesk_ticket_draft')
 
-    setAccessToken(
-      null,
-    )
+    void logoutApi()
 
-    setUser(
-      null,
-    )
-
-    setIsAuthLoading(
-      false,
-    )
+    setAccessToken(null)
+    setUser(null)
+    setIsAuthLoading(false)
 
     if (message) {
       setSessionExpiredMessage(message)
     }
   }, [])
 
-  const clearSessionExpiredMessage = useCallback(() => {
-    setSessionExpiredMessage(null)
+  // 1. Initial Session Restoration & Silent Refresh on Reload
+  useEffect(() => {
+    let cancelled = false
+
+    async function initSession() {
+      const stored = getStoredAccessToken()
+
+      if (stored) {
+        // We have an active unexpired access token in sessionStorage
+        try {
+          const currentUser = await getCurrentUser(stored)
+          if (!cancelled) {
+            setUser(currentUser)
+            setIsAuthLoading(false)
+          }
+          return
+        } catch {
+          // Fall through to silent refresh via HttpOnly cookie
+        }
+      }
+
+      // No valid access token in storage: attempt silent refresh using HttpOnly cookie
+      try {
+        const refreshResult = await refreshSessionRequest()
+        if (cancelled) return
+
+        sessionStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, refreshResult.accessToken)
+        setAccessToken(refreshResult.accessToken)
+
+        const currentUser = await getCurrentUser(refreshResult.accessToken)
+        if (cancelled) return
+
+        setUser(currentUser)
+        setIsAuthLoading(false)
+      } catch {
+        if (!cancelled) {
+          sessionStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY)
+          setAccessToken(null)
+          setUser(null)
+          setIsAuthLoading(false)
+        }
+      }
+    }
+
+    void initSession()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  // Listen for centralized session expiration events triggered by API interceptors
+  // 2. Proactive Refresh Timer (refreshes 60s before token expiration)
   useEffect(() => {
+    if (!accessToken) {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current)
+        refreshTimeoutRef.current = null
+      }
+      return
+    }
+
+    const expiresAtMs = getJwtExpiresAtMs(accessToken)
+    if (!expiresAtMs) return
+
+    // Refresh 60 seconds before token expires (or immediately if already within window)
+    const msUntilRefresh = Math.max(1000, expiresAtMs - Date.now() - 60000)
+
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current)
+    }
+
+    refreshTimeoutRef.current = setTimeout(async () => {
+      try {
+        const refreshResult = await refreshSessionRequest()
+        sessionStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, refreshResult.accessToken)
+        setAccessToken(refreshResult.accessToken)
+      } catch {
+        // If proactive refresh fails, authFetch will retry or handle on actual 401
+      }
+    }, msUntilRefresh)
+
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current)
+        refreshTimeoutRef.current = null
+      }
+    }
+  }, [accessToken])
+
+  // 3. Listen for token refresh and session expiration events
+  useEffect(() => {
+    function handleTokenRefreshed(event: Event) {
+      const customEvent = event as CustomEvent<{ accessToken: string }>
+      if (customEvent.detail?.accessToken) {
+        setAccessToken(customEvent.detail.accessToken)
+      }
+    }
+
     function handleExpiredEvent(event: Event) {
       const customEvent = event as CustomEvent<{ message?: string }>
       signOut(
@@ -138,67 +197,14 @@ export function AuthProvider({
       )
     }
 
-    window.addEventListener(
-      SESSION_EXPIRED_EVENT,
-      handleExpiredEvent,
-    )
+    window.addEventListener(TOKEN_REFRESHED_EVENT, handleTokenRefreshed)
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleExpiredEvent)
 
     return () => {
-      window.removeEventListener(
-        SESSION_EXPIRED_EVENT,
-        handleExpiredEvent,
-      )
+      window.removeEventListener(TOKEN_REFRESHED_EVENT, handleTokenRefreshed)
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleExpiredEvent)
     }
   }, [signOut])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function restoreSession() {
-      if (!accessToken) {
-        setIsAuthLoading(false)
-        return
-      }
-
-      setIsAuthLoading(true)
-
-      try {
-        const currentUser =
-          await getCurrentUser(
-            accessToken,
-          )
-
-        if (cancelled) {
-          return
-        }
-
-        setUser(
-          currentUser,
-        )
-      } catch {
-        if (cancelled) {
-          return
-        }
-
-        signOut('Your session has expired. Please sign in again.')
-      } finally {
-        if (!cancelled) {
-          setIsAuthLoading(
-            false,
-          )
-        }
-      }
-    }
-
-    void restoreSession()
-
-    return () => {
-      cancelled = true
-    }
-  }, [
-    accessToken,
-    signOut,
-  ])
 
   async function signIn(
     email: string,
@@ -206,17 +212,14 @@ export function AuthProvider({
   ): Promise<void> {
     clearSessionExpiredMessage()
 
-    const loginResponse =
-      await loginRequest({
-        email,
-        password,
-      })
+    const loginResponse = await loginRequest({
+      email,
+      password,
+    })
 
-    const currentUser =
-      await getCurrentUser(
-        loginResponse.accessToken,
-      )
+    const currentUser = await getCurrentUser(loginResponse.accessToken)
 
+    // Draft isolation: discard drafts created by a different user
     const existingDraft = sessionStorage.getItem('flowdesk_ticket_draft')
     if (existingDraft) {
       try {
@@ -234,13 +237,8 @@ export function AuthProvider({
       loginResponse.accessToken,
     )
 
-    setAccessToken(
-      loginResponse.accessToken,
-    )
-
-    setUser(
-      currentUser,
-    )
+    setAccessToken(loginResponse.accessToken)
+    setUser(currentUser)
   }
 
   async function setSessionToken(
@@ -248,10 +246,7 @@ export function AuthProvider({
   ): Promise<void> {
     clearSessionExpiredMessage()
 
-    const currentUser =
-      await getCurrentUser(
-        token,
-      )
+    const currentUser = await getCurrentUser(token)
 
     const existingDraft = sessionStorage.getItem('flowdesk_ticket_draft')
     if (existingDraft) {
@@ -270,13 +265,8 @@ export function AuthProvider({
       token,
     )
 
-    setAccessToken(
-      token,
-    )
-
-    setUser(
-      currentUser,
-    )
+    setAccessToken(token)
+    setUser(currentUser)
   }
 
   return (
@@ -284,9 +274,7 @@ export function AuthProvider({
       value={{
         user,
         accessToken,
-        isAuthenticated:
-          accessToken !== null &&
-          user !== null,
+        isAuthenticated: accessToken !== null && user !== null,
         isAuthLoading,
         sessionExpiredMessage,
         signIn,
