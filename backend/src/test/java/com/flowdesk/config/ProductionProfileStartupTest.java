@@ -19,9 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 @ActiveProfiles("prod")
 @TestPropertySource(properties = {
-        "spring.datasource.url=jdbc:postgresql://localhost:5432/flowdesk_test",
-        "spring.datasource.username=flowdesk_app",
-        "spring.datasource.password=12345678",
+        "spring.datasource.url=${DB_TEST_URL:jdbc:postgresql://localhost:5432/flowdesk_test}",
+        "spring.datasource.username=${DB_TEST_USERNAME:${DB_USERNAME:flowdesk_app}}",
+        "spring.datasource.password=${DB_TEST_PASSWORD:${DB_PASSWORD:12345678}}",
         "app.security.jwt.secret=YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=",
         "FRONTEND_ORIGIN=https://flowdesk.test.internal",
         "FLOWDESK_FRONTEND_ORIGIN=https://flowdesk.test.internal",

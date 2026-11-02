@@ -267,10 +267,10 @@ backend/src/test/java/com/flowdesk/config/ProductionProfileStartupTest.java
 
 ## 11. PR Link and GitHub CI Status
 
-- **Pull Request:** [GitHub PR #58](https://github.com/Vibhushan-2003/flowdesk/pull/58) *(Pending publication)*
+- **Pull Request:** [GitHub PR #58](https://github.com/Vibhushan-2003/flowdesk/pull/58)
 - **Target Branch:** `main`
 - **Head Branch:** `feat/day65-production-security-hardening`
-- **GitHub Actions Status:** Verified upon pull request push.
+- **GitHub Actions Status:** CI Build & Test in progress.
 
 ---
 
@@ -301,3 +301,4 @@ The FlowDesk codebase has satisfied all Day 65 security and configuration harden
 - ClamAV scanning is enforced in production with fail-closed semantics.
 - Full regression suites (960 backend tests, 41 E2E tests, frontend lint and build) are 100% passing.
 - The system is positioned for single-node OCI Always Free deployment in Day 66.
+
