@@ -10,7 +10,7 @@ import {
 } from './fixtures/mockApi'
 
 const SCREENSHOT_DIR = process.env.CI
-  ? path.resolve(__dirname, '../playwright-screenshots')
+  ? path.resolve(process.cwd(), 'playwright-screenshots')
   : path.resolve(
       'C:/Users/gvibh/.gemini/antigravity/brain/883a14e0-42dd-4f24-a364-05a5cbe98223/screenshots',
     )
