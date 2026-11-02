@@ -5,6 +5,7 @@ import com.flowdesk.ai.client.AiReplyDraftMessageRole;
 
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.CommentVisibility;
 import com.flowdesk.ticket.domain.TicketComment;
 import com.flowdesk.ticket.domain.TicketStatus;
 
@@ -101,8 +102,9 @@ public class AiReplyDraftContextService {
         List<AiReplyDraftConversationMessage>
                 conversation =
                 ticketCommentRepository
-                        .findByTicket_IdOrderByCreatedAtAsc(
-                                ticket.getId()
+                        .findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                                ticket.getId(),
+                                CommentVisibility.PUBLIC
                         )
                         .stream()
                         .map(

@@ -1,5 +1,6 @@
 package com.flowdesk.ticket.repository;
 
+import com.flowdesk.ticket.domain.CommentVisibility;
 import com.flowdesk.ticket.domain.TicketComment;
 
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -15,5 +16,12 @@ public interface TicketCommentRepository
     List<TicketComment>
             findByTicket_IdOrderByCreatedAtAsc(
                     UUID ticketId
+            );
+
+    @EntityGraph(attributePaths = "authorUser")
+    List<TicketComment>
+            findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                    UUID ticketId,
+                    CommentVisibility visibility
             );
 }

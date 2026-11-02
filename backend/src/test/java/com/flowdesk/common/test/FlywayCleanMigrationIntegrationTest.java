@@ -42,8 +42,8 @@ class FlywayCleanMigrationIntegrationTest {
     }
 
     @Test
-    @DisplayName("Verify clean Flyway V1 through V24 migrations on a brand new disposable schema")
-    void testCleanV1ToV24MigrationsOnFreshSchema() throws Exception {
+    @DisplayName("Verify clean Flyway V1 through V25 migrations on a brand new disposable schema")
+    void testCleanV1ToV25MigrationsOnFreshSchema() throws Exception {
         Flyway flyway = Flyway.configure()
                 .dataSource(dbUrl, dbUser, dbPassword)
                 .schemas(DISPOSABLE_SCHEMA)
@@ -51,12 +51,12 @@ class FlywayCleanMigrationIntegrationTest {
                 .locations("classpath:db/migration")
                 .load();
 
-        // 1. Run migrations from scratch (V1 to V24)
+        // 1. Run migrations from scratch (V1 to V25)
         MigrateResult result = flyway.migrate();
 
         assertThat(result.success).isTrue();
-        assertThat(result.targetSchemaVersion).isEqualTo("24");
-        assertThat(result.migrationsExecuted).isEqualTo(24);
+        assertThat(result.targetSchemaVersion).isEqualTo("25");
+        assertThat(result.migrationsExecuted).isEqualTo(25);
 
         // 2. Validate all checksums on fresh schema
         flyway.validate();
@@ -101,6 +101,16 @@ class FlywayCleanMigrationIntegrationTest {
                 assertThat(hasLockUntil).isTrue();
                 assertThat(hasLockedAt).isTrue();
                 assertThat(hasLockedBy).isTrue();
+            }
+
+            // Check ticket_comments table exists with visibility column (V25)
+            try (ResultSet rs = stmt.executeQuery(
+                    "SELECT column_name, data_type, is_nullable, column_default " +
+                    "FROM information_schema.columns " +
+                    "WHERE table_schema = '" + DISPOSABLE_SCHEMA + "' AND table_name = 'ticket_comments' AND column_name = 'visibility'")) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("is_nullable")).isEqualTo("NO");
+                assertThat(rs.getString("column_default")).contains("PUBLIC");
             }
         }
     }

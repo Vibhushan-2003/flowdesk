@@ -3,6 +3,7 @@ package com.flowdesk.ticket.service;
 import com.flowdesk.notification.domain.NotificationType;
 import com.flowdesk.notification.service.NotificationService;
 
+import com.flowdesk.ticket.domain.CommentVisibility;
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
 import com.flowdesk.ticket.domain.TicketComment;
@@ -15,6 +16,7 @@ import com.flowdesk.ticket.repository.TicketAssignmentRepository;
 import com.flowdesk.ticket.repository.TicketCommentRepository;
 import com.flowdesk.ticket.repository.TicketRepository;
 
+import com.flowdesk.user.domain.RoleCode;
 import com.flowdesk.user.domain.User;
 import com.flowdesk.user.repository.UserRepository;
 
@@ -25,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -73,6 +76,10 @@ public class TicketCommentService {
      *
      * Can read comments only on a ticket
      * created by that employee.
+     *
+     * CRITICAL SECURITY REQUIREMENT:
+     * Employees can read PUBLIC comments ONLY.
+     * Internal staff notes are strictly excluded.
      */
     @Transactional(readOnly = true)
     public List<TicketCommentResponse>
@@ -87,7 +94,14 @@ public class TicketCommentService {
                         ticketNumber
                 );
 
-        return getComments(ticket);
+        return ticketCommentRepository
+                .findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                        ticket.getId(),
+                        CommentVisibility.PUBLIC
+                )
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     /*
@@ -95,6 +109,9 @@ public class TicketCommentService {
      *
      * Can add a comment only to a ticket
      * created by that employee.
+     *
+     * Employees cannot forge an INTERNAL visibility flag.
+     * All employee comments are strictly PUBLIC.
      *
      * If the ticket currently has an active
      * support engineer, that engineer receives
@@ -107,6 +124,13 @@ public class TicketCommentService {
                     String ticketNumber,
                     CreateTicketCommentRequest request
             ) {
+
+        if (request != null && request.visibility() == CommentVisibility.INTERNAL) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Employees cannot create internal notes"
+            );
+        }
 
         Ticket ticket =
                 findEmployeeOwnedTicket(
@@ -123,7 +147,8 @@ public class TicketCommentService {
                 createComment(
                         ticket,
                         author,
-                        request
+                        request,
+                        CommentVisibility.PUBLIC
                 );
 
         notifyAssignedEngineer(
@@ -135,83 +160,129 @@ public class TicketCommentService {
     }
 
     /*
-     * SUPPORT ENGINEER
+     * SUPPORT STAFF (Support Engineer, Team Lead, Admin)
      *
-     * Can read comments only while they have
-     * the active assignment for the ticket.
+     * Can read all comments (PUBLIC and INTERNAL) where
+     * they have authorized ticket access.
      */
     @Transactional(readOnly = true)
     public List<TicketCommentResponse>
             getSupportComments(
-                    UUID supportEngineerId,
+                    UUID staffUserId,
                     String ticketNumber
             ) {
 
         String normalizedTicketNumber =
                 normalizeTicketNumber(ticketNumber);
 
-        TicketAssignment assignment =
+        Ticket ticket =
                 ticketAssignmentRepository
                         .findAuthorizedSupportAssignments(
                                 normalizedTicketNumber,
-                                supportEngineerId
+                                staffUserId
                         )
                         .stream()
+                        .map(TicketAssignment::getTicket)
                         .findFirst()
-                        .orElseThrow(
-                                () -> new ResponseStatusException(
-                                        HttpStatus.NOT_FOUND,
-                                        "Ticket not found"
-                                )
-                        );
+                        .orElseGet(() -> {
+                            User staffUser = userRepository.findById(staffUserId).orElse(null);
+                            boolean isLeadOrAdmin = staffUser != null && staffUser.getRoles().stream()
+                                    .anyMatch(r -> r.getCode() == RoleCode.ADMIN || r.getCode() == RoleCode.TEAM_LEAD);
+                            if (isLeadOrAdmin) {
+                                return ticketRepository.findByTicketNumber(normalizedTicketNumber)
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Ticket not found"
+                                        ));
+                            }
+                            throw new ResponseStatusException(
+                                    HttpStatus.NOT_FOUND,
+                                    "Ticket not found"
+                            );
+                        });
 
-        return getComments(
-                assignment.getTicket()
-        );
+        return ticketCommentRepository
+                .findByTicket_IdOrderByCreatedAtAsc(
+                        ticket.getId()
+                )
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     /*
-     * SUPPORT ENGINEER
+     * SUPPORT STAFF (Support Engineer, Team Lead, Admin)
      *
-     * Can add comments only while they have
-     * the active assignment.
+     * Can add PUBLIC replies or INTERNAL staff notes where
+     * they have authorized ticket access.
      *
-     * The employee who created the ticket
-     * receives a persistent notification.
+     * PUBLIC replies notify the ticket creator.
+     * INTERNAL notes do NOT notify the ticket creator.
      */
     @Transactional
     public TicketCommentResponse
             addSupportComment(
-                    UUID supportEngineerId,
+                    UUID staffUserId,
                     String ticketNumber,
                     CreateTicketCommentRequest request
             ) {
 
-        TicketAssignment assignment =
-                findActiveSupportAssignment(
-                        supportEngineerId,
-                        ticketNumber
+        String normalizedTicketNumber =
+                normalizeTicketNumber(ticketNumber);
+
+        Ticket ticket;
+        User author;
+
+        Optional<TicketAssignment> assignmentOpt =
+                ticketAssignmentRepository
+                        .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
+                                normalizedTicketNumber,
+                                staffUserId
+                        );
+
+        if (assignmentOpt.isPresent()) {
+            ticket = assignmentOpt.get().getTicket();
+            ensureCommentingAllowed(ticket);
+            author = findUser(staffUserId);
+        } else {
+            User staffUser = userRepository.findById(staffUserId).orElse(null);
+            boolean isLeadOrAdmin = staffUser != null && staffUser.getRoles().stream()
+                    .anyMatch(r -> r.getCode() == RoleCode.ADMIN || r.getCode() == RoleCode.TEAM_LEAD);
+            if (isLeadOrAdmin) {
+                ticket = ticketRepository.findByTicketNumber(normalizedTicketNumber)
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "Ticket not found"
+                        ));
+                ensureCommentingAllowed(ticket);
+                author = staffUser;
+            } else {
+                throw new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Ticket not found"
                 );
+            }
+        }
 
-        Ticket ticket =
-                assignment.getTicket();
-
-        ensureCommentingAllowed(ticket);
-
-        User author =
-                findUser(supportEngineerId);
+        CommentVisibility visibility =
+                (request != null && request.visibility() != null)
+                        ? request.visibility()
+                        : CommentVisibility.PUBLIC;
 
         TicketCommentResponse response =
                 createComment(
                         ticket,
                         author,
-                        request
+                        request,
+                        visibility
                 );
 
-        notifyTicketCreator(
-                ticket,
-                author
-        );
+        if (visibility == CommentVisibility.PUBLIC) {
+            notifyTicketCreator(
+                    ticket,
+                    author
+            );
+        }
 
         return response;
     }
@@ -238,29 +309,6 @@ public class TicketCommentService {
                 );
     }
 
-    private TicketAssignment
-            findActiveSupportAssignment(
-                    UUID supportEngineerId,
-                    String ticketNumber
-            ) {
-
-        String normalizedTicketNumber =
-                normalizeTicketNumber(ticketNumber);
-
-        return ticketAssignmentRepository
-                .findByTicket_TicketNumberAndAssignedToUser_IdAndReleasedAtIsNull(
-                        normalizedTicketNumber,
-                        supportEngineerId
-                )
-                .orElseThrow(
-                        () ->
-                                new ResponseStatusException(
-                                        HttpStatus.NOT_FOUND,
-                                        "Ticket not found"
-                                )
-                );
-    }
-
     private User findUser(
             UUID userId
     ) {
@@ -276,25 +324,12 @@ public class TicketCommentService {
                 );
     }
 
-    private List<TicketCommentResponse>
-            getComments(
-                    Ticket ticket
-            ) {
-
-        return ticketCommentRepository
-                .findByTicket_IdOrderByCreatedAtAsc(
-                        ticket.getId()
-                )
-                .stream()
-                .map(this::toResponse)
-                .toList();
-    }
-
     private TicketCommentResponse
             createComment(
                     Ticket ticket,
                     User author,
-                    CreateTicketCommentRequest request
+                    CreateTicketCommentRequest request,
+                    CommentVisibility visibility
             ) {
 
         validateRequest(request);
@@ -306,7 +341,8 @@ public class TicketCommentService {
                     new TicketComment(
                             ticket,
                             author,
-                            request.body()
+                            request.body(),
+                            visibility
                     );
         }
         catch (IllegalArgumentException exception) {
@@ -492,7 +528,8 @@ public class TicketCommentService {
                 author.getId(),
                 authorName,
                 comment.getBody(),
-                comment.getCreatedAt()
+                comment.getCreatedAt(),
+                comment.getVisibility()
         );
     }
 

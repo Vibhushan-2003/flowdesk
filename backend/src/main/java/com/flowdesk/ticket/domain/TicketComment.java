@@ -3,6 +3,8 @@ package com.flowdesk.ticket.domain;
 import com.flowdesk.user.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -32,6 +34,10 @@ public class TicketComment {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String body;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", nullable = false, length = 20)
+    private CommentVisibility visibility = CommentVisibility.PUBLIC;
+
     @Column(
         name = "created_at",
         nullable = false,
@@ -46,6 +52,15 @@ public class TicketComment {
         Ticket ticket,
         User authorUser,
         String body
+    ) {
+        this(ticket, authorUser, body, CommentVisibility.PUBLIC);
+    }
+
+    public TicketComment(
+        Ticket ticket,
+        User authorUser,
+        String body,
+        CommentVisibility visibility
     ) {
         if (ticket == null) {
             throw new IllegalArgumentException(
@@ -76,6 +91,7 @@ public class TicketComment {
         this.ticket = ticket;
         this.authorUser = authorUser;
         this.body = normalizedBody;
+        this.visibility = visibility != null ? visibility : CommentVisibility.PUBLIC;
     }
 
     @PrePersist
@@ -87,6 +103,10 @@ public class TicketComment {
         if (createdAt == null) {
             createdAt =
                 OffsetDateTime.now(ZoneOffset.UTC);
+        }
+
+        if (visibility == null) {
+            visibility = CommentVisibility.PUBLIC;
         }
     }
 
@@ -104,6 +124,10 @@ public class TicketComment {
 
     public String getBody() {
         return body;
+    }
+
+    public CommentVisibility getVisibility() {
+        return visibility;
     }
 
     public OffsetDateTime getCreatedAt() {

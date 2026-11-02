@@ -4,6 +4,7 @@ import com.flowdesk.ai.client.AiReplyDraftMessageRole;
 
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.CommentVisibility;
 import com.flowdesk.ticket.domain.TicketComment;
 import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketStatus;
@@ -198,8 +199,9 @@ class AiReplyDraftContextServiceTest {
 
         when(
                 ticketCommentRepository
-                        .findByTicket_IdOrderByCreatedAtAsc(
-                                ticketId
+                        .findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                                ticketId,
+                                CommentVisibility.PUBLIC
                         )
         ).thenReturn(
                 List.of(
@@ -352,8 +354,9 @@ class AiReplyDraftContextServiceTest {
 
         when(
                 ticketCommentRepository
-                        .findByTicket_IdOrderByCreatedAtAsc(
-                                ticketId
+                        .findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                                ticketId,
+                                CommentVisibility.PUBLIC
                         )
         ).thenReturn(
                 List.of()
@@ -578,8 +581,9 @@ class AiReplyDraftContextServiceTest {
 
         when(
                 ticketCommentRepository
-                        .findByTicket_IdOrderByCreatedAtAsc(
-                                ticketId
+                        .findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                                ticketId,
+                                CommentVisibility.PUBLIC
                         )
         ).thenReturn(
                 List.of(

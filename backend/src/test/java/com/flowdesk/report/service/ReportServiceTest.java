@@ -107,7 +107,7 @@ class ReportServiceTest {
 
         // Daily resolved
         ReportQueryRepository.DateCount resolvedCount = mock(ReportQueryRepository.DateCount.class);
-        when(resolvedCount.getDate()).thenReturn(java.sql.Date.valueOf(LocalDate.of(2026, 10, 1)));
+        when(resolvedCount.getDate()).thenReturn(LocalDate.of(2026, 10, 1));
         when(resolvedCount.getCount()).thenReturn(10L);
         when(reportQueryRepository.countDailyResolved(any(), any())).thenReturn(List.of(resolvedCount));
 
