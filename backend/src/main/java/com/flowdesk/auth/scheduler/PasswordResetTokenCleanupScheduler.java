@@ -1,6 +1,7 @@
 package com.flowdesk.auth.scheduler;
 
 import com.flowdesk.auth.service.PasswordResetService;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,6 +13,7 @@ import java.time.Duration;
  * Periodically cleans up expired and consumed password reset tokens older than the retention threshold.
  * <p>
  * Ensures active, unexpired tokens are never deleted.
+ * Uses PostgreSQL distributed locking (@SchedulerLock) to prevent duplicate cleanup across instances.
  */
 @Component
 public class PasswordResetTokenCleanupScheduler {
@@ -33,6 +35,11 @@ public class PasswordResetTokenCleanupScheduler {
     @Scheduled(
             fixedDelayString = "${app.security.password-reset.cleanup.fixed-delay-ms:3600000}",
             initialDelayString = "${app.security.password-reset.cleanup.initial-delay-ms:60000}"
+    )
+    @SchedulerLock(
+            name = "PasswordResetTokenCleanupScheduler_cleanupTokens",
+            lockAtMostFor = "10m",
+            lockAtLeastFor = "1m"
     )
     public void cleanupTokens() {
         try {

@@ -25,12 +25,20 @@ public class RefreshTokenProperties {
         this.idleTtl = idleTtl;
     }
 
+    public void setIdleDurationSeconds(long seconds) {
+        this.idleTtl = Duration.ofSeconds(seconds);
+    }
+
     public Duration getAbsoluteTtl() {
         return absoluteTtl;
     }
 
     public void setAbsoluteTtl(Duration absoluteTtl) {
         this.absoluteTtl = absoluteTtl;
+    }
+
+    public void setMaxLifetimeSeconds(long seconds) {
+        this.absoluteTtl = Duration.ofSeconds(seconds);
     }
 
     public String getCookieName() {
@@ -73,4 +81,3 @@ public class RefreshTokenProperties {
         this.gracePeriodSeconds = gracePeriodSeconds;
     }
 }
-

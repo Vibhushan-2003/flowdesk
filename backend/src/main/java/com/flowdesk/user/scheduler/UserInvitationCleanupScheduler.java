@@ -1,6 +1,7 @@
 package com.flowdesk.user.scheduler;
 
 import com.flowdesk.user.service.UserInvitationService;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -8,6 +9,11 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
+/**
+ * Periodically cleans up expired and consumed user invitations older than the retention threshold.
+ * <p>
+ * Uses PostgreSQL distributed locking (@SchedulerLock) to prevent duplicate cleanup across instances.
+ */
 @Component
 public class UserInvitationCleanupScheduler {
 
@@ -22,6 +28,11 @@ public class UserInvitationCleanupScheduler {
     @Scheduled(
             fixedDelayString = "${app.security.invitation.cleanup.fixed-delay-ms:3600000}",
             initialDelayString = "${app.security.invitation.cleanup.initial-delay-ms:120000}"
+    )
+    @SchedulerLock(
+            name = "UserInvitationCleanupScheduler_cleanupInvitations",
+            lockAtMostFor = "10m",
+            lockAtLeastFor = "1m"
     )
     public void cleanupInvitations() {
         try {

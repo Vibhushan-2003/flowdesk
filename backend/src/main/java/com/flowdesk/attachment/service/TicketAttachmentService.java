@@ -42,6 +42,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import com.flowdesk.attachment.dto.AttachmentRescanReport;
+import org.springframework.data.domain.PageRequest;
 
 @Service
 public class TicketAttachmentService {
@@ -534,6 +536,84 @@ public class TicketAttachmentService {
                 attachment.getCreatedAt(),
                 attachment.getScanStatus(),
                 attachment.getScanDetails()
+        );
+    }
+
+    /**
+     * Administratively rescans pending attachments in bounded batches using the active malware scanner.
+     */
+    @Transactional
+    public AttachmentRescanReport rescanPendingAttachments(int maxBatchSize) {
+        long totalPending = attachmentRepository.countByScanStatus(ScanStatus.PENDING_SCAN);
+        if (totalPending == 0) {
+            return new AttachmentRescanReport(0, 0, 0, 0, 0, "No pending attachments found");
+        }
+
+        if (malwareScanner == null || !malwareScanner.isAvailable()) {
+            log.warn("Administrative rescan skipped: malware scanner is unavailable or not configured");
+            return AttachmentRescanReport.skipped(totalPending, "Malware scanner is unavailable or not configured");
+        }
+
+        int limit = Math.max(1, Math.min(maxBatchSize, 100));
+        List<TicketAttachment> batch = attachmentRepository.findPendingForRescanWithSkipLocked(limit);
+        if (batch.isEmpty()) {
+            return new AttachmentRescanReport(
+                    totalPending,
+                    0,
+                    0,
+                    0,
+                    0,
+                    "No unlocked pending attachments available (concurrent rescan may be in progress)"
+            );
+        }
+
+        int scanned = 0;
+        int clean = 0;
+        int infected = 0;
+        int failed = 0;
+
+        for (TicketAttachment attachment : batch) {
+            if (!storageService.exists(attachment.getStorageKey())) {
+                log.error("Attachment [id={}] storage file missing during rescan", attachment.getId());
+                attachment.markScanFailed("Storage file missing during rescan");
+                attachmentRepository.save(attachment);
+                failed++;
+                scanned++;
+                continue;
+            }
+
+            try (InputStream in = storageService.load(attachment.getStorageKey())) {
+                ScanResult result = malwareScanner.scan(in, attachment.getSanitizedFilename(), attachment.getSizeBytes());
+                scanned++;
+
+                if (result.isClean()) {
+                    attachment.markClean();
+                    clean++;
+                } else if (result.isInfected()) {
+                    attachment.markInfected("Malware detected on rescan: " + result.virusName());
+                    infected++;
+                } else {
+                    attachment.markScanFailed("Rescan failed: " + result.failureReason());
+                    failed++;
+                }
+
+                attachmentRepository.save(attachment);
+            } catch (Exception e) {
+                log.error("Failed to rescan attachment [id={}]", attachment.getId(), e);
+                attachment.markScanFailed("Rescan exception: " + e.getMessage());
+                attachmentRepository.save(attachment);
+                failed++;
+                scanned++;
+            }
+        }
+
+        return new AttachmentRescanReport(
+                totalPending,
+                scanned,
+                clean,
+                infected,
+                failed,
+                "Rescan batch completed: " + scanned + " scanned (" + clean + " clean, " + infected + " infected, " + failed + " failed)"
         );
     }
 }
