@@ -55,6 +55,16 @@ public class TicketAttachment {
     @Column(name = "status", nullable = false, length = 30)
     private AttachmentStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scan_status", nullable = false, length = 30)
+    private ScanStatus scanStatus;
+
+    @Column(name = "scanned_at")
+    private OffsetDateTime scannedAt;
+
+    @Column(name = "scan_details", length = 255)
+    private String scanDetails;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
@@ -72,6 +82,21 @@ public class TicketAttachment {
             String checksumSha256,
             AttachmentStatus status
     ) {
+        this(ticket, uploadedByUser, originalFilename, sanitizedFilename, contentType, sizeBytes, storageKey, checksumSha256, status, ScanStatus.CLEAN);
+    }
+
+    public TicketAttachment(
+            Ticket ticket,
+            User uploadedByUser,
+            String originalFilename,
+            String sanitizedFilename,
+            String contentType,
+            long sizeBytes,
+            String storageKey,
+            String checksumSha256,
+            AttachmentStatus status,
+            ScanStatus scanStatus
+    ) {
         this.id = UUID.randomUUID();
         this.ticket = Objects.requireNonNull(ticket, "ticket is required");
         this.uploadedByUser = Objects.requireNonNull(uploadedByUser, "uploadedByUser is required");
@@ -88,6 +113,7 @@ public class TicketAttachment {
         }
         this.checksumSha256 = checksumSha256;
         this.status = status != null ? status : AttachmentStatus.AVAILABLE;
+        this.scanStatus = scanStatus != null ? scanStatus : ScanStatus.CLEAN;
     }
 
     @PrePersist
@@ -97,6 +123,9 @@ public class TicketAttachment {
         }
         if (status == null) {
             status = AttachmentStatus.AVAILABLE;
+        }
+        if (scanStatus == null) {
+            scanStatus = ScanStatus.CLEAN;
         }
         if (createdAt == null) {
             createdAt = OffsetDateTime.now(ZoneOffset.UTC);
@@ -108,6 +137,31 @@ public class TicketAttachment {
             throw new IllegalArgumentException(fieldName + " is required");
         }
         return value.trim();
+    }
+
+    public void markClean() {
+        this.scanStatus = ScanStatus.CLEAN;
+        this.status = AttachmentStatus.AVAILABLE;
+        this.scannedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        this.scanDetails = "Clean";
+    }
+
+    public void markInfected(String virusName) {
+        this.scanStatus = ScanStatus.INFECTED;
+        this.status = AttachmentStatus.QUARANTINED;
+        this.scannedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        this.scanDetails = virusName != null ? virusName : "Malware.Detected";
+    }
+
+    public void markScanFailed(String reason) {
+        this.scanStatus = ScanStatus.SCAN_FAILED;
+        this.status = AttachmentStatus.QUARANTINED;
+        this.scannedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        this.scanDetails = reason != null ? reason : "Scanner failure";
+    }
+
+    public boolean isDownloadable() {
+        return this.status == AttachmentStatus.AVAILABLE && this.scanStatus == ScanStatus.CLEAN;
     }
 
     public void markAvailable() {
@@ -156,6 +210,18 @@ public class TicketAttachment {
 
     public AttachmentStatus getStatus() {
         return status;
+    }
+
+    public ScanStatus getScanStatus() {
+        return scanStatus;
+    }
+
+    public OffsetDateTime getScannedAt() {
+        return scannedAt;
+    }
+
+    public String getScanDetails() {
+        return scanDetails;
     }
 
     public OffsetDateTime getCreatedAt() {

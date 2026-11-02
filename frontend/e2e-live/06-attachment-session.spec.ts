@@ -95,4 +95,156 @@ test.describe('Real-Stack Live: Attachments & Session Continuity', () => {
     await expect(page).toHaveURL(/.*tickets\/new/)
     await expect(page.getByRole('heading', { name: /create a ticket/i })).toBeVisible()
   })
+
+  test('Scenario 13: Real refresh-token cookie rotation and session continuity', async () => {
+    const backendUrl = getResolvedBackendUrl()
+
+    // 1. Authenticate with real credentials
+    const loginRes = await fetch(`${backendUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'http://127.0.0.1:3000',
+        'X-FlowDesk-Client': 'Playwright-Live',
+      },
+      body: JSON.stringify({
+        email: E2E_EMPLOYEE_A.email,
+        password: E2E_EMPLOYEE_A.password,
+      }),
+    })
+    expect(loginRes.status).toBe(200)
+
+    // Inspect Set-Cookie header
+    const setCookie = loginRes.headers.get('set-cookie') || ''
+    expect(setCookie).toContain('flowdesk_refresh')
+    expect(setCookie.toLowerCase()).toContain('httponly')
+    expect(setCookie.toLowerCase()).toContain('samesite=strict')
+
+    // Extract the raw cookie
+    const cookieMatch = setCookie.match(/flowdesk_refresh=([^;]+)/)
+    expect(cookieMatch).toBeTruthy()
+    const refreshCookieValue = cookieMatch ? cookieMatch[1] : ''
+
+    // 2. Perform silent refresh with the cookie and CSRF protection
+    const refreshRes = await fetch(`${backendUrl}/api/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        Origin: 'http://127.0.0.1:3000',
+        'X-FlowDesk-Client': 'Playwright-Live',
+        Cookie: `flowdesk_refresh=${refreshCookieValue}`,
+      },
+    })
+    expect(refreshRes.status).toBe(200)
+    const refreshData = (await refreshRes.json()) as { accessToken: string; userEmail: string }
+    expect(refreshData.accessToken).toBeTruthy()
+    expect(refreshData.userEmail).toBe(E2E_EMPLOYEE_A.email)
+
+    // Verify cookie was rotated
+    const rotatedCookie = refreshRes.headers.get('set-cookie') || ''
+    expect(rotatedCookie).toContain('flowdesk_refresh')
+  })
+
+  test('Scenario 14: Quarantined malware attachment upload and download rejection', async () => {
+    const backendUrl = getResolvedBackendUrl()
+    const token = await loginAndGetToken(backendUrl, E2E_EMPLOYEE_A)
+
+    // 1. Create a ticket
+    const ticketRes = await fetch(`${backendUrl}/api/tickets`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        type: 'INCIDENT',
+        title: `Malware Quarantine Test Ticket ${Date.now()}`,
+        description: 'Verifying infected file quarantine and download rejection fail-closed',
+      }),
+    })
+    expect(ticketRes.status).toBe(201)
+    const ticket = (await ticketRes.json()) as { ticketNumber: string }
+
+    // 2. Upload simulated EICAR malware payload
+    const eicarPayload = 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*'
+    const blob = new Blob([eicarPayload], { type: 'text/plain' })
+    const formData = new FormData()
+    formData.append('file', blob, 'eicar-test.txt')
+
+    const uploadRes = await fetch(
+      `${backendUrl}/api/tickets/${ticket.ticketNumber}/attachments`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      },
+    )
+    expect(uploadRes.status).toBe(201)
+    const attachmentData = (await uploadRes.json()) as {
+      id: string
+      filename: string
+      status: string
+      scanStatus: string
+    }
+    expect(attachmentData.status).toBe('QUARANTINED')
+    expect(attachmentData.scanStatus).toBe('INFECTED')
+
+    // 3. Attempt download: must fail closed with 403 Forbidden
+    const downloadRes = await fetch(
+      `${backendUrl}/api/tickets/${ticket.ticketNumber}/attachments/${attachmentData.id}/download`,
+      {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    )
+    expect(downloadRes.status).toBe(403)
+  })
+
+  test('Scenario 15: Logout revokes refresh session and clears cookie', async () => {
+    const backendUrl = getResolvedBackendUrl()
+
+    // 1. Authenticate to establish session
+    const loginRes = await fetch(`${backendUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'http://127.0.0.1:3000',
+        'X-FlowDesk-Client': 'Playwright-Live',
+      },
+      body: JSON.stringify({
+        email: E2E_EMPLOYEE_A.email,
+        password: E2E_EMPLOYEE_A.password,
+      }),
+    })
+    expect(loginRes.status).toBe(200)
+    const setCookie = loginRes.headers.get('set-cookie') || ''
+    const cookieMatch = setCookie.match(/flowdesk_refresh=([^;]+)/)
+    expect(cookieMatch).toBeTruthy()
+    const refreshCookieValue = cookieMatch ? cookieMatch[1] : ''
+
+    // 2. Call logout with CSRF protection and cookie
+    const logoutRes = await fetch(`${backendUrl}/api/auth/logout`, {
+      method: 'POST',
+      headers: {
+        Origin: 'http://127.0.0.1:3000',
+        'X-FlowDesk-Client': 'Playwright-Live',
+        Cookie: `flowdesk_refresh=${refreshCookieValue}`,
+      },
+    })
+    expect(logoutRes.status).toBe(200)
+
+    // Inspect cookie cleared
+    const clearCookieHeader = logoutRes.headers.get('set-cookie') || ''
+    expect(clearCookieHeader).toContain('flowdesk_refresh')
+
+    // 3. Attempting refresh with revoked cookie must return 401 Unauthorized
+    const retryRefresh = await fetch(`${backendUrl}/api/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        Origin: 'http://127.0.0.1:3000',
+        'X-FlowDesk-Client': 'Playwright-Live',
+        Cookie: `flowdesk_refresh=${refreshCookieValue}`,
+      },
+    })
+    expect(retryRefresh.status).toBe(401)
+  })
 })

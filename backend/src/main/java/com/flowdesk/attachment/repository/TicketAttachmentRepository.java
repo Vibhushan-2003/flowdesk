@@ -18,6 +18,11 @@ public interface TicketAttachmentRepository extends JpaRepository<TicketAttachme
             AttachmentStatus status
     );
 
+    List<TicketAttachment> findByTicket_IdAndStatusInOrderByCreatedAtAsc(
+            UUID ticketId,
+            Collection<AttachmentStatus> statuses
+    );
+
     Optional<TicketAttachment> findByTicket_TicketNumberAndIdAndStatus(
             String ticketNumber,
             UUID id,

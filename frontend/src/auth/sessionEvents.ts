@@ -1,4 +1,5 @@
 export const SESSION_EXPIRED_EVENT = 'flowdesk:session-expired'
+export const TOKEN_REFRESHED_EVENT = 'flowdesk:token-refreshed'
 
 let lastExpiryNotification = 0
 
@@ -21,16 +22,15 @@ export function notifySessionExpired(
   }
 }
 
-export function isJwtExpired(token: string | null): boolean {
+export function getJwtExpiresAtMs(token: string | null): number | null {
   if (!token || !token.trim()) {
-    return true
+    return null
   }
   try {
     const parts = token.split('.')
     if (parts.length !== 3) {
-      return true
+      return null
     }
-    // Base64URL decode with safe padding
     let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
     while (base64.length % 4 !== 0) {
       base64 += '='
@@ -43,12 +43,19 @@ export function isJwtExpired(token: string | null): boolean {
     )
     const payload = JSON.parse(json) as { exp?: unknown }
     if (typeof payload.exp !== 'number') {
-      return true
+      return null
     }
-    // Consider expired if within 5 seconds of expiration timestamp
-    return payload.exp * 1000 <= Date.now() + 5000
+    return payload.exp * 1000
   } catch {
-    return true
+    return null
   }
 }
 
+export function isJwtExpired(token: string | null): boolean {
+  const expiresAt = getJwtExpiresAtMs(token)
+  if (expiresAt === null) {
+    return true
+  }
+  // Consider expired if within 5 seconds of expiration timestamp
+  return expiresAt <= Date.now() + 5000
+}

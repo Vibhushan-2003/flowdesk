@@ -22,8 +22,11 @@ export async function login(
 ): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-FlowDesk-Client': 'web',
     },
     body: JSON.stringify(request),
   })
@@ -47,13 +50,52 @@ export async function login(
   return response.json() as Promise<LoginResponse>
 }
 
+export async function refreshToken(): Promise<LoginResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-FlowDesk-Client': 'web',
+    },
+  })
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Refresh token has expired or is invalid')
+    }
+    throw new Error('Unable to refresh session')
+  }
+
+  return response.json() as Promise<LoginResponse>
+}
+
+export async function logoutApi(): Promise<void> {
+  try {
+    await fetch(`${API_BASE_URL}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-FlowDesk-Client': 'web',
+      },
+    })
+  } catch {
+    // Fail silently on logout network failure
+  }
+}
+
 export async function getCurrentUser(
   accessToken: string,
 ): Promise<MeResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
     method: 'GET',
+    credentials: 'include',
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      'X-Requested-With': 'XMLHttpRequest',
     },
   })
 
@@ -75,9 +117,11 @@ export async function changePassword(
 ): Promise<ChangePasswordResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
+      'X-Requested-With': 'XMLHttpRequest',
     },
     body: JSON.stringify(request),
   })
@@ -115,6 +159,7 @@ export async function forgotPassword(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
     },
     body: JSON.stringify(request),
   })
@@ -152,6 +197,7 @@ export async function resetPassword(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
     },
     body: JSON.stringify(request),
   })
@@ -189,6 +235,7 @@ export async function acceptInvitation(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
     },
     body: JSON.stringify(request),
   })
@@ -210,10 +257,10 @@ export async function acceptInvitation(
     }
 
     if (response.status === 400) {
-      throw new Error('Please check the password information you entered.')
+      throw new Error('This invitation link is invalid or has expired.')
     }
 
-    throw new Error('Unable to accept invitation. The invitation link may be invalid or expired.')
+    throw new Error('Unable to complete invitation. Please try again.')
   }
 
   return response.json() as Promise<AcceptInvitationResponse>
@@ -222,15 +269,13 @@ export async function acceptInvitation(
 export async function getGoogleOAuthConfig(): Promise<GoogleOAuthConfigResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/oauth2/config`, {
     method: 'GET',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+    },
   })
 
   if (!response.ok) {
-    return {
-      enabled: false,
-      clientId: '',
-      redirectUri: '',
-      authUri: 'https://accounts.google.com/o/oauth2/v2/auth',
-    }
+    throw new Error('Failed to load Google OAuth configuration')
   }
 
   return response.json() as Promise<GoogleOAuthConfigResponse>
@@ -241,43 +286,16 @@ export async function googleLogin(
 ): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/oauth2/google`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-FlowDesk-Client': 'web',
     },
     body: JSON.stringify(request),
   })
 
   if (!response.ok) {
-    if (response.status === 409) {
-      let linkToken = ''
-      let email = ''
-      let provider = 'GOOGLE'
-      let message = 'Account linking required.'
-      try {
-        const errorBody = await response.json()
-        if (errorBody) {
-          if (typeof errorBody.message === 'string') message = errorBody.message
-          if (typeof errorBody.linkToken === 'string') linkToken = errorBody.linkToken
-          if (typeof errorBody.email === 'string') email = errorBody.email
-          if (typeof errorBody.provider === 'string') provider = errorBody.provider
-        }
-      } catch {
-        // ignore parse error
-      }
-
-      const error = new Error(message) as Error & {
-        status: 409
-        linkToken: string
-        email: string
-        provider: string
-      }
-      error.status = 409
-      error.linkToken = linkToken
-      error.email = email
-      error.provider = provider
-      throw error
-    }
-
     let errorMessage = 'Google authentication failed. Please try again.'
     try {
       const errorBody = await response.json()
@@ -296,13 +314,18 @@ export async function googleLogin(
   return response.json() as Promise<LoginResponse>
 }
 
-export async function completeGoogleLink(
+export const completeGoogleLink = completeGoogleLinking
+
+export async function completeGoogleLinking(
   request: GoogleLinkAccountRequest,
 ): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/oauth2/google/link`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-FlowDesk-Client': 'web',
     },
     body: JSON.stringify(request),
   })
