@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "app.security.invitation.frontend-origin=https://flowdesk.test.internal",
         "app.mail.enabled=false",
         "app.mail.host=smtp.test.internal",
+        "app.storage.attachment.local.base-directory=${java.io.tmpdir}/flowdesk-prod-test-attachments",
         "app.attachment.malware-scanner.type=clamav",
         "app.attachment.malware-scanner.clamav.host=localhost",
         "app.attachment.malware-scanner.clamav.port=3310"
