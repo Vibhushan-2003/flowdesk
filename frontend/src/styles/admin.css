@@ -1,0 +1,553 @@
+/* ==========================================================================
+   FlowDesk Horizon — Administration, Reports & Audit Stylesheet
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Filter & Toolbar Controls
+   -------------------------------------------------------------------------- */
+.horizon-filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-6);
+}
+
+.horizon-filter-presets {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.horizon-preset-btn {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.horizon-preset-btn:hover {
+  color: var(--color-text-primary);
+}
+
+.horizon-preset-btn.is-active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: var(--shadow-sm);
+}
+
+.horizon-date-range-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.horizon-date-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.horizon-date-input {
+  padding: 5px 10px;
+  font-size: var(--font-size-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.horizon-date-input:focus {
+  border-color: var(--color-focus-ring);
+  box-shadow: 0 0 0 2px var(--color-focus-ring-subtle, rgba(37, 99, 235, 0.15));
+}
+
+/* --------------------------------------------------------------------------
+   KPI Metric Cards
+   -------------------------------------------------------------------------- */
+.horizon-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.horizon-kpi-card {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.horizon-kpi-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-hover);
+}
+
+.horizon-kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.horizon-kpi-title {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.horizon-kpi-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-subtle);
+  color: var(--color-primary);
+}
+
+.horizon-kpi-value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.horizon-kpi-subtext {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0 0;
+  line-height: var(--line-height-normal);
+}
+
+/* --------------------------------------------------------------------------
+   Chart Visualization
+   -------------------------------------------------------------------------- */
+.horizon-chart-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+
+.horizon-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.horizon-chart-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.horizon-chart-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.horizon-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.horizon-legend-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.horizon-legend-color--created {
+  background: var(--color-primary);
+}
+
+.horizon-legend-color--resolved {
+  background: var(--color-success);
+}
+
+.horizon-chart-bars-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  height: 180px;
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+  overflow-x: auto;
+}
+
+.horizon-chart-bar-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 38px;
+  height: 100%;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.horizon-bars-pair {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 140px;
+  width: 100%;
+  justify-content: center;
+}
+
+.horizon-bar {
+  width: 14px;
+  min-height: 4px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: height var(--transition-normal), opacity var(--transition-fast);
+}
+
+.horizon-bar--created {
+  background: var(--color-primary);
+}
+
+.horizon-bar--created:hover {
+  opacity: 0.85;
+}
+
+.horizon-bar--resolved {
+  background: var(--color-success);
+}
+
+.horizon-bar--resolved:hover {
+  opacity: 0.85;
+}
+
+.horizon-bar-date {
+  font-size: 11px;
+  font-family: var(--font-family-mono);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Data Grid 2-Column Section
+   -------------------------------------------------------------------------- */
+.horizon-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+/* --------------------------------------------------------------------------
+   Table Styling
+   -------------------------------------------------------------------------- */
+.horizon-data-table-simple {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+  text-align: left;
+}
+
+.horizon-data-table-simple th {
+  padding: 10px 14px;
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.horizon-data-table-simple td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-text-primary);
+  vertical-align: middle;
+}
+
+.horizon-data-table-simple tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+.horizon-data-table-simple tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* --------------------------------------------------------------------------
+   Export Bar
+   -------------------------------------------------------------------------- */
+.horizon-export-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5) var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.horizon-export-info h3 {
+  margin: 0;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.horizon-export-info p {
+  margin: 4px 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.horizon-export-buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   SLA Operations
+   -------------------------------------------------------------------------- */
+.horizon-sla-exposure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4);
+}
+
+.horizon-sla-exposure-card {
+  padding: var(--space-4);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.horizon-sla-exposure-count {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-family-mono);
+  color: var(--color-text-primary);
+}
+
+.horizon-sla-breach-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.horizon-sla-breach-item:last-child {
+  border-bottom: none;
+}
+
+.horizon-sla-breach-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.horizon-sla-breach-time {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Audit Trail & JSON Viewer
+   -------------------------------------------------------------------------- */
+.horizon-audit-json-viewer {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  overflow-x: auto;
+  max-height: 380px;
+  line-height: var(--line-height-relaxed);
+}
+
+.horizon-audit-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.horizon-audit-metadata-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.horizon-audit-metadata-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+}
+
+.horizon-audit-metadata-val {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+/* --------------------------------------------------------------------------
+   Attachment Rescan Admin Section
+   -------------------------------------------------------------------------- */
+.horizon-rescan-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+
+.horizon-rescan-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.horizon-rescan-metric-pill {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.horizon-rescan-metric-value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-family-mono);
+  color: var(--color-text-primary);
+}
+
+.horizon-rescan-metric-label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Breakpoints
+   -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .horizon-filter-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .horizon-filter-presets {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .horizon-preset-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .horizon-date-range-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .horizon-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .horizon-grid-2col {
+    grid-template-columns: 1fr;
+  }
+
+  .horizon-export-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .horizon-export-buttons {
+    width: 100%;
+  }
+
+  .horizon-export-buttons button {
+    flex: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .horizon-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

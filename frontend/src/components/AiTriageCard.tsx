@@ -1,7 +1,11 @@
+import { useEffect, useState } from 'react'
 import {
-  useEffect,
-  useState,
-} from 'react'
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  ShieldCheck,
+  RefreshCw,
+} from 'lucide-react'
 
 import {
   AiTriageApiError,
@@ -9,17 +13,13 @@ import {
   generateAiTriageRecommendation,
   getAiTriageRecommendation,
 } from '../api/aiTriage'
-
-import type {
-  AiTriageRecommendationResponse,
-} from '../types/aiTriage'
-
-import type {
-  TicketPriority,
-  TicketStatus,
-} from '../types/ticket'
-
-import './AiTriageCard.css'
+import type { AiTriageRecommendationResponse } from '../types/aiTriage'
+import type { TicketPriority, TicketStatus } from '../types/ticket'
+import { Button } from './ui/Button'
+import { Badge } from './ui/Badge'
+import { PriorityBadge } from './ui/PriorityBadge'
+import { Modal } from './ui/Modal'
+import { formatDate } from '../utils/formatters'
 
 interface AiTriageCardProps {
   accessToken: string | null
@@ -29,24 +29,8 @@ interface AiTriageCardProps {
   onApplied: () => Promise<void>
 }
 
-function formatConfidence(
-  confidence: number,
-) {
-  return `${Math.round(
-    confidence * 100,
-  )}%`
-}
-
-function formatDate(
-  value: string,
-) {
-  return new Date(value).toLocaleString()
-}
-
-function getPriorityClass(
-  priority: TicketPriority,
-) {
-  return `ai-triage-priority ai-triage-priority-${priority.toLowerCase()}`
+function formatConfidence(confidence: number) {
+  return `${Math.round(confidence * 100)}%`
 }
 
 export function AiTriageCard({
@@ -56,45 +40,12 @@ export function AiTriageCard({
   ticketStatus,
   onApplied,
 }: AiTriageCardProps) {
-  const [
-    recommendation,
-    setRecommendation,
-  ] =
-    useState<AiTriageRecommendationResponse | null>(
-      null,
-    )
-
-  const [
-    isLoading,
-    setIsLoading,
-  ] =
-    useState(true)
-
-  const [
-    isGenerating,
-    setIsGenerating,
-  ] =
-    useState(false)
-
-  const [
-    isApplying,
-    setIsApplying,
-  ] =
-    useState(false)
-
-  const [
-    isConfirmingApply,
-    setIsConfirmingApply,
-  ] =
-    useState(false)
-
-  const [
-    error,
-    setError,
-  ] =
-    useState<string | null>(
-      null,
-    )
+  const [recommendation, setRecommendation] = useState<AiTriageRecommendationResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [isApplying, setIsApplying] = useState(false)
+  const [isConfirmingApply, setIsConfirmingApply] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -102,13 +53,9 @@ export function AiTriageCard({
     async function loadRecommendation() {
       if (!accessToken) {
         if (!cancelled) {
-          setError(
-            'Your session is no longer valid',
-          )
-
+          setError('Your session is no longer valid')
           setIsLoading(false)
         }
-
         return
       }
 
@@ -116,33 +63,15 @@ export function AiTriageCard({
       setError(null)
 
       try {
-        const response =
-          await getAiTriageRecommendation(
-            accessToken,
-            ticketNumber,
-          )
-
+        const response = await getAiTriageRecommendation(accessToken, ticketNumber)
         if (!cancelled) {
-          setRecommendation(
-            response,
-          )
+          setRecommendation(response)
         }
       } catch (caughtError) {
-        if (cancelled) {
-          return
-        }
-
-        if (
-          caughtError instanceof Error
-        ) {
-          setError(
-            caughtError.message,
-          )
-        } else {
-          setError(
-            'Unable to load AI triage',
-          )
-        }
+        if (cancelled) return
+        setError(
+          caughtError instanceof Error ? caughtError.message : 'Unable to load AI triage recommendation',
+        )
       } finally {
         if (!cancelled) {
           setIsLoading(false)
@@ -155,17 +84,11 @@ export function AiTriageCard({
     return () => {
       cancelled = true
     }
-  }, [
-    accessToken,
-    ticketNumber,
-  ])
+  }, [accessToken, ticketNumber])
 
   async function handleGenerate() {
     if (!accessToken) {
-      setError(
-        'Your session is no longer valid',
-      )
-
+      setError('Your session is no longer valid')
       return
     }
 
@@ -173,67 +96,32 @@ export function AiTriageCard({
     setError(null)
 
     try {
-      const response =
-        await generateAiTriageRecommendation(
-          accessToken,
-          ticketNumber,
-        )
-
-      setRecommendation(
-        response,
-      )
+      const response = await generateAiTriageRecommendation(accessToken, ticketNumber)
+      setRecommendation(response)
     } catch (caughtError) {
-      if (
-        caughtError instanceof AiTriageApiError &&
-        caughtError.status === 409
-      ) {
+      if (caughtError instanceof AiTriageApiError && caughtError.status === 409) {
         try {
-          const existing =
-            await getAiTriageRecommendation(
-              accessToken,
-              ticketNumber,
-            )
-
+          const existing = await getAiTriageRecommendation(accessToken, ticketNumber)
           if (existing) {
-            setRecommendation(
-              existing,
-            )
-
+            setRecommendation(existing)
             return
           }
         } catch {
-          /*
-           * Fall through to the controlled
-           * error handling below.
-           */
+          // Fall through
         }
       }
 
-      if (
-        caughtError instanceof Error
-      ) {
-        setError(
-          caughtError.message,
-        )
-      } else {
-        setError(
-          'Unable to generate AI triage',
-        )
-      }
+      setError(
+        caughtError instanceof Error ? caughtError.message : 'Unable to generate AI triage recommendation',
+      )
     } finally {
       setIsGenerating(false)
     }
   }
 
   async function handleApply() {
-    if (
-      !accessToken ||
-      !recommendation
-    ) {
-      setError(
-        'Your session is no longer valid',
-      )
-
+    if (!accessToken || !recommendation) {
+      setError('Your session is no longer valid')
       return
     }
 
@@ -241,411 +129,165 @@ export function AiTriageCard({
     setError(null)
 
     try {
-      const response =
-        await applyAiTriageRecommendation(
-          accessToken,
-          ticketNumber,
-        )
-
-      /*
-       * Immediately update the recommendation
-       * state so the Apply action disappears even
-       * before the parent ticket finishes reloading.
-       */
-      setRecommendation(
-        (currentRecommendation) => {
-          if (!currentRecommendation) {
-            return currentRecommendation
-          }
-
-          return {
-            ...currentRecommendation,
-            applied: true,
-            appliedByUserId:
-              response.appliedByUserId,
-            appliedAt:
-              response.appliedAt,
-          }
-        },
+      const response = await applyAiTriageRecommendation(accessToken, ticketNumber)
+      setRecommendation((curr) =>
+        curr
+          ? {
+              ...curr,
+              applied: true,
+              appliedByUserId: response.appliedByUserId,
+              appliedAt: response.appliedAt,
+            }
+          : curr,
       )
 
       setIsConfirmingApply(false)
-
-      try {
-        await onApplied()
-      } catch {
-        setError(
-          'The AI recommendation was applied, but the ticket view could not refresh automatically. Reload the page to see the latest priority and SLA.',
-        )
-      }
+      await onApplied()
     } catch (caughtError) {
-      if (
-        caughtError instanceof Error
-      ) {
-        setError(
-          caughtError.message,
-        )
-      } else {
-        setError(
-          'Unable to apply the AI recommendation',
-        )
-      }
+      setError(
+        caughtError instanceof Error ? caughtError.message : 'Unable to apply AI recommendation',
+      )
     } finally {
       setIsApplying(false)
     }
   }
 
-  const canApply =
-    ticketStatus === 'ASSIGNED'
-
+  const canApply = ticketStatus === 'ASSIGNED'
   const priorityWouldChange =
-    recommendation !== null &&
-    recommendation.suggestedPriority !==
-      currentPriority
+    recommendation !== null && recommendation.suggestedPriority !== currentPriority
 
   return (
-    <section
-      className="ai-triage-card"
-      aria-labelledby="ai-triage-heading"
-    >
-      <header className="ai-triage-header">
-        <div>
-          <div className="ai-triage-label-row">
-            <span className="ai-triage-badge">
-              AI advisory
-            </span>
-
-            <span className="ai-triage-advisory-label">
-              Human decision required
-            </span>
-          </div>
-
-          <h3 id="ai-triage-heading">
-            AI-assisted triage
-          </h3>
-
-          <p>
-            Get an AI recommendation based on the
-            ticket type, title and description.
-          </p>
+    <div className="horizon-ai-triage-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {/* Header Info */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Sparkles size={16} style={{ color: 'var(--color-primary)' }} />
+          <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)' }}>
+            AI Priority Advisory
+          </span>
         </div>
-      </header>
 
-      <div className="ai-triage-notice">
-        <strong>
-          Human-in-the-loop
-        </strong>
-
-        <p>
-          FlowDesk never applies the AI
-          recommendation automatically. A support
-          engineer must explicitly approve it
-          before work starts.
-        </p>
+        <Badge variant="neutral" size="sm">
+          Human-in-the-Loop
+        </Badge>
       </div>
 
-      {isLoading && (
-        <div
-          className="ai-triage-loading"
-          aria-live="polite"
-        >
-          Checking for an existing AI
-          recommendation...
+      {/* Error state */}
+      {error && (
+        <div className="horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ margin: 0, padding: '0.5rem 0.75rem' }}>
+          <AlertCircle size={16} className="horizon-auth-alert-icon" />
+          <span style={{ fontSize: 'var(--font-size-xs)' }}>{error}</span>
         </div>
       )}
 
-      {!isLoading &&
-        !recommendation && (
-          <div className="ai-triage-empty">
-            <div>
-              <strong>
-                No recommendation generated yet
-              </strong>
-
-              <p>
-                Generate a one-time AI triage
-                recommendation for this ticket.
-              </p>
+      {/* Loading state */}
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-xs)' }}>
+          Checking existing AI recommendation...
+        </div>
+      ) : !recommendation ? (
+        /* Unanalyzed Ticket */
+        <div style={{ padding: '1rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', textAlign: 'center' }}>
+          <p style={{ margin: '0 0 0.75rem', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+            No AI triage recommendation has been generated yet for this ticket.
+          </p>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => void handleGenerate()}
+            isLoading={isGenerating}
+            leadingIcon={<Sparkles size={14} />}
+          >
+            Generate AI Triage
+          </Button>
+        </div>
+      ) : (
+        /* Has Recommendation */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {/* Priority comparison */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>Suggested:</span>
+              <PriorityBadge priority={recommendation.suggestedPriority} size="sm" />
             </div>
 
-            <button
-              type="button"
-              className="ai-triage-generate-button"
-              disabled={
-                isGenerating
-              }
-              onClick={() =>
-                void handleGenerate()
-              }
-            >
-              {isGenerating
-                ? 'Generating...'
-                : 'Generate AI triage'}
-            </button>
-          </div>
-        )}
-
-      {recommendation && (
-        <div className="ai-triage-result">
-          <div className="ai-triage-result-grid">
-            <div>
-              <span>
-                Current priority
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-primary)' }}>
+                {formatConfidence(recommendation.confidence)}
               </span>
-
-              <strong
-                className={getPriorityClass(
-                  currentPriority,
-                )}
-              >
-                {currentPriority}
-              </strong>
-            </div>
-
-            <div>
-              <span>
-                AI suggestion
-              </span>
-
-              <strong
-                className={getPriorityClass(
-                  recommendation
-                    .suggestedPriority,
-                )}
-              >
-                {
-                  recommendation
-                    .suggestedPriority
-                }
-              </strong>
-            </div>
-
-            <div>
-              <span>
-                Confidence
-              </span>
-
-              <strong className="ai-triage-confidence">
-                {formatConfidence(
-                  recommendation.confidence,
-                )}
-              </strong>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>confidence</span>
             </div>
           </div>
 
-          <div className="ai-triage-reason">
-            <span>
-              Why AI suggested this
-            </span>
-
-            <p>
-              {recommendation.reason}
+          {/* Reasoning */}
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)', lineHeight: 'var(--line-height-relaxed)', background: 'var(--color-canvas)', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+            <p style={{ margin: '0 0 4px', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-secondary)' }}>
+              Analysis & Reasoning:
             </p>
+            <p style={{ margin: 0 }}>{recommendation.reason}</p>
           </div>
 
+          {/* Applied status or Apply action */}
           {recommendation.applied ? (
-            <div className="ai-triage-applied-message">
-              <strong>
-                Recommendation applied by a
-                support engineer
-              </strong>
-
-              <p>
-                The human decision was recorded
-                {recommendation.appliedAt
-                  ? ` on ${formatDate(
-                      recommendation.appliedAt,
-                    )}`
-                  : ''}
-                . The ticket priority is now{' '}
-                <b>{currentPriority}</b>.
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-xs)', color: 'var(--color-success)', background: 'var(--color-success-subtle)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)' }}>
+              <CheckCircle2 size={16} />
+              <span>Applied to ticket{recommendation.appliedAt ? ` on ${formatDate(recommendation.appliedAt)}` : ''}</span>
             </div>
           ) : (
-            <>
-              <div className="ai-triage-safety-message">
-                <strong>
-                  No automatic change was made
-                </strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginTop: '4px' }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void handleGenerate()}
+                isLoading={isGenerating}
+                leadingIcon={<RefreshCw size={12} />}
+              >
+                Regenerate
+              </Button>
 
-                <p>
-                  Ticket priority is currently{' '}
-                  <b>{currentPriority}</b>.
-                  Applying this recommendation
-                  requires your explicit
-                  confirmation.
-                </p>
-              </div>
-
-              {!canApply && (
-                <div className="ai-triage-locked-message">
-                  <strong>
-                    Recommendation can no longer
-                    be applied
-                  </strong>
-
-                  <p>
-                    Priority can only be changed
-                    while the ticket is assigned
-                    and before support work starts.
-                  </p>
-                </div>
+              {canApply ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsConfirmingApply(true)}
+                  disabled={!priorityWouldChange || isApplying}
+                  leadingIcon={<ShieldCheck size={14} />}
+                >
+                  {priorityWouldChange ? 'Apply Recommendation' : 'Priority Already Matches'}
+                </Button>
+              ) : (
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                  Can only apply while status is ASSIGNED
+                </span>
               )}
-
-              {canApply &&
-                !isConfirmingApply && (
-                  <div className="ai-triage-apply-row">
-                    <div>
-                      <strong>
-                        Ready for your decision?
-                      </strong>
-
-                      <p>
-                        Review the recommendation
-                        before applying it.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="ai-triage-apply-button"
-                      disabled={isApplying}
-                      onClick={() => {
-                        setError(null)
-                        setIsConfirmingApply(
-                          true,
-                        )
-                      }}
-                    >
-                      Apply AI suggestion
-                    </button>
-                  </div>
-                )}
-
-              {canApply &&
-                isConfirmingApply && (
-                  <div className="ai-triage-confirmation">
-                    <strong>
-                      Confirm human decision
-                    </strong>
-
-                    {priorityWouldChange ? (
-                      <p>
-                        Change priority from{' '}
-                        <b>
-                          {currentPriority}
-                        </b>{' '}
-                        to{' '}
-                        <b>
-                          {
-                            recommendation
-                              .suggestedPriority
-                          }
-                        </b>
-                        ? SLA deadlines will be
-                        recalculated from the
-                        original SLA start time.
-                      </p>
-                    ) : (
-                      <p>
-                        The AI suggestion already
-                        matches the current{' '}
-                        <b>
-                          {currentPriority}
-                        </b>{' '}
-                        priority. Accepting it will
-                        record your decision
-                        without recalculating the
-                        SLA.
-                      </p>
-                    )}
-
-                    <div className="ai-triage-confirmation-actions">
-                      <button
-                        type="button"
-                        className="ai-triage-cancel-button"
-                        disabled={isApplying}
-                        onClick={() =>
-                          setIsConfirmingApply(
-                            false,
-                          )
-                        }
-                      >
-                        Cancel
-                      </button>
-
-                      <button
-                        type="button"
-                        className="ai-triage-confirm-button"
-                        disabled={isApplying}
-                        onClick={() =>
-                          void handleApply()
-                        }
-                      >
-                        {isApplying
-                          ? 'Applying...'
-                          : 'Confirm and apply'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-            </>
+            </div>
           )}
-
-          <footer className="ai-triage-meta">
-            <span>
-              {recommendation.provider}
-            </span>
-
-            <span aria-hidden="true">
-              •
-            </span>
-
-            <span>
-              {recommendation.model}
-            </span>
-
-            <span aria-hidden="true">
-              •
-            </span>
-
-            <span>
-              {formatDate(
-                recommendation.createdAt,
-              )}
-            </span>
-          </footer>
         </div>
       )}
 
-      {error && (
-        <div
-          className="ai-triage-error"
-          role="alert"
-        >
-          <strong>
-            AI triage notice
-          </strong>
-
-          <p>
-            {error}
+      {/* Confirmation Modal */}
+      <Modal
+        isOpen={isConfirmingApply}
+        onClose={() => setIsConfirmingApply(false)}
+        title="Apply AI Priority Recommendation?"
+        subtitle={`This will change the ticket priority from ${currentPriority} to ${recommendation?.suggestedPriority}. SLA deadlines may be recalculated based on the new priority.`}
+        footer={
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" size="sm" onClick={() => setIsConfirmingApply(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => void handleApply()} isLoading={isApplying}>
+              Confirm and Apply
+            </Button>
+          </div>
+        }
+      >
+        <div style={{ padding: '0.5rem 0' }}>
+          <p style={{ fontSize: 'var(--font-size-sm)', margin: '0 0 0.5rem' }}>
+            <strong>Reasoning:</strong> {recommendation?.reason}
           </p>
-
-          {!recommendation && (
-            <button
-              type="button"
-              disabled={
-                isGenerating
-              }
-              onClick={() =>
-                void handleGenerate()
-              }
-            >
-              Try again
-            </button>
-          )}
         </div>
-      )}
-    </section>
+      </Modal>
+    </div>
   )
 }

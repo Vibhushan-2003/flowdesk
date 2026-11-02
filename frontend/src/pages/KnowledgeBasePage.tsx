@@ -1,9 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  Search,
+  Plus,
+  Eye,
+  ExternalLink,
+  RotateCcw,
+} from 'lucide-react'
+
 import { getArticles, getCategories, getManagementArticles } from '../api/kb'
 import { useAuth } from '../auth/useAuth'
 import type { ArticleStatus, KbArticleSummary, KbCategory, PageResponse } from '../types/kb'
 import { formatDate } from '../utils/formatters'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Button } from '../components/ui/Button'
+import { Badge } from '../components/ui/Badge'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
 import '../styles/kb.css'
 
 export function KnowledgeBasePage() {
@@ -115,59 +128,67 @@ export function KnowledgeBasePage() {
   }
 
   return (
-    <main className="kb-container">
-      {/* Top Navigation */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <button
-          type="button"
-          className="dashboard-secondary-button"
-          onClick={() => navigate('/dashboard')}
-        >
-          ← Dashboard
-        </button>
+    <div className="kb-container horizon-kb-workspace">
+      {/* Page Header */}
+      <PageHeader
+        title="Knowledge Base"
+        subtitle="Find verified troubleshooting guides, standard operating procedures, and answers to common IT questions."
+        actions={
+          isStaff ? (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate('/support/kb/articles/new')}
+              leadingIcon={<Plus size={16} />}
+            >
+              New Article
+            </Button>
+          ) : undefined
+        }
+      />
 
-        {isStaff && (
-          <button
-            type="button"
-            className="kb-search-btn"
-            style={{ padding: '0.6rem 1.25rem', fontSize: '0.9rem' }}
-            onClick={() => navigate('/support/kb/articles/new')}
-          >
-            + New Article
-          </button>
-        )}
-      </div>
-
-      {/* Hero Search */}
-      <section className="kb-hero">
-        <p className="eyebrow" style={{ color: '#2563eb', fontWeight: 600 }}>Self-Service Support</p>
-        <h1>Knowledge Base</h1>
-        <p className="kb-hero-subtitle">
-          Find verified troubleshooting guides, standard operating procedures, and answers to common IT questions.
+      {/* Hero Search Section */}
+      <section className="kb-hero horizon-card" style={{ marginBottom: '2rem', padding: '2.5rem 1.5rem', textAlign: 'center', background: 'var(--color-surface)' }}>
+        <p className="eyebrow" style={{ color: 'var(--color-primary)', fontWeight: 'var(--font-weight-semibold)', margin: '0 0 0.5rem' }}>
+          Self-Service Support
+        </p>
+        <h1 style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', margin: '0 0 0.75rem', color: 'var(--color-text-primary)' }}>
+          How can we help you today?
+        </h1>
+        <p className="kb-hero-subtitle" style={{ fontSize: 'var(--font-size-md)', color: 'var(--color-text-secondary)', maxWidth: '600px', margin: '0 auto 1.75rem' }}>
+          Search across our documentation for setup instructions, fixes, and FAQs.
         </p>
 
-        <form onSubmit={handleSearchSubmit} className="kb-search-box">
-          <input
-            type="text"
-            className="kb-search-input"
-            placeholder="Search articles by keywords (e.g. VPN, Wi-Fi, monitor, password)..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-          <button type="submit" className="kb-search-btn">
+        <form onSubmit={handleSearchSubmit} className="kb-search-box" style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', gap: '0.5rem' }}>
+          <div className="horizon-auth-input-wrapper" style={{ flex: 1 }}>
+            <span className="horizon-auth-input-icon" aria-hidden="true">
+              <Search size={18} />
+            </span>
+            <input
+              type="text"
+              className="kb-search-input horizon-auth-input horizon-auth-input-with-icon"
+              placeholder="Search articles by keywords (e.g. VPN, Wi-Fi, monitor, password)..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+
+          <button type="submit" className="kb-search-btn horizon-btn horizon-btn--primary horizon-btn--md">
             Search
           </button>
+
           {activeSearch && (
             <button
               type="button"
-              className="dashboard-secondary-button"
+              className="horizon-btn horizon-btn--secondary horizon-btn--md"
               onClick={() => {
                 setSearchInput('')
                 setActiveSearch('')
                 setPage(0)
               }}
             >
-              Clear
+              <RotateCcw size={14} />
+              <span>Clear</span>
             </button>
           )}
         </form>
@@ -175,11 +196,11 @@ export function KnowledgeBasePage() {
 
       {/* Staff Management Tab Bar */}
       {isStaff && (
-        <div className="kb-management-bar">
-          <div className="kb-tabs">
+        <div className="kb-management-bar horizon-card" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+          <div className="kb-tabs" style={{ display: 'inline-flex', padding: '3px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', gap: '4px' }}>
             <button
               type="button"
-              className={`kb-tab-btn ${activeTab === 'published' ? 'active' : ''}`}
+              className={`kb-tab-btn horizon-btn horizon-btn--sm ${activeTab === 'published' ? 'horizon-btn--primary' : 'horizon-btn--ghost'}`}
               onClick={() => {
                 setActiveTab('published')
                 setPage(0)
@@ -189,7 +210,7 @@ export function KnowledgeBasePage() {
             </button>
             <button
               type="button"
-              className={`kb-tab-btn ${activeTab === 'management' ? 'active' : ''}`}
+              className={`kb-tab-btn horizon-btn horizon-btn--sm ${activeTab === 'management' ? 'horizon-btn--primary' : 'horizon-btn--ghost'}`}
               onClick={() => {
                 setActiveTab('management')
                 setPage(0)
@@ -201,10 +222,10 @@ export function KnowledgeBasePage() {
 
           {activeTab === 'management' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Status:</span>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>Status:</span>
               <select
-                className="kb-editor-select"
-                style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+                className="kb-editor-select horizon-select"
+                style={{ height: '36px', padding: '0 2rem 0 0.75rem', fontSize: 'var(--font-size-xs)', width: 'auto' }}
                 value={managementStatus}
                 onChange={(e) => {
                   setManagementStatus(e.target.value as ArticleStatus | '')
@@ -221,11 +242,12 @@ export function KnowledgeBasePage() {
         </div>
       )}
 
-      {/* Category Pills */}
-      <div className="kb-categories-nav">
+      {/* Category Filter Pills */}
+      <div className="kb-categories-nav" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.75rem' }}>
         <button
           type="button"
-          className={`kb-category-pill ${selectedCategoryId === '' ? 'active' : ''}`}
+          className={`kb-category-pill horizon-badge ${selectedCategoryId === '' ? 'horizon-badge--primary' : 'horizon-badge--neutral'}`}
+          style={{ cursor: 'pointer', padding: '6px 14px', height: 'auto', fontSize: 'var(--font-size-xs)' }}
           onClick={() => handleCategorySelect('')}
         >
           All Categories
@@ -234,7 +256,8 @@ export function KnowledgeBasePage() {
           <button
             key={cat.id}
             type="button"
-            className={`kb-category-pill ${selectedCategoryId === cat.id ? 'active' : ''}`}
+            className={`kb-category-pill horizon-badge ${selectedCategoryId === cat.id ? 'horizon-badge--primary' : 'horizon-badge--neutral'}`}
+            style={{ cursor: 'pointer', padding: '6px 14px', height: 'auto', fontSize: 'var(--font-size-xs)' }}
             onClick={() => handleCategorySelect(cat.id)}
           >
             {cat.name} {cat.articleCount > 0 ? `(${cat.articleCount})` : ''}
@@ -244,62 +267,77 @@ export function KnowledgeBasePage() {
 
       {/* Content Area */}
       {isLoading ? (
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}>
-          Loading knowledge base articles...
+        <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--color-text-secondary)' }}>
+          <p>Loading knowledge base articles...</p>
         </div>
       ) : error ? (
-        <div className="error-banner" style={{ margin: '2rem 0' }}>
-          {error}
+        <div className="error-banner horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ margin: '2rem 0' }}>
+          <span>{error}</span>
         </div>
       ) : !articlePage || articlePage.content.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '4rem 1rem', background: '#f8fafc', borderRadius: '8px' }}>
-          <h3 style={{ color: '#334155', marginBottom: '0.5rem' }}>No articles found</h3>
-          <p style={{ color: '#64748b', maxWidth: '450px', margin: '0 auto 1.5rem' }}>
-            {activeSearch
+        <EmptyState
+          title="No articles found"
+          description={
+            activeSearch
               ? `No articles matched your search query "${activeSearch}". Try broader keywords.`
-              : 'There are currently no articles published in this category.'}
-          </p>
-          {isStaff && (
-            <button
-              type="button"
-              className="kb-search-btn"
-              onClick={() => navigate('/support/kb/articles/new')}
-            >
-              Write First Article
-            </button>
-          )}
-        </div>
+              : 'There are currently no articles published in this category.'
+          }
+          action={
+            isStaff ? (
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => navigate('/support/kb/articles/new')}
+                leadingIcon={<Plus size={16} />}
+              >
+                Write First Article
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <>
-          <div className="kb-articles-grid">
+          {/* Article Cards Grid */}
+          <div className="kb-articles-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
             {articlePage.content.map((art) => (
-              <div key={art.id} className="kb-article-card">
-                <div className="kb-card-header">
-                  <span className="kb-category-tag">{art.categoryName}</span>
-                  {activeTab === 'management' && (
-                    <span className={`kb-status-badge ${art.status.toLowerCase()}`}>
-                      {art.status}
-                    </span>
-                  )}
+              <article
+                key={art.id}
+                className="kb-article-card horizon-card"
+                style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem', cursor: 'pointer', transition: 'all var(--duration-fast) var(--ease-default)' }}
+                onClick={() => navigate(`/kb/articles/${encodeURIComponent(art.slug)}`)}
+              >
+                <div>
+                  <div className="kb-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                    <Badge variant="primary" size="sm" className="kb-category-tag">
+                      {art.categoryName}
+                    </Badge>
+                    {activeTab === 'management' && (
+                      <Badge
+                        variant={art.status === 'PUBLISHED' ? 'success' : art.status === 'DRAFT' ? 'warning' : 'neutral'}
+                        size="sm"
+                        className={`kb-status-badge ${art.status.toLowerCase()}`}
+                      >
+                        {art.status}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <h2 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)', margin: '0 0 0.5rem', lineHeight: 'var(--line-height-tight)' }}>
+                    {art.title}
+                  </h2>
+
+                  <p className="kb-article-summary" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 'var(--line-height-base)', margin: '0 0 1rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {art.summary}
+                  </p>
                 </div>
 
-                <a
-                  href={`/kb/articles/${encodeURIComponent(art.slug)}`}
-                  style={{ textDecoration: 'none', color: 'inherit' }}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    navigate(`/kb/articles/${encodeURIComponent(art.slug)}`)
-                  }}
-                >
-                  <h2>{art.title}</h2>
-                </a>
-
-                <p className="kb-article-summary">{art.summary}</p>
-
-                <div className="kb-card-footer">
+                <div className="kb-card-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid var(--color-divider)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
                   <span>By {art.authorName}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span>👁 {art.viewCount} views</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Eye size={12} />
+                      {art.viewCount}
+                    </span>
                     {art.publishedAt && <span>{formatDate(art.publishedAt)}</span>}
                     {isStaff && (
                       <button
@@ -307,49 +345,43 @@ export function KnowledgeBasePage() {
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: '#2563eb',
+                          color: 'var(--color-primary)',
                           cursor: 'pointer',
-                          fontWeight: 600,
-                          fontSize: '0.8rem',
+                          fontWeight: 'var(--font-weight-semibold)',
+                          fontSize: 'var(--font-size-xs)',
                           padding: 0,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
                         }}
-                        onClick={() => navigate(`/support/kb/articles/${art.id}/edit`)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/support/kb/articles/${art.id}/edit`)
+                        }}
                       >
-                        Edit ↗
+                        <span>Edit</span>
+                        <ExternalLink size={11} />
                       </button>
                     )}
                   </div>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
 
-          {/* Pagination */}
-          {articlePage.totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '2rem' }}>
-              <button
-                type="button"
-                className="dashboard-secondary-button"
-                disabled={articlePage.first}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                Previous
-              </button>
-              <span style={{ fontSize: '0.9rem', color: '#64748b' }}>
-                Page {articlePage.page + 1} of {articlePage.totalPages} ({articlePage.totalElements} total)
-              </span>
-              <button
-                type="button"
-                className="dashboard-secondary-button"
-                disabled={articlePage.last}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-              </button>
-            </div>
-          )}
+          {/* Standard Pagination Component */}
+          <Pagination
+            page={articlePage.page}
+            totalPages={articlePage.totalPages}
+            totalElements={articlePage.totalElements}
+            isFirst={articlePage.first}
+            isLast={articlePage.last}
+            onPageChange={(p) => setPage(p)}
+            label="Knowledge Base pagination"
+            entityName="articles"
+          />
         </>
       )}
-    </main>
+    </div>
   )
 }

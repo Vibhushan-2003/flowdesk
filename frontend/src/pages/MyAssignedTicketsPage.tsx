@@ -1,28 +1,37 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useTicketListUrlFilters } from '../hooks/useTicketListUrlFilters'
-
 import {
-  getMyAssignedTickets,
-  getSupportTicketHistory,
-} from '../api/ticket'
+  Inbox,
+  Search,
+  AlertCircle,
+  ArrowRight,
+  UserCheck,
+  Archive,
+} from 'lucide-react'
+
+import { useTicketListUrlFilters } from '../hooks/useTicketListUrlFilters'
+import { getMyAssignedTickets, getSupportTicketHistory } from '../api/ticket'
 import { useAuth } from '../auth/useAuth'
 import { TicketListOverview } from '../components/TicketListOverview'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { Badge } from '../components/ui/Badge'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { PriorityBadge } from '../components/ui/PriorityBadge'
+import { DataTable, type Column } from '../components/ui/DataTable'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
+import { formatDate, formatLabel, formatSlaStatus } from '../utils/formatters'
 
 import type {
   PageResponse,
-  SlaStatus,
   SupportTicketSummary,
   TicketPriority,
   TicketStatus,
 } from '../types/ticket'
 
-import '../styles/ticket-filters.css'
-import '../styles/ticket-list-overview.css'
-
 const PAGE_SIZE = 10
-
-type SupportViewMode = 'active' | 'resolved' | 'history'
 
 const ACTIVE_STATUSES: TicketStatus[] = [
   'ASSIGNED',
@@ -32,52 +41,15 @@ const ACTIVE_STATUSES: TicketStatus[] = [
   'CLOSED',
 ]
 
-const HISTORY_STATUSES: TicketStatus[] = [
-  'RESOLVED',
-  'CLOSED',
-]
+const HISTORY_STATUSES: TicketStatus[] = ['RESOLVED', 'CLOSED']
 
-const PRIORITIES: TicketPriority[] = [
-  'LOW',
-  'MEDIUM',
-  'HIGH',
-  'CRITICAL',
-]
-
-function formatLabel(value: string) {
-  return value.replaceAll('_', ' ')
-}
-
-function formatDate(value: string | null) {
-  if (!value) return 'Not started'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString()
-}
-
-function formatSlaStatus(status: SlaStatus) {
-  switch (status) {
-    case 'MET':
-      return 'Met'
-    case 'BREACHED':
-      return 'Breached'
-    case 'PENDING':
-      return 'Pending'
-    case 'UNKNOWN':
-      return 'Unknown'
-  }
-}
-
-function getStatusClass(status: string) {
-  return `support-status support-status-${status
-    .toLowerCase()
-    .replaceAll('_', '-')}`
-}
+const PRIORITIES: TicketPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 
 export function MyAssignedTicketsPage() {
-  const { accessToken } = useAuth()
+  const { user, accessToken } = useAuth()
   const navigate = useNavigate()
+
+  const isSupport = user?.roles.includes('SUPPORT_ENGINEER') ?? false
   const [searchParams, setSearchParams] = useSearchParams()
 
   const {
@@ -97,58 +69,22 @@ export function MyAssignedTicketsPage() {
   } = useTicketListUrlFilters()
 
   const viewParam = searchParams.get('view')
-  const isResolvedStatus = appliedFilters.status === 'RESOLVED'
-  const isClosedStatus = appliedFilters.status === 'CLOSED'
+  const isHistoryMode = viewParam === 'history'
 
-  let currentView: SupportViewMode = 'active'
-  if (viewParam === 'history' || isClosedStatus) {
-    currentView = 'history'
-  } else if (viewParam === 'resolved' || isResolvedStatus) {
-    currentView = 'resolved'
-  }
-
-  const isHistoryQuery =
-    currentView === 'resolved' || currentView === 'history'
-
-  const [ticketPage, setTicketPage] =
-    useState<PageResponse<SupportTicketSummary> | null>(null)
-
+  const [ticketPage, setTicketPage] = useState<PageResponse<SupportTicketSummary> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [refreshVersion, setRefreshVersion] = useState(0)
 
-  function refreshTickets() {
-    setRefreshVersion((version) => version + 1)
-  }
-
-  function handleViewChange(newView: SupportViewMode) {
-    const newParams = new URLSearchParams()
-    if (appliedFilters.search) {
-      newParams.set('search', appliedFilters.search)
-    }
-    if (appliedFilters.priority) {
-      newParams.set('priority', appliedFilters.priority)
-    }
-    if (appliedFilters.sort === 'oldest') {
-      newParams.set('sort', 'oldest')
-    }
-
-    if (newView === 'resolved') {
-      newParams.set('status', 'RESOLVED')
-    } else if (newView === 'history') {
-      newParams.set('view', 'history')
-    }
-    setSearchParams(newParams)
-  }
-
-  function handleResetFilters() {
-    if (currentView === 'resolved') {
-      setSearchParams(new URLSearchParams({ status: 'RESOLVED' }))
-    } else if (currentView === 'history') {
-      setSearchParams(new URLSearchParams({ view: 'history' }))
+  function setViewMode(mode: 'active' | 'history') {
+    const nextParams = new URLSearchParams(searchParams)
+    if (mode === 'history') {
+      nextParams.set('view', 'history')
     } else {
-      resetFilters()
+      nextParams.delete('view')
     }
+    nextParams.set('page', '0')
+    setSearchParams(nextParams)
+    setPage(0)
   }
 
   useEffect(() => {
@@ -157,7 +93,6 @@ export function MyAssignedTicketsPage() {
     async function loadTickets() {
       if (!accessToken) {
         if (!cancelled) {
-          setTicketPage(null)
           setError('Your session is no longer valid')
           setIsLoading(false)
         }
@@ -168,38 +103,24 @@ export function MyAssignedTicketsPage() {
       setError(null)
 
       try {
-        const response = isHistoryQuery
-          ? await getSupportTicketHistory(
-              accessToken,
-              page,
-              PAGE_SIZE,
-              currentView === 'resolved'
-                ? { ...appliedFilters, status: 'RESOLVED' }
-                : appliedFilters,
-            )
-          : await getMyAssignedTickets(
-              accessToken,
-              page,
-              PAGE_SIZE,
-              appliedFilters,
-            )
+        const response = isHistoryMode
+          ? await getSupportTicketHistory(accessToken, page, PAGE_SIZE, appliedFilters)
+          : await getMyAssignedTickets(accessToken, page, PAGE_SIZE, appliedFilters)
 
         if (!cancelled) {
           setTicketPage(response)
         }
       } catch (caughtError) {
-        if (!cancelled) {
-          setTicketPage(null)
-          setError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : isHistoryQuery
-                ? 'Unable to load ticket history'
-                : 'Unable to load assigned tickets',
-          )
-        }
+        if (cancelled) return
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : 'Unable to load your assigned tickets. Please try again.',
+        )
       } finally {
-        if (!cancelled) setIsLoading(false)
+        if (!cancelled) {
+          setIsLoading(false)
+        }
       }
     }
 
@@ -208,436 +129,375 @@ export function MyAssignedTicketsPage() {
     return () => {
       cancelled = true
     }
-  }, [
-    accessToken,
-    page,
-    appliedFilters,
-    currentView,
-    isHistoryQuery,
-    refreshVersion,
-  ])
+  }, [accessToken, page, appliedFilters, isHistoryMode])
 
-  const hasFilters = Boolean(
-    appliedFilters.search ||
-      appliedFilters.priority ||
-      (currentView === 'history' && appliedFilters.status) ||
-      (currentView === 'active' && appliedFilters.status),
-  )
+  // Table columns
+  const columns: Column<SupportTicketSummary>[] = [
+    {
+      key: 'ticketNumber',
+      header: 'Ticket #',
+      render: (ticket: SupportTicketSummary) => (
+        <button
+          type="button"
+          className="ticket-number-link"
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-family-mono)',
+            fontWeight: 'var(--font-weight-bold)',
+            color: 'var(--color-primary)',
+          }}
+          onClick={(e) => {
+            e.stopPropagation()
+            navigate(`/support/tickets/${ticket.ticketNumber}`)
+          }}
+        >
+          {ticket.ticketNumber}
+        </button>
+      ),
+      width: '120px',
+    },
+    {
+      key: 'title',
+      header: 'Subject',
+      render: (ticket: SupportTicketSummary) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <span
+            style={{
+              fontWeight: 'var(--font-weight-medium)',
+              color: 'var(--color-text-primary)',
+              lineHeight: 1.3,
+            }}
+          >
+            {ticket.title}
+          </span>
+          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+            Assigned {formatDate(ticket.assignedAt || ticket.createdAt)}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (ticket: SupportTicketSummary) => (
+        <Badge variant="neutral" size="sm">
+          {formatLabel(ticket.type)}
+        </Badge>
+      ),
+      width: '130px',
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (ticket: SupportTicketSummary) => <StatusBadge status={ticket.status} size="sm" />,
+      width: '120px',
+    },
+    {
+      key: 'priority',
+      header: 'Priority',
+      render: (ticket: SupportTicketSummary) => <PriorityBadge priority={ticket.priority} size="sm" />,
+      width: '110px',
+    },
+    {
+      key: 'slaStatus',
+      header: 'Resolution SLA',
+      render: (ticket: SupportTicketSummary) => {
+        if (!ticket.resolutionSlaStatus) return <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>&mdash;</span>
+        const isBreached = ticket.resolutionSlaStatus === 'BREACHED'
+        return (
+          <Badge variant={isBreached ? 'danger' : 'success'} size="sm" dot>
+            {formatSlaStatus(ticket.resolutionSlaStatus)}
+          </Badge>
+        )
+      },
+      width: '130px',
+    },
+    {
+      key: 'assignedAt',
+      header: 'Assigned Date',
+      render: (ticket: SupportTicketSummary) => (
+        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+          {formatDate(ticket.assignedAt || ticket.createdAt)}
+        </span>
+      ),
+      width: '160px',
+    },
+    {
+      key: 'actions',
+      header: 'Open',
+      align: 'right',
+      render: (ticket: SupportTicketSummary) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation()
+            navigate(`/support/tickets/${ticket.ticketNumber}`)
+          }}
+          leadingIcon={<ArrowRight size={14} />}
+          aria-label={`Open ticket ${ticket.ticketNumber}`}
+        />
+      ),
+      width: '70px',
+    },
+  ]
 
-  const availableStatuses =
-    currentView === 'history'
-      ? HISTORY_STATUSES
-      : currentView === 'resolved'
-        ? (['RESOLVED'] as TicketStatus[])
-        : ACTIVE_STATUSES
+  const statusOptions = isHistoryMode ? HISTORY_STATUSES : ACTIVE_STATUSES
 
   return (
-    <main className="support-work-page">
-      <header className="support-page-header">
-        <div>
-          <p className="eyebrow">FlowDesk Operations</p>
-          <h1>
-            {currentView === 'resolved'
-              ? 'Resolved tickets'
-              : currentView === 'history'
-                ? 'Ticket history'
-                : 'My assigned tickets'}
-          </h1>
-          <p className="support-page-description">
-            {currentView === 'resolved'
-              ? 'Tickets you have successfully resolved. Review resolution details and diagnostic attachments.'
-              : currentView === 'history'
-                ? 'Your historical record of completed and closed tickets.'
-                : 'Your active support workload. Open a ticket to start work, wait for the requester, resume work, or resolve the issue.'}
-          </p>
-        </div>
-
-        <div className="support-header-actions">
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => navigate('/support/queue')}
-          >
-            Support queue
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => navigate('/dashboard')}
-          >
-            Dashboard
-          </button>
-        </div>
-      </header>
-
-      {/* Day 51 Phase 5A: Support navigation tabs */}
-      <nav
-        className="support-nav-tabs"
-        aria-label="Support ticket navigation"
-      >
-        <button
-          type="button"
-          className={`support-nav-tab ${
-            currentView === 'active' ? 'active' : ''
-          }`}
-          onClick={() => handleViewChange('active')}
-        >
-          Active Tickets
-        </button>
-        <button
-          type="button"
-          className={`support-nav-tab ${
-            currentView === 'resolved' ? 'active' : ''
-          }`}
-          onClick={() => handleViewChange('resolved')}
-        >
-          Resolved Tickets
-        </button>
-        <button
-          type="button"
-          className={`support-nav-tab ${
-            currentView === 'history' ? 'active' : ''
-          }`}
-          onClick={() => handleViewChange('history')}
-        >
-          Ticket History
-        </button>
-      </nav>
-
-      <form
-        onSubmit={applyFilters}
-        aria-label="Assigned ticket filters"
-      >
-        <label>
-          Search title or ticket number
-          <input
-            type="search"
-            value={searchText}
-            maxLength={100}
-            onChange={(event) =>
-              setSearchText(event.target.value)
-            }
-            placeholder="Search tickets"
-          />
-        </label>
-
-        <label>
-          Status
-          <select
-            value={
-              currentView === 'resolved'
-                ? 'RESOLVED'
-                : selectedStatus
-            }
-            disabled={currentView === 'resolved'}
-            onChange={(event) =>
-              setSelectedStatus(
-                event.target.value as TicketStatus | '',
-              )
-            }
-          >
-            <option value="">
-              {currentView === 'history'
-                ? 'All historical statuses'
-                : 'All statuses'}
-            </option>
-            {availableStatuses.map((status) => (
-              <option key={status} value={status}>
-                {formatLabel(status)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          Priority
-          <select
-            value={selectedPriority}
-            onChange={(event) =>
-              setSelectedPriority(
-                event.target.value as TicketPriority | '',
-              )
-            }
-          >
-            <option value="">All priorities</option>
-            {PRIORITIES.map((priority) => (
-              <option key={priority} value={priority}>
-                {priority}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          Order
-          <select
-            value={selectedSort}
-            onChange={(event) =>
-              setSelectedSort(
-                event.target.value as 'newest' | 'oldest',
-              )
-            }
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-          </select>
-        </label>
-
-        <button type="submit">Apply filters</button>
-        <button
-          type="button"
-          onClick={handleResetFilters}
-        >
-          Clear
-        </button>
-      </form>
-
-      <TicketListOverview
-        filters={appliedFilters}
-        totalElements={
-          error ? null : ticketPage?.totalElements ?? null
+    <div className="assigned-tickets-page horizon-page-container">
+      {/* Header */}
+      <PageHeader
+        title={isHistoryMode ? 'Resolved Ticket History' : 'My Assigned Tickets'}
+        subtitle={
+          isHistoryMode
+            ? 'Review historical tickets you have successfully resolved or closed.'
+            : 'Track, update, and resolve tickets currently assigned to your workload.'
         }
-        visibleCount={
-          error ? 0 : ticketPage?.content.length ?? 0
+        actions={
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {isSupport && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => navigate('/support/queue')}
+                leadingIcon={<Inbox size={14} />}
+              >
+                Support Queue
+              </Button>
+            )}
+          </div>
         }
-        isLoading={isLoading}
-        onRefresh={refreshTickets}
       />
 
-      <section className="support-overview">
-        <article>
-          <span>
-            {currentView === 'resolved'
-              ? 'Resolved tickets'
-              : currentView === 'history'
-                ? 'Historical tickets'
-                : 'Active assignments'}
-          </span>
-          <strong>
-            {error ? '—' : ticketPage?.totalElements ?? 0}
-          </strong>
-        </article>
-        <article>
-          <span>Workspace</span>
-          <strong>Support engineer</strong>
-        </article>
-        <article>
-          <span>Workflow</span>
-          <strong>
-            {isHistoryQuery
-              ? 'Resolution history'
-              : 'Assignment based'}
-          </strong>
-        </article>
-      </section>
-
-      {error && (
-        <div
-          className="support-alert support-alert-error"
-          role="alert"
+      {/* View Switcher Tabs (Active vs History) */}
+      <div className="horizon-view-tabs" role="tablist" aria-label="Workload views">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={!isHistoryMode}
+          className={`horizon-view-tab ${!isHistoryMode ? 'is-active' : ''}`}
+          onClick={() => setViewMode('active')}
         >
-          {error}
+          <UserCheck size={16} />
+          <span>Active Workload</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={isHistoryMode}
+          className={`horizon-view-tab ${isHistoryMode ? 'is-active' : ''}`}
+          onClick={() => setViewMode('history')}
+        >
+          <Archive size={16} />
+          <span>Resolved History</span>
+        </button>
+      </div>
+
+      {/* Overview Stat Chips */}
+      {ticketPage && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <TicketListOverview
+            filters={appliedFilters}
+            totalElements={ticketPage.totalElements}
+            visibleCount={ticketPage.content.length}
+            isLoading={isLoading}
+            onRefresh={() => setPage(page)}
+          />
         </div>
       )}
 
-      {isLoading && (
-        <section className="support-loading-state">
-          <div className="support-loading-dot" />
-          <p>
-            {isHistoryQuery
-              ? 'Loading ticket history...'
-              : 'Loading your assigned tickets...'}
-          </p>
-        </section>
+      {/* Error alert */}
+      {error && (
+        <div
+          className="horizon-auth-alert horizon-auth-alert--error"
+          role="alert"
+          style={{ marginBottom: '1.5rem' }}
+        >
+          <AlertCircle size={18} className="horizon-auth-alert-icon" />
+          <span>{error}</span>
+        </div>
       )}
 
-      {!isLoading &&
-        !error &&
-        ticketPage &&
-        ticketPage.content.length === 0 && (
-          <section className="support-empty-state">
-            <div className="support-empty-mark">✓</div>
-            <h2>
-              {hasFilters
-                ? currentView === 'resolved'
-                  ? 'No matching resolved tickets'
-                  : currentView === 'history'
-                    ? 'No matching historical tickets'
-                    : 'No matching assignments'
-                : currentView === 'resolved'
-                  ? 'No resolved tickets'
-                  : currentView === 'history'
-                    ? 'No ticket history'
-                    : 'No active assignments'}
-            </h2>
-            <p>
-              {hasFilters
-                ? 'Try changing your search or filters.'
-                : currentView === 'resolved'
-                  ? 'You have not resolved any tickets yet.'
-                  : currentView === 'history'
-                    ? 'You have no completed or closed ticket history.'
-                    : 'You currently have no tickets assigned to you. Open the support queue when you are ready to take another issue.'}
-            </p>
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() =>
-                hasFilters
-                  ? handleResetFilters()
-                  : navigate('/support/queue')
-              }
-            >
-              {hasFilters
-                ? 'Clear filters'
-                : 'Open support queue'}
-            </button>
-          </section>
-        )}
-
-      {!isLoading &&
-        !error &&
-        ticketPage &&
-        ticketPage.content.length > 0 && (
-          <section className="assigned-ticket-list">
-            {ticketPage.content.map((ticket) => (
-              <article
-                className="assigned-ticket-card"
-                key={ticket.ticketId}
-              >
-                <div className="assigned-ticket-card-main">
-                  <div className="assigned-ticket-heading">
-                    <div>
-                      <button
-                        type="button"
-                        className="support-ticket-link"
-                        onClick={() =>
-                          navigate(
-                            `/support/tickets/${ticket.ticketNumber}`,
-                          )
-                        }
-                      >
-                        {ticket.ticketNumber}
-                      </button>
-                      <h2>{ticket.title}</h2>
-                    </div>
-
-                    <span
-                      className={getStatusClass(ticket.status)}
-                    >
-                      {formatLabel(ticket.status)}
-                    </span>
-                  </div>
-
-                  <div className="assigned-ticket-meta">
-                    <div>
-                      <span>Type</span>
-                      <strong>
-                        {formatLabel(ticket.type)}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Priority</span>
-                      <strong>{ticket.priority}</strong>
-                    </div>
-                    <div>
-                      <span>Assigned</span>
-                      <strong>
-                        {formatDate(ticket.assignedAt)}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Created</span>
-                      <strong>
-                        {formatDate(ticket.createdAt)}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Response SLA</span>
-                      <strong>
-                        {formatSlaStatus(
-                          ticket.responseSlaStatus,
-                        )}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Response due</span>
-                      <strong>
-                        {formatDate(ticket.responseDueAt)}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Resolution SLA</span>
-                      <strong>
-                        {formatSlaStatus(
-                          ticket.resolutionSlaStatus,
-                        )}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Resolution due</span>
-                      <strong>
-                        {formatDate(ticket.resolutionDueAt)}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="assigned-ticket-card-action">
-                  <button
-                    type="button"
-                    className="primary-button"
-                    onClick={() =>
-                      navigate(
-                        `/support/tickets/${ticket.ticketNumber}`,
-                      )
-                    }
-                  >
-                    {ticket.status === 'RESOLVED' ||
-                    ticket.status === 'CLOSED'
-                      ? 'View details'
-                      : 'Open ticket'}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </section>
-        )}
-
-      {!isLoading &&
-        !error &&
-        ticketPage &&
-        ticketPage.totalElements > 0 && (
-          <nav
-            className="pagination"
-            aria-label="Assigned tickets pagination"
-          >
-            <button
-              type="button"
-              disabled={ticketPage.first}
-              onClick={() =>
-                setPage((current) =>
-                  Math.max(0, current - 1),
-                )
-              }
-            >
-              Previous
-            </button>
-            <span>
-              Page {ticketPage.page + 1} of{' '}
-              {ticketPage.totalPages}
+      {/* Filter and Search Bar */}
+      <Card padded style={{ marginBottom: '1.5rem' }}>
+        <form
+          className="ticket-filters-form"
+          onSubmit={applyFilters}
+          style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}
+        >
+          {/* Search Input */}
+          <div className="horizon-input-wrapper" style={{ flex: '1 1 220px', minWidth: '180px' }}>
+            <span className="horizon-input-icon horizon-input-icon--leading">
+              <Search size={16} />
             </span>
-            <button
-              type="button"
-              disabled={ticketPage.last}
-              onClick={() =>
-                setPage((current) => current + 1)
-              }
+            <input
+              type="text"
+              className="horizon-input has-leading-icon"
+              placeholder="Search assigned tickets..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+            />
+          </div>
+
+          {/* Status Select */}
+          <div className="horizon-select-wrapper" style={{ minWidth: '150px' }}>
+            <select
+              className="horizon-select"
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value as TicketStatus | '')}
+              aria-label="Filter by status"
             >
-              Next
-            </button>
-          </nav>
+              <option value="">All Statuses</option>
+              {statusOptions.map((s) => (
+                <option key={s} value={s}>
+                  {formatLabel(s)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Priority Select */}
+          <div className="horizon-select-wrapper" style={{ minWidth: '140px' }}>
+            <select
+              className="horizon-select"
+              value={selectedPriority}
+              onChange={(e) => setSelectedPriority(e.target.value as TicketPriority | '')}
+              aria-label="Filter by priority"
+            >
+              <option value="">All Priorities</option>
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {formatLabel(p)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sort Select */}
+          <div className="horizon-select-wrapper" style={{ minWidth: '140px' }}>
+            <select
+              className="horizon-select"
+              value={selectedSort}
+              onChange={(e) => setSelectedSort(e.target.value as 'newest' | 'oldest')}
+              aria-label="Sort tickets"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </div>
+
+          {/* Buttons */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
+            <Button variant="primary" size="sm" type="submit">
+              Apply
+            </Button>
+            <Button variant="secondary" size="sm" type="button" onClick={resetFilters}>
+              Reset
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* Desktop Table View (>=768px) */}
+      <div className="desktop-ticket-table-view">
+        <DataTable<SupportTicketSummary>
+          columns={columns}
+          data={ticketPage?.content || []}
+          keyExtractor={(ticket) => ticket.ticketNumber}
+          isLoading={isLoading}
+          onRowClick={(ticket) => navigate(`/support/tickets/${ticket.ticketNumber}`)}
+          emptyMessage={
+            isHistoryMode
+              ? 'You have not resolved or closed any tickets matching the current criteria.'
+              : 'You have no active tickets assigned to you. Visit the Support Queue to claim a ticket.'
+          }
+          emptyAction={
+            !isHistoryMode && isSupport ? (
+              <Button variant="primary" size="sm" onClick={() => navigate('/support/queue')}>
+                Browse Support Queue
+              </Button>
+            ) : undefined
+          }
+        />
+      </div>
+
+      {/* Mobile Card View (<768px) */}
+      <div className="mobile-ticket-card-view" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--color-text-secondary)' }}>
+            <p>Loading assigned tickets...</p>
+          </div>
+        ) : !ticketPage || ticketPage.content.length === 0 ? (
+          <EmptyState
+            icon={<UserCheck size={32} />}
+            title="No tickets found"
+            description={
+              isHistoryMode
+                ? 'No resolved tickets match your filters.'
+                : 'No active tickets currently assigned to you.'
+            }
+          />
+        ) : (
+          ticketPage.content.map((ticket) => (
+            <Card
+              key={ticket.ticketNumber}
+              padded
+              className="horizon-ticket-mobile-card"
+              onClick={() => navigate(`/support/tickets/${ticket.ticketNumber}`)}
+              style={{ cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-family-mono)',
+                    fontWeight: 'var(--font-weight-bold)',
+                    color: 'var(--color-primary)',
+                  }}
+                >
+                  {ticket.ticketNumber}
+                </span>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <PriorityBadge priority={ticket.priority} size="sm" />
+                  <StatusBadge status={ticket.status} size="sm" />
+                </div>
+              </div>
+
+              <h4 style={{ margin: '0 0 6px', fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)' }}>
+                {ticket.title}
+              </h4>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                <span>Assigned {formatDate(ticket.assignedAt || ticket.createdAt)}</span>
+                {ticket.resolutionSlaStatus && (
+                  <Badge variant={ticket.resolutionSlaStatus === 'BREACHED' ? 'danger' : 'success'} size="sm" dot>
+                    {formatSlaStatus(ticket.resolutionSlaStatus)}
+                  </Badge>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-divider)', fontSize: 'var(--font-size-xs)' }}>
+                <span style={{ color: 'var(--color-primary)', fontWeight: 'var(--font-weight-medium)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  Open Workbench <ArrowRight size={12} />
+                </span>
+              </div>
+            </Card>
+          ))
         )}
-    </main>
+      </div>
+
+      {/* Pagination Controls */}
+      {ticketPage && ticketPage.totalPages > 1 && (
+        <Pagination
+          page={ticketPage.page}
+          totalPages={ticketPage.totalPages}
+          totalElements={ticketPage.totalElements}
+          onPageChange={(p) => setPage(p)}
+        />
+      )}
+    </div>
   )
 }

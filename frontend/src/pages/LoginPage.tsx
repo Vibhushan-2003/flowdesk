@@ -3,18 +3,27 @@ import {
   useEffect,
   useState,
 } from 'react'
-
 import {
   Link,
   Navigate,
   useLocation,
   useNavigate,
 } from 'react-router-dom'
+import {
+  Layers,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  CheckCircle2,
+} from 'lucide-react'
 
 import { getGoogleOAuthConfig } from '../api/auth'
 import { useAuth } from '../auth/useAuth'
 import type { GoogleOAuthConfigResponse } from '../types/auth'
 import { generateCodeChallenge, generateRandomString } from '../utils/pkce'
+import { ThemeSwitcher } from '../components/ui/ThemeSwitcher'
 
 function getSafeRedirectPath(rawPath?: unknown): string {
   let candidate: string | null = null
@@ -120,9 +129,7 @@ export function LoginPage() {
     window.location.href = `${googleConfig.authUri}?${params.toString()}`
   }
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     setError(null)
@@ -130,12 +137,8 @@ export function LoginPage() {
 
     try {
       await signIn(email, password)
-
       const targetPath = getSafeRedirectPath(locationState?.from)
-
-      navigate(targetPath, {
-        replace: true,
-      })
+      navigate(targetPath, { replace: true })
     } catch (caughtError) {
       if (caughtError instanceof Error) {
         setError(caughtError.message)
@@ -148,41 +151,50 @@ export function LoginPage() {
   }
 
   return (
-    <main className="login-page">
-      <section className="login-card">
-        <div className="login-heading">
-          <p className="eyebrow">FlowDesk</p>
+    <main className="login-page horizon-auth-page">
+      <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem' }}>
+        <ThemeSwitcher variant="toggle" />
+      </div>
 
-          <h1>Welcome back</h1>
+      <section className="login-card horizon-auth-card" aria-labelledby="login-heading-id">
+        {/* Brand Row */}
+        <div className="horizon-auth-brand-row">
+          <div className="horizon-auth-brand-icon" aria-hidden="true">
+            <Layers size={20} />
+          </div>
+          <span className="horizon-auth-brand-name eyebrow">FlowDesk</span>
+          <span className="horizon-auth-badge">Horizon</span>
+        </div>
 
-          <p>
-            Sign in to manage your IT service requests.
+        {/* Headings */}
+        <div className="login-heading horizon-auth-heading">
+          <h1 id="login-heading-id">Welcome back</h1>
+          <p className="horizon-auth-subtitle">
+            Sign in to manage your IT service requests and operational workflows.
           </p>
         </div>
 
+        {/* Alerts */}
         {sessionNotice && (
-          <p
-            className="form-error"
-            role="alert"
-          >
-            {sessionNotice}
-          </p>
+          <div className="form-error horizon-auth-alert horizon-auth-alert--error" role="alert">
+            <AlertCircle size={18} className="horizon-auth-alert-icon" />
+            <span>{sessionNotice}</span>
+          </div>
         )}
 
         {successNotice && (
-          <p
-            className="form-success"
-            role="status"
-          >
-            {successNotice}
-          </p>
+          <div className="form-success horizon-auth-alert horizon-auth-alert--success" role="status">
+            <CheckCircle2 size={18} className="horizon-auth-alert-icon" />
+            <span>{successNotice}</span>
+          </div>
         )}
 
+        {/* Google OAuth Option */}
         {googleConfig?.enabled && (
           <div style={{ marginBottom: '1.25rem' }}>
             <button
               type="button"
-              className="google-button"
+              className="google-button horizon-auth-google-btn"
               onClick={handleGoogleLogin}
               disabled={isSubmitting}
             >
@@ -192,6 +204,7 @@ export function LoginPage() {
                 width="18"
                 height="18"
                 xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
               >
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -212,83 +225,101 @@ export function LoginPage() {
               </svg>
               <span>Continue with Google</span>
             </button>
-            <div className="auth-divider">
+            <div className="auth-divider horizon-auth-divider">
               <span>or sign in with password</span>
             </div>
           </div>
         )}
 
+        {/* Credentials Form */}
         <form
-          className="login-form"
+          className="login-form horizon-auth-form"
           onSubmit={handleSubmit}
         >
-          <label htmlFor="login-email">
-            Email
+          {/* Email field */}
+          <div className="horizon-form-field">
+            <label htmlFor="login-email" className="horizon-label">
+              Email
+            </label>
+            <div className="horizon-auth-input-wrapper">
+              <span className="horizon-auth-input-icon" aria-hidden="true">
+                <Mail size={16} />
+              </span>
+              <input
+                id="login-email"
+                name="email"
+                type="email"
+                className="horizon-auth-input horizon-auth-input-with-icon"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="username"
+                placeholder="name@company.com"
+                required
+              />
+            </div>
+          </div>
 
-            <input
-              id="login-email"
-              name="email"
-              type="email"
-              value={email}
-              onChange={(event) =>
-                setEmail(event.target.value)
-              }
-              autoComplete="username"
-              required
-            />
-          </label>
-
-          <label htmlFor="login-password">
-            <div className="label-with-link">
-              <span>Password</span>
-              <Link to="/forgot-password" className="forgot-password-link">
+          {/* Password field */}
+          <div className="horizon-form-field">
+            <div className="horizon-auth-label-row">
+              <label htmlFor="login-password" className="horizon-label">
+                Password
+              </label>
+              <Link to="/forgot-password" className="forgot-password-link horizon-auth-link">
                 Forgot password?
               </Link>
             </div>
 
-            <div className="password-input-wrapper">
+            <div className="password-input-wrapper horizon-auth-input-wrapper">
+              <span className="horizon-auth-input-icon" aria-hidden="true">
+                <Lock size={16} />
+              </span>
               <input
                 id="login-password"
                 name="password"
                 type={showPassword ? 'text' : 'password'}
+                className="horizon-auth-input horizon-auth-input-with-icon"
                 value={password}
-                onChange={(event) =>
-                  setPassword(event.target.value)
-                }
+                onChange={(event) => setPassword(event.target.value)}
                 autoComplete="current-password"
+                placeholder="••••••••••••"
                 required
               />
               <button
                 type="button"
-                className="password-toggle-btn"
+                className="password-toggle-btn horizon-auth-password-toggle"
                 onClick={() => setShowPassword(!showPassword)}
                 tabIndex={-1}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? 'Hide' : 'Show'}
+                {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                <span style={{ marginLeft: '4px' }}>{showPassword ? 'Hide' : 'Show'}</span>
               </button>
             </div>
-          </label>
+          </div>
 
+          {/* Error Message */}
           {error && (
-            <p
-              className="form-error"
-              role="alert"
-            >
-              {error}
-            </p>
+            <div className="form-error horizon-auth-alert horizon-auth-alert--error" role="alert">
+              <AlertCircle size={18} className="horizon-auth-alert-icon" />
+              <span>{error}</span>
+            </div>
           )}
 
+          {/* Submit Button */}
           <button
             type="submit"
+            className="horizon-btn horizon-btn--primary horizon-btn--md horizon-btn--full-width"
             disabled={isSubmitting}
-            style={{ marginTop: '0.25rem' }}
+            style={{ marginTop: '0.5rem' }}
           >
-            {isSubmitting
-              ? 'Signing in...'
-              : 'Sign in'}
+            {isSubmitting ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
+
+        <div className="horizon-auth-footer">
+          <p>FlowDesk Horizon &bull; Enterprise IT Service Management</p>
+        </div>
       </section>
     </main>
   )

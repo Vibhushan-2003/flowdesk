@@ -1,10 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
-import { getArticleBySlug } from '../api/kb'
+import {
+  ArrowLeft,
+  Calendar,
+  User,
+  Eye,
+  Check,
+  X,
+  ExternalLink,
+  Lightbulb,
+} from 'lucide-react'
+
+import { getArticleBySlug, recordArticleDeflection } from '../api/kb'
 import { useAuth } from '../auth/useAuth'
 import type { KbArticle } from '../types/kb'
 import { formatDate } from '../utils/formatters'
+import { Button } from '../components/ui/Button'
+import { Badge } from '../components/ui/Badge'
 import '../styles/kb.css'
 
 export function ArticleViewPage() {
@@ -71,220 +84,227 @@ export function ArticleViewPage() {
     }
   }, [accessToken, slug])
 
+  async function handleFeedback(helpful: boolean) {
+    if (!article || !accessToken) return
+    setFeedbackGiven(helpful ? 'yes' : 'no')
+    try {
+      if (helpful) {
+        await recordArticleDeflection(accessToken, article.id)
+      }
+    } catch {
+      // Ignore feedback logging errors
+    }
+  }
+
   if (isLoading) {
     return (
-      <main className="kb-container" style={{ textAlign: 'center', padding: '4rem 1rem', color: '#64748b' }}>
-        Loading article...
-      </main>
+      <div className="kb-container" style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--color-text-secondary)' }}>
+        <p>Loading article...</p>
+      </div>
     )
   }
 
   if (error || !article) {
     return (
-      <main className="kb-container">
+      <div className="kb-container">
         <div style={{ margin: '2rem 0' }}>
           <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
             {isFromTicket && (
-              <button
-                type="button"
-                className="dashboard-primary-button"
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => navigate('/tickets/new', { state: { ticketDraft } })}
+                leadingIcon={<ArrowLeft size={14} />}
               >
-                ← Return to Ticket Form
-              </button>
+                Return to Ticket Form
+              </Button>
             )}
-            <button
-              type="button"
-              className="dashboard-secondary-button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => navigate('/kb')}
+              leadingIcon={<ArrowLeft size={14} />}
             >
-              ← Back to Knowledge Base
-            </button>
+              Back to Knowledge Base
+            </Button>
           </div>
 
-          <div className="error-banner" style={{ padding: '2rem', textAlign: 'center' }}>
-            <h2 style={{ marginBottom: '0.5rem', color: '#991b1b' }}>Article Unavailable</h2>
-            <p style={{ color: '#b91c1c' }}>
+          <div className="error-banner horizon-auth-alert horizon-auth-alert--error" style={{ padding: '2rem', textAlign: 'center' }}>
+            <h2 style={{ marginBottom: '0.5rem', color: 'var(--color-danger)' }}>Article Unavailable</h2>
+            <p style={{ color: 'var(--color-danger-text)', margin: 0 }}>
               {error ?? 'This article does not exist or has not yet been published.'}
             </p>
           </div>
         </div>
-      </main>
+      </div>
     )
   }
 
   return (
-    <main className="kb-container">
-      {/* Breadcrumbs */}
-      <nav className="kb-breadcrumbs">
-        <Link to="/kb">Knowledge Base</Link>
-        <span>/</span>
-        <span>{article.categoryName}</span>
-        <span>/</span>
-        <span style={{ color: '#0f172a', fontWeight: 500 }}>{article.title}</span>
-      </nav>
-
+    <div className="kb-container horizon-article-view">
       {/* Return to Ticket Banner if navigated from ticket deflection */}
       {isFromTicket && (
-        <aside className="kb-ticket-return-bar" aria-label="Return to ticket submission">
-          <div className="kb-ticket-return-content">
-            <span className="kb-ticket-return-icon">💡</span>
+        <aside
+          className="kb-ticket-return-bar horizon-card"
+          aria-label="Return to ticket submission"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            padding: '12px 18px',
+            marginBottom: '1.5rem',
+            background: 'var(--color-primary-subtle)',
+            border: '1px solid var(--color-primary-border)',
+            borderRadius: 'var(--radius-lg)',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div className="kb-ticket-return-content" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)' }}>
+            <Lightbulb size={18} style={{ color: 'var(--color-primary)' }} />
             <span>
               Reviewing suggested guide for your ticket:{' '}
               <strong>{ticketDraft?.title || 'Draft ticket'}</strong>
             </span>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="sm"
             className="kb-ticket-return-btn"
-            onClick={() =>
-              navigate('/tickets/new', {
-                state: { ticketDraft },
-              })
-            }
+            onClick={() => navigate('/tickets/new', { state: { ticketDraft } })}
+            leadingIcon={<ArrowLeft size={14} />}
           >
-            ← Return to Ticket Form
-          </button>
+            Return to Ticket Form
+          </Button>
         </aside>
       )}
 
-      {/* Header */}
-      <header className="kb-view-header">
-        <div className="kb-view-title-row">
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-              <span className="kb-category-tag">{article.categoryName}</span>
+      {/* Header & Metadata */}
+      <header className="kb-view-header horizon-card" style={{ padding: '2rem', marginBottom: '2rem' }}>
+        <nav className="kb-breadcrumbs" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
+          <Link to="/kb" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
+            Knowledge Base
+          </Link>
+          <span>/</span>
+          <span>{article.categoryName}</span>
+          <span>/</span>
+          <span style={{ color: 'var(--color-text-primary)', fontWeight: 'var(--font-weight-medium)' }}>
+            {article.title}
+          </span>
+        </nav>
+
+        <div className="kb-view-title-row" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '260px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <Badge variant="primary" size="md" className="kb-category-tag">
+                {article.categoryName}
+              </Badge>
               {article.status !== 'PUBLISHED' && (
-                <span className={`kb-status-badge ${article.status.toLowerCase()}`}>
+                <Badge
+                  variant={article.status === 'DRAFT' ? 'warning' : 'neutral'}
+                  size="md"
+                  className={`kb-status-badge ${article.status.toLowerCase()}`}
+                >
                   {article.status}
-                </span>
+                </Badge>
               )}
             </div>
-            <h1>{article.title}</h1>
+
+            <h1 style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)', margin: '0 0 0.75rem', lineHeight: 'var(--line-height-tight)' }}>
+              {article.title}
+            </h1>
+
+            <p style={{ fontSize: 'var(--font-size-md)', color: 'var(--color-text-secondary)', lineHeight: 'var(--line-height-relaxed)', margin: 0 }}>
+              {article.summary}
+            </p>
           </div>
 
-          {isStaff && (
-            <button
-              type="button"
-              className="dashboard-secondary-button"
-              onClick={() => navigate(`/support/kb/articles/${article.id}/edit`)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {isStaff && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => navigate(`/support/kb/articles/${article.id}/edit`)}
+                trailingIcon={<ExternalLink size={14} />}
+              >
+                Edit Article
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/kb')}
+              leadingIcon={<ArrowLeft size={14} />}
             >
-              Edit Article ↗
-            </button>
-          )}
+              Back
+            </Button>
+          </div>
         </div>
 
-        <p style={{ fontSize: '1.1rem', color: '#475569', margin: '0.75rem 0 1rem', lineHeight: 1.5 }}>
-          {article.summary}
-        </p>
-
-        <div className="kb-meta-bar">
-          <span>Author: <strong>{article.authorName}</strong></span>
+        <div className="kb-meta-bar" style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--color-divider)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <User size={13} />
+            Author: <strong style={{ color: 'var(--color-text-primary)' }}>{article.authorName}</strong>
+          </span>
           {article.publishedAt && (
-            <span>Published: <strong>{formatDate(article.publishedAt)}</strong></span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Calendar size={13} />
+              Published: <strong style={{ color: 'var(--color-text-primary)' }}>{formatDate(article.publishedAt)}</strong>
+            </span>
           )}
-          <span>Last Updated: <strong>{formatDate(article.updatedAt)}</strong></span>
-          <span>Views: <strong>{article.viewCount}</strong></span>
+          <span>
+            Last updated: <strong style={{ color: 'var(--color-text-primary)' }}>{formatDate(article.updatedAt)}</strong>
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Eye size={13} />
+            {article.viewCount} views
+          </span>
         </div>
       </header>
 
-      {/* Markdown Content Body */}
-      <article className="kb-article-body">
+      {/* Markdown Content Article Body */}
+      <article className="kb-article-body horizon-card" style={{ padding: '2.5rem', marginBottom: '2rem', lineHeight: 'var(--line-height-relaxed)', fontSize: 'var(--font-size-base)', color: 'var(--color-text-primary)' }}>
         <ReactMarkdown>{article.contentMarkdown}</ReactMarkdown>
       </article>
 
       {/* Helpful Feedback Box */}
-      <section className="kb-feedback-box">
+      <section className="kb-feedback-box horizon-card" style={{ padding: '1.5rem 2rem', textAlign: 'center', maxWidth: '560px', margin: '0 auto 3rem' }}>
         {feedbackGiven ? (
           <div>
-            <p style={{ color: '#059669', fontWeight: 600, margin: 0 }}>
-              Thank you for your feedback! This helps us improve our knowledge base guides.
+            <p style={{ color: 'var(--color-success)', fontWeight: 'var(--font-weight-semibold)', margin: '0 0 6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <Check size={18} />
+              Thank you for your feedback!
             </p>
-            {isFromTicket && (
-              <div style={{ marginTop: '0.75rem' }}>
-                <p style={{ color: '#047857', fontSize: '0.875rem', margin: '0 0 0.5rem 0' }}>
-                  No ticket was submitted. You can safely return to your dashboard.
-                </p>
-                <button
-                  type="button"
-                  className="dashboard-secondary-button"
-                  onClick={() => {
-                    sessionStorage.removeItem('flowdesk_ticket_draft')
-                    navigate('/dashboard')
-                  }}
-                >
-                  Return to Dashboard
-                </button>
-              </div>
-            )}
+            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', margin: 0 }}>
+              Your response helps us maintain high quality documentation.
+            </p>
           </div>
         ) : (
           <div>
-            <p style={{ fontWeight: 600, color: '#334155', margin: '0 0 0.5rem 0' }}>
-              Was this article helpful?
+            <p style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)', margin: '0 0 0.75rem' }}>
+              Did this article resolve your issue?
             </p>
-            <div className="kb-feedback-buttons">
-              <button
-                type="button"
-                className="kb-feedback-btn"
-                onClick={() => {
-                  sessionStorage.removeItem('flowdesk_ticket_draft')
-                  setFeedbackGiven('yes')
-                }}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFeedback(true)}
+                leadingIcon={<Check size={14} style={{ color: 'var(--color-success)' }} />}
               >
-                👍 Yes, this solved my issue
-              </button>
-              <button
-                type="button"
-                className="kb-feedback-btn"
-                onClick={() => setFeedbackGiven('no')}
+                Yes, it helped
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFeedback(false)}
+                leadingIcon={<X size={14} style={{ color: 'var(--color-danger)' }} />}
               >
-                👎 No, I still need help
-              </button>
+                No, I need more help
+              </Button>
             </div>
-            {isFromTicket && (
-              <div style={{ marginTop: '0.75rem' }}>
-                <button
-                  type="button"
-                  className="dashboard-secondary-button"
-                  style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
-                  onClick={() =>
-                    navigate('/tickets/new', {
-                      state: { ticketDraft },
-                    })
-                  }
-                >
-                  ← Return to Ticket Form
-                </button>
-              </div>
-            )}
           </div>
         )}
       </section>
-
-      {/* Navigation footer */}
-      <div className="kb-view-footer-nav">
-        {isFromTicket && (
-          <button
-            type="button"
-            className="dashboard-primary-button"
-            onClick={() =>
-              navigate('/tickets/new', {
-                state: { ticketDraft },
-              })
-            }
-          >
-            ← Return to Ticket Form
-          </button>
-        )}
-        <button
-          type="button"
-          className="dashboard-secondary-button"
-          onClick={() => navigate('/kb')}
-        >
-          ← Back to Knowledge Base
-        </button>
-      </div>
-    </main>
+    </div>
   )
 }

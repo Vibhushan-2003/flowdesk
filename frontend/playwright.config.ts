@@ -9,6 +9,8 @@ export default defineConfig({
     'tickets.spec.ts',
     'reports.spec.ts',
     'security-refresh-malware.spec.ts',
+    'screenshots.spec.ts',
+    'admin-batch-d.spec.ts',
   ],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

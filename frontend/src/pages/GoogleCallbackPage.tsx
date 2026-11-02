@@ -9,8 +9,19 @@ import {
   useNavigate,
   useSearchParams,
 } from 'react-router-dom'
+import {
+  Layers,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react'
+
 import { completeGoogleLink, googleLogin } from '../api/auth'
 import { useAuth } from '../auth/useAuth'
+import { ThemeSwitcher } from '../components/ui/ThemeSwitcher'
 
 export function GoogleCallbackPage() {
   const { setSessionToken } = useAuth()
@@ -164,24 +175,26 @@ export function GoogleCallbackPage() {
 
   if (isLoading) {
     return (
-      <main className="login-page">
-        <section className="login-card" style={{ textAlign: 'center' }}>
-          <div className="login-heading">
-            <p className="eyebrow">FlowDesk</p>
-            <h1>Signing you in</h1>
-            <p>Connecting to Google and verifying your credentials...</p>
+      <main className="login-page horizon-auth-page">
+        <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem' }}>
+          <ThemeSwitcher variant="toggle" />
+        </div>
+
+        <section className="login-card horizon-auth-card" style={{ textAlign: 'center' }}>
+          <div className="horizon-auth-brand-row" style={{ justifyContent: 'center' }}>
+            <div className="horizon-auth-brand-icon" aria-hidden="true">
+              <Layers size={20} />
+            </div>
+            <span className="horizon-auth-brand-name eyebrow">FlowDesk</span>
           </div>
-          <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center' }}>
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                border: '3px solid #e5e7eb',
-                borderTopColor: '#1f2937',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-              }}
-            />
+
+          <div className="login-heading horizon-auth-heading">
+            <h1>Signing you in</h1>
+            <p className="horizon-auth-subtitle">Connecting to Google and verifying your credentials...</p>
+          </div>
+
+          <div style={{ margin: '2.5rem 0', display: 'flex', justifyContent: 'center' }}>
+            <Loader2 size={36} className="horizon-btn__spinner" style={{ color: 'var(--color-primary)' }} />
           </div>
         </section>
       </main>
@@ -190,12 +203,23 @@ export function GoogleCallbackPage() {
 
   if (isLinkingRequired) {
     return (
-      <main className="login-page">
-        <section className="login-card" aria-labelledby="linking-heading">
-          <div className="login-heading">
-            <p className="eyebrow">FlowDesk Security</p>
+      <main className="login-page horizon-auth-page">
+        <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem' }}>
+          <ThemeSwitcher variant="toggle" />
+        </div>
+
+        <section className="login-card horizon-auth-card" aria-labelledby="linking-heading">
+          <div className="horizon-auth-brand-row">
+            <div className="horizon-auth-brand-icon" aria-hidden="true">
+              <Layers size={20} />
+            </div>
+            <span className="horizon-auth-brand-name eyebrow">FlowDesk Security</span>
+            <span className="horizon-auth-badge">Account Link</span>
+          </div>
+
+          <div className="login-heading horizon-auth-heading">
             <h1 id="linking-heading">Link Google Account</h1>
-            <p>
+            <p className="horizon-auth-subtitle">
               {linkingMessage ||
                 (linkingEmail
                   ? `An existing FlowDesk account was found for ${linkingEmail}. To confirm your identity and link Google sign-in, please enter your FlowDesk password.`
@@ -203,14 +227,20 @@ export function GoogleCallbackPage() {
             </p>
           </div>
 
-          <form className="login-form" onSubmit={handleLinkPasswordSubmit} noValidate>
-            <label htmlFor="flowdesk-password">
-              FlowDesk password
-              <div className="password-input-wrapper">
+          <form className="login-form horizon-auth-form" onSubmit={handleLinkPasswordSubmit} noValidate>
+            <div className="horizon-form-field">
+              <label htmlFor="flowdesk-password" className="horizon-label">
+                FlowDesk password
+              </label>
+              <div className="password-input-wrapper horizon-auth-input-wrapper">
+                <span className="horizon-auth-input-icon" aria-hidden="true">
+                  <Lock size={16} />
+                </span>
                 <input
                   id="flowdesk-password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
+                  className="horizon-auth-input horizon-auth-input-with-icon"
                   autoComplete="current-password"
                   value={flowDeskPassword}
                   onChange={(e) => setFlowDeskPassword(e.target.value)}
@@ -220,36 +250,40 @@ export function GoogleCallbackPage() {
                 />
                 <button
                   type="button"
-                  className="password-toggle-btn"
+                  className="password-toggle-btn horizon-auth-password-toggle"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   tabIndex={-1}
                 >
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                  <span style={{ marginLeft: '4px' }}>{showPassword ? 'Hide' : 'Show'}</span>
                 </button>
               </div>
-              <span className="field-hint">
+              <span className="field-hint horizon-form-helper" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                 Enter your existing FlowDesk password once to link this Google account permanently.
               </span>
-            </label>
+            </div>
 
             {linkingError && (
-              <p className="form-error" role="alert">
-                {linkingError}
-              </p>
+              <div className="form-error horizon-auth-alert horizon-auth-alert--error" role="alert">
+                <AlertCircle size={18} className="horizon-auth-alert-icon" />
+                <span>{linkingError}</span>
+              </div>
             )}
 
             <button
               type="submit"
+              className="horizon-btn horizon-btn--primary horizon-btn--md horizon-btn--full-width"
               disabled={isLinkingSubmitting || !flowDeskPassword.trim()}
               style={{ marginTop: '0.5rem' }}
             >
               {isLinkingSubmitting ? 'Verifying & linking...' : 'Link account & sign in'}
             </button>
 
-            <div className="login-secondary-actions" style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-              <Link to="/login" className="back-to-login-link">
-                &larr; Cancel and return to sign in
+            <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+              <Link to="/login" className="back-to-login-link horizon-auth-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <ArrowLeft size={14} />
+                <span>Cancel and return to sign in</span>
               </Link>
             </div>
           </form>
@@ -259,33 +293,46 @@ export function GoogleCallbackPage() {
   }
 
   return (
-    <main className="login-page">
-      <section className="login-card" aria-labelledby="auth-error-heading">
-        <div className="login-heading">
-          <p className="eyebrow">FlowDesk</p>
+    <main className="login-page horizon-auth-page">
+      <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem' }}>
+        <ThemeSwitcher variant="toggle" />
+      </div>
+
+      <section className="login-card horizon-auth-card" aria-labelledby="auth-error-heading">
+        <div className="horizon-auth-brand-row">
+          <div className="horizon-auth-brand-icon" aria-hidden="true">
+            <Layers size={20} />
+          </div>
+          <span className="horizon-auth-brand-name eyebrow">FlowDesk</span>
+          <span className="horizon-auth-badge">Authentication</span>
+        </div>
+
+        <div className="login-heading horizon-auth-heading">
           <h1 id="auth-error-heading">
             {is403Forbidden ? 'Access restricted' : 'Sign in failed'}
           </h1>
-          <p>
+          <p className="horizon-auth-subtitle">
             {is403Forbidden
               ? 'FlowDesk is an invitation-only service.'
               : 'We were unable to complete your sign in with Google.'}
           </p>
         </div>
 
-        <p className="form-error" role="alert" style={{ marginBottom: '1.5rem' }}>
-          {error || 'An unexpected error occurred during Google authentication.'}
-        </p>
+        <div className="form-error horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ marginBottom: '1.5rem' }}>
+          <AlertCircle size={18} className="horizon-auth-alert-icon" />
+          <span>{error || 'An unexpected error occurred during Google authentication.'}</span>
+        </div>
 
         {is403Forbidden && (
-          <p style={{ fontSize: '0.875rem', color: '#4b5563', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5, marginBottom: '1.5rem' }}>
             If you are a member of an organization using FlowDesk, ask your administrator to send you an invitation email. If you already received an invitation email, click the activation link in that email to set up your account.
           </p>
         )}
 
-        <div className="login-secondary-actions" style={{ textAlign: 'center' }}>
-          <Link to="/login" className="primary-button" style={{ display: 'inline-block', width: 'auto' }}>
-            &larr; Return to sign in
+        <div style={{ textAlign: 'center' }}>
+          <Link to="/login" className="primary-button horizon-btn horizon-btn--primary horizon-btn--md horizon-btn--full-width">
+            <ArrowLeft size={16} />
+            <span>Return to sign in</span>
           </Link>
         </div>
       </section>

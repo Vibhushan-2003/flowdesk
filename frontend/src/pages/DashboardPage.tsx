@@ -1,17 +1,34 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  Ticket,
+  Inbox,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  UserCheck,
+  CheckSquare,
+  BarChart3,
+  Users,
+  ShieldCheck,
+  Plus,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react'
 
 import { getDashboardStats } from '../api/dashboard'
 import { useAuth } from '../auth/useAuth'
 import { ChangePasswordCard } from '../components/ChangePasswordCard'
-import { NotificationBell } from '../components/NotificationBell'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Badge } from '../components/ui/Badge'
+import { Button } from '../components/ui/Button'
+import { KPIStatCard } from '../components/ui/KPIStatCard'
 import type { DashboardMetricsResponse } from '../types/dashboard'
 
 export function DashboardPage() {
   const {
     user,
     accessToken,
-    signOut,
   } = useAuth()
 
   const navigate = useNavigate()
@@ -21,22 +38,11 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  const isSupportEngineer =
-    user?.roles.includes(
-      'SUPPORT_ENGINEER',
-    ) ?? false
-
-  const canViewOperations =
-    user?.roles.some(
-      (role) =>
-        role === 'TEAM_LEAD' ||
-        role === 'ADMIN',
-    ) ?? false
-
-  const isAdmin =
-    user?.roles.includes(
-      'ADMIN',
-    ) ?? false
+  const roles = user?.roles || []
+  const isSupportEngineer = roles.includes('SUPPORT_ENGINEER')
+  const canViewOperations = roles.includes('TEAM_LEAD') || roles.includes('ADMIN')
+  const isAdmin = roles.includes('ADMIN')
+  const primaryRole = roles[0] || 'EMPLOYEE'
 
   useEffect(() => {
     let cancelled = false
@@ -83,193 +89,194 @@ export function DashboardPage() {
     setRefreshKey((k) => k + 1)
   }
 
-  function handleSignOut() {
-    signOut()
-
-    navigate('/login')
-  }
-
   return (
-    <main className="dashboard-page">
-      <header className="dashboard-header">
-        <div>
-          <p className="eyebrow">
-            FlowDesk
-          </p>
+    <div className="dashboard-page horizon-dashboard">
+      {/* Top Page Header */}
+      <PageHeader
+        title="Dashboard"
+        subtitle="Manage your support requests, track SLAs, and oversee operational workspaces."
+        badge={
+          <Badge variant="primary" size="md">
+            {primaryRole.replace('_', ' ')}
+          </Badge>
+        }
+        actions={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRetry}
+              disabled={isLoading}
+              leadingIcon={<RefreshCw size={14} className={isLoading ? 'horizon-btn__spinner' : ''} />}
+            >
+              Refresh
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate('/tickets/new')}
+              leadingIcon={<Plus size={16} />}
+            >
+              New Ticket
+            </Button>
+          </div>
+        }
+      />
 
-          <h1>
-            Dashboard
-          </h1>
-
-          <p className="dashboard-subtitle">
-            Manage your support requests and
-            operational work from one place.
-          </p>
-        </div>
-
-        <div className="dashboard-header-actions">
-          <NotificationBell />
-
-          <button
-            type="button"
-            onClick={handleSignOut}
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
-
+      {/* Loading Shimmer / Banner */}
       {isLoading && (
-        <div className="dashboard-metrics-loading" role="status" aria-live="polite">
-          Loading live operational statistics...
+        <div className="dashboard-metrics-loading horizon-dashboard-loading" role="status" aria-live="polite">
+          <Loader2 size={18} className="horizon-btn__spinner" />
+          <span>Loading live operational statistics...</span>
         </div>
       )}
 
+      {/* Error Alert with Retry CTA */}
       {error && (
-        <div className="dashboard-metrics-error" role="alert">
-          <span>{error}</span>
-          <button type="button" onClick={handleRetry}>
+        <div className="dashboard-metrics-error horizon-dashboard-error" role="alert">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={18} />
+            <span>{error}</span>
+          </div>
+          <button
+            type="button"
+            className="horizon-btn horizon-btn--secondary horizon-btn--sm"
+            onClick={handleRetry}
+          >
             Retry
           </button>
         </div>
       )}
 
-      <section className="dashboard-workspace-grid">
-        <article className="dashboard-workspace-card">
-          <p className="dashboard-card-label">
-            Employee workspace
-          </p>
-
-          <h2>
-            IT support
-          </h2>
-
-          <p>
-            Report an incident, request a service,
-            or track tickets you have already
-            created.
-          </p>
-
-          {metrics?.employee && (
-            <div className="dashboard-kpi-grid" aria-label="Your IT support ticket statistics">
-              <div className="dashboard-kpi-chip">
-                <span className="dashboard-kpi-value">{metrics.employee.openTickets}</span>
-                <span className="dashboard-kpi-label">Open Tickets</span>
-              </div>
-              <div className={`dashboard-kpi-chip ${metrics.employee.ticketsAwaitingResponse > 0 ? 'dashboard-kpi-chip-alert' : ''}`}>
-                <span className="dashboard-kpi-value">{metrics.employee.ticketsAwaitingResponse}</span>
-                <span className="dashboard-kpi-label">Awaiting Your Reply</span>
-              </div>
-              <div className="dashboard-kpi-chip">
-                <span className="dashboard-kpi-value">{metrics.employee.resolvedTickets}</span>
-                <span className="dashboard-kpi-label">Resolved Tickets</span>
-              </div>
+      {/* Workspace Grid */}
+      <section className="dashboard-workspace-grid horizon-dashboard-grid">
+        {/* Card 1: Employee Workspace */}
+        <article className="dashboard-workspace-card horizon-workspace-card">
+          <div>
+            <div className="horizon-workspace-card__header">
+              <p className="dashboard-card-label horizon-workspace-card__label">
+                Employee workspace
+              </p>
+              <h2 className="horizon-workspace-card__title">
+                <Ticket size={20} style={{ color: 'var(--color-primary)' }} />
+                <span>IT support</span>
+              </h2>
+              <p className="horizon-workspace-card__description">
+                Report an incident, request a service, or track tickets you have already created.
+              </p>
             </div>
-          )}
 
-          <div className="dashboard-action-buttons">
+            {metrics?.employee && (
+              <div
+                className="dashboard-kpi-grid horizon-workspace-card__kpis"
+                aria-label="Your IT support ticket statistics"
+              >
+                <KPIStatCard
+                  label="Open Tickets"
+                  value={metrics.employee.openTickets}
+                  icon={<Inbox size={16} />}
+                />
+                <KPIStatCard
+                  label="Awaiting Your Reply"
+                  value={metrics.employee.ticketsAwaitingResponse}
+                  alert={metrics.employee.ticketsAwaitingResponse > 0}
+                  icon={<Clock size={16} />}
+                />
+                <KPIStatCard
+                  label="Resolved Tickets"
+                  value={metrics.employee.resolvedTickets}
+                  icon={<CheckCircle2 size={16} />}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="dashboard-action-buttons horizon-workspace-card__actions">
             <button
               type="button"
-              onClick={() =>
-                navigate(
-                  '/tickets/new',
-                )
-              }
+              className="horizon-btn horizon-btn--primary horizon-btn--md"
+              onClick={() => navigate('/tickets/new')}
             >
               Create ticket
             </button>
-
             <button
               type="button"
-              className="dashboard-secondary-button"
-              onClick={() =>
-                navigate(
-                  '/tickets',
-                )
-              }
+              className="dashboard-secondary-button horizon-btn horizon-btn--secondary horizon-btn--md"
+              onClick={() => navigate('/tickets')}
             >
               My tickets
             </button>
-
             <button
               type="button"
-              className="dashboard-secondary-button"
-              onClick={() =>
-                navigate(
-                  '/kb',
-                )
-              }
+              className="dashboard-secondary-button horizon-btn horizon-btn--secondary horizon-btn--md"
+              onClick={() => navigate('/kb')}
             >
               Knowledge Base
             </button>
           </div>
         </article>
 
+        {/* Card 2: Support Engineer Workspace */}
         {isSupportEngineer && (
-          <article className="dashboard-workspace-card dashboard-support-card">
-            <p className="dashboard-card-label">
-              Support workspace
-            </p>
-
-            <h2>
-              Engineer operations
-            </h2>
-
-            <p>
-              Claim incoming tickets and manage the
-              active issues currently assigned to
-              you.
-            </p>
-
-            {metrics?.support && (
-              <div className="dashboard-kpi-grid" aria-label="Support engineer queue statistics">
-                <div className="dashboard-kpi-chip">
-                  <span className="dashboard-kpi-value">{metrics.support.assignedActiveTickets}</span>
-                  <span className="dashboard-kpi-label">My Assigned</span>
-                </div>
-                <div className="dashboard-kpi-chip">
-                  <span className="dashboard-kpi-value">{metrics.support.unassignedQueueTickets}</span>
-                  <span className="dashboard-kpi-label">Unassigned Queue</span>
-                </div>
-                <div className={`dashboard-kpi-chip ${metrics.support.assignedSlaBreaches > 0 ? 'dashboard-kpi-chip-alert' : ''}`}>
-                  <span className="dashboard-kpi-value">{metrics.support.assignedSlaBreaches}</span>
-                  <span className="dashboard-kpi-label">SLA Breaches</span>
-                </div>
+          <article className="dashboard-workspace-card dashboard-support-card horizon-workspace-card">
+            <div>
+              <div className="horizon-workspace-card__header">
+                <p className="dashboard-card-label horizon-workspace-card__label">
+                  Support workspace
+                </p>
+                <h2 className="horizon-workspace-card__title">
+                  <UserCheck size={20} style={{ color: 'var(--color-primary)' }} />
+                  <span>Engineer operations</span>
+                </h2>
+                <p className="horizon-workspace-card__description">
+                  Claim incoming tickets and manage the active issues currently assigned to you.
+                </p>
               </div>
-            )}
 
-            <div className="dashboard-action-buttons">
+              {metrics?.support && (
+                <div
+                  className="dashboard-kpi-grid horizon-workspace-card__kpis"
+                  aria-label="Support engineer queue statistics"
+                >
+                  <KPIStatCard
+                    label="My Assigned"
+                    value={metrics.support.assignedActiveTickets}
+                    icon={<UserCheck size={16} />}
+                  />
+                  <KPIStatCard
+                    label="Unassigned Queue"
+                    value={metrics.support.unassignedQueueTickets}
+                    icon={<Inbox size={16} />}
+                  />
+                  <KPIStatCard
+                    label="SLA Breaches"
+                    value={metrics.support.assignedSlaBreaches}
+                    alert={metrics.support.assignedSlaBreaches > 0}
+                    icon={<AlertCircle size={16} />}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="dashboard-action-buttons horizon-workspace-card__actions">
               <button
                 type="button"
-                onClick={() =>
-                  navigate(
-                    '/support/tickets',
-                  )
-                }
+                className="horizon-btn horizon-btn--primary horizon-btn--md"
+                onClick={() => navigate('/support/tickets')}
               >
                 My assigned tickets
               </button>
-
               <button
                 type="button"
-                className="dashboard-secondary-button"
-                onClick={() =>
-                  navigate(
-                    '/support/queue',
-                  )
-                }
+                className="dashboard-secondary-button horizon-btn horizon-btn--secondary horizon-btn--md"
+                onClick={() => navigate('/support/queue')}
               >
                 Support queue
               </button>
-
               <button
                 type="button"
-                className="dashboard-secondary-button"
-                onClick={() =>
-                  navigate(
-                    '/kb',
-                  )
-                }
+                className="dashboard-secondary-button horizon-btn horizon-btn--secondary horizon-btn--md"
+                onClick={() => navigate('/kb')}
               >
                 Knowledge Base
               </button>
@@ -277,39 +284,43 @@ export function DashboardPage() {
           </article>
         )}
 
+        {/* Card 3: Approval Workspace */}
         {canViewOperations && (
-          <article className="dashboard-workspace-card">
-            <p className="dashboard-card-label">
-              Approval workspace
-            </p>
-
-            <h2>
-              Service request approvals
-            </h2>
-
-            <p>
-              Review pending service requests and
-              approve or reject them before they
-              enter the support workflow.
-            </p>
-
-            {metrics?.operations && (
-              <div className="dashboard-kpi-grid" aria-label="Service request approvals count">
-                <div className={`dashboard-kpi-chip ${metrics.operations.pendingApprovals > 0 ? 'dashboard-kpi-chip-alert' : ''}`}>
-                  <span className="dashboard-kpi-value">{metrics.operations.pendingApprovals}</span>
-                  <span className="dashboard-kpi-label">Pending Approvals</span>
-                </div>
+          <article className="dashboard-workspace-card horizon-workspace-card">
+            <div>
+              <div className="horizon-workspace-card__header">
+                <p className="dashboard-card-label horizon-workspace-card__label">
+                  Approval workspace
+                </p>
+                <h2 className="horizon-workspace-card__title">
+                  <CheckSquare size={20} style={{ color: 'var(--color-warning)' }} />
+                  <span>Service request approvals</span>
+                </h2>
+                <p className="horizon-workspace-card__description">
+                  Review pending service requests and approve or reject them before they enter the support workflow.
+                </p>
               </div>
-            )}
 
-            <div className="dashboard-action-buttons">
+              {metrics?.operations && (
+                <div
+                  className="dashboard-kpi-grid horizon-workspace-card__kpis"
+                  aria-label="Service request approvals count"
+                >
+                  <KPIStatCard
+                    label="Pending Approvals"
+                    value={metrics.operations.pendingApprovals ?? 0}
+                    alert={(metrics.operations.pendingApprovals ?? 0) > 0}
+                    icon={<CheckSquare size={16} />}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="dashboard-action-buttons horizon-workspace-card__actions">
               <button
                 type="button"
-                onClick={() =>
-                  navigate(
-                    '/approvals',
-                  )
-                }
+                className="horizon-btn horizon-btn--primary horizon-btn--md"
+                onClick={() => navigate('/approvals')}
               >
                 Open approval inbox
               </button>
@@ -317,59 +328,60 @@ export function DashboardPage() {
           </article>
         )}
 
+        {/* Card 4: Operations SLA Workspace */}
         {canViewOperations && (
-          <article className="dashboard-workspace-card">
-            <p className="dashboard-card-label">
-              Operations workspace
-            </p>
-
-            <h2>
-              SLA operations
-            </h2>
-
-            <p>
-              Review active SLA exposure,
-              compliance, priority breakdowns,
-              and recent breach history.
-            </p>
-
-            {metrics?.operations && (
-              <div className="dashboard-kpi-grid" aria-label="Operational ticket statistics">
-                <div className="dashboard-kpi-chip">
-                  <span className="dashboard-kpi-value">{metrics.operations.totalActiveTickets}</span>
-                  <span className="dashboard-kpi-label">Total Active</span>
-                </div>
-                <div className="dashboard-kpi-chip">
-                  <span className="dashboard-kpi-value">{metrics.operations.unassignedQueueTickets}</span>
-                  <span className="dashboard-kpi-label">Unassigned Queue</span>
-                </div>
-                <div className={`dashboard-kpi-chip ${metrics.operations.slaBreaches > 0 ? 'dashboard-kpi-chip-alert' : ''}`}>
-                  <span className="dashboard-kpi-value">{metrics.operations.slaBreaches}</span>
-                  <span className="dashboard-kpi-label">SLA Breaches</span>
-                </div>
+          <article className="dashboard-workspace-card horizon-workspace-card">
+            <div>
+              <div className="horizon-workspace-card__header">
+                <p className="dashboard-card-label horizon-workspace-card__label">
+                  Operations workspace
+                </p>
+                <h2 className="horizon-workspace-card__title">
+                  <BarChart3 size={20} style={{ color: 'var(--color-primary)' }} />
+                  <span>SLA operations</span>
+                </h2>
+                <p className="horizon-workspace-card__description">
+                  Review active SLA exposure, compliance, priority breakdowns, and recent breach history.
+                </p>
               </div>
-            )}
 
-            <div className="dashboard-action-buttons">
+              {metrics?.operations && (
+                <div
+                  className="dashboard-kpi-grid horizon-workspace-card__kpis"
+                  aria-label="Operational ticket statistics"
+                >
+                  <KPIStatCard
+                    label="Total Active"
+                    value={metrics.operations.totalActiveTickets}
+                    icon={<Ticket size={16} />}
+                  />
+                  <KPIStatCard
+                    label="Unassigned Queue"
+                    value={metrics.operations.unassignedQueueTickets}
+                    icon={<Inbox size={16} />}
+                  />
+                  <KPIStatCard
+                    label="SLA Breaches"
+                    value={metrics.operations.slaBreaches ?? metrics.operations.activeSlaBreaches ?? 0}
+                    alert={(metrics.operations.slaBreaches ?? metrics.operations.activeSlaBreaches ?? 0) > 0}
+                    icon={<AlertCircle size={16} />}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="dashboard-action-buttons horizon-workspace-card__actions">
               <button
                 type="button"
-                onClick={() =>
-                  navigate(
-                    '/sla/dashboard',
-                  )
-                }
+                className="horizon-btn horizon-btn--primary horizon-btn--md"
+                onClick={() => navigate('/sla/dashboard')}
               >
                 Open SLA dashboard
               </button>
-
               <button
                 type="button"
-                className="dashboard-secondary-button"
-                onClick={() =>
-                  navigate(
-                    '/reports',
-                  )
-                }
+                className="dashboard-secondary-button horizon-btn horizon-btn--secondary horizon-btn--md"
+                onClick={() => navigate('/reports')}
               >
                 Operational reports
               </button>
@@ -377,29 +389,29 @@ export function DashboardPage() {
           </article>
         )}
 
+        {/* Card 5: User Management */}
         {isAdmin && (
-          <article className="dashboard-workspace-card">
-            <p className="dashboard-card-label">
-              Administration workspace
-            </p>
+          <article className="dashboard-workspace-card horizon-workspace-card">
+            <div>
+              <div className="horizon-workspace-card__header">
+                <p className="dashboard-card-label horizon-workspace-card__label">
+                  Administration workspace
+                </p>
+                <h2 className="horizon-workspace-card__title">
+                  <Users size={20} style={{ color: 'var(--color-primary)' }} />
+                  <span>User management</span>
+                </h2>
+                <p className="horizon-workspace-card__description">
+                  Manage user accounts, assign roles, create users, and activate or deactivate system access.
+                </p>
+              </div>
+            </div>
 
-            <h2>
-              User management
-            </h2>
-
-            <p>
-              Manage user accounts, assign roles, create users,
-              and activate or deactivate system access.
-            </p>
-
-            <div className="dashboard-action-buttons">
+            <div className="dashboard-action-buttons horizon-workspace-card__actions">
               <button
                 type="button"
-                onClick={() =>
-                  navigate(
-                    '/admin/users',
-                  )
-                }
+                className="horizon-btn horizon-btn--primary horizon-btn--md"
+                onClick={() => navigate('/admin/users')}
               >
                 Manage users
               </button>
@@ -407,30 +419,29 @@ export function DashboardPage() {
           </article>
         )}
 
+        {/* Card 6: Audit Trail */}
         {isAdmin && (
-          <article className="dashboard-workspace-card">
-            <p className="dashboard-card-label">
-              Governance workspace
-            </p>
+          <article className="dashboard-workspace-card horizon-workspace-card">
+            <div>
+              <div className="horizon-workspace-card__header">
+                <p className="dashboard-card-label horizon-workspace-card__label">
+                  Governance workspace
+                </p>
+                <h2 className="horizon-workspace-card__title">
+                  <ShieldCheck size={20} style={{ color: 'var(--color-primary)' }} />
+                  <span>Audit trail</span>
+                </h2>
+                <p className="horizon-workspace-card__description">
+                  Review immutable records of important user actions, system events, ticket changes, approvals, and SLA breaches.
+                </p>
+              </div>
+            </div>
 
-            <h2>
-              Audit trail
-            </h2>
-
-            <p>
-              Review immutable records of important
-              user actions, system events, ticket
-              changes, approvals, and SLA breaches.
-            </p>
-
-            <div className="dashboard-action-buttons">
+            <div className="dashboard-action-buttons horizon-workspace-card__actions">
               <button
                 type="button"
-                onClick={() =>
-                  navigate(
-                    '/audit',
-                  )
-                }
+                className="horizon-btn horizon-btn--primary horizon-btn--md"
+                onClick={() => navigate('/audit')}
               >
                 Open audit trail
               </button>
@@ -439,59 +450,40 @@ export function DashboardPage() {
         )}
       </section>
 
-      <section className="user-card">
-        <div className="account-card-heading">
+      {/* Account Profile Card */}
+      <section className="user-card horizon-account-card">
+        <div className="account-card-heading horizon-account-header">
           <div>
-            <p className="dashboard-card-label">
+            <p className="dashboard-card-label horizon-workspace-card__label">
               Account
             </p>
-
-            <h2>
+            <h2 style={{ margin: '4px 0 0', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
               Your profile
             </h2>
           </div>
-
-          <span className="account-status">
+          <Badge variant="success" size="sm">
             Active
-          </span>
+          </Badge>
         </div>
 
-        <div className="account-details-grid">
-          <div>
-            <span>
-              Email
-            </span>
-
-            <strong>
-              {user?.email}
-            </strong>
+        <div className="account-details-grid horizon-account-grid">
+          <div className="horizon-account-item">
+            <span>Email</span>
+            <strong>{user?.email}</strong>
           </div>
-
-          <div>
-            <span>
-              User ID
-            </span>
-
-            <strong>
-              {user?.userId}
-            </strong>
+          <div className="horizon-account-item">
+            <span>User ID</span>
+            <strong>{user?.userId}</strong>
           </div>
-
-          <div>
-            <span>
-              Roles
-            </span>
-
-            <strong>
-              {user?.roles.join(
-                ', ',
-              )}
-            </strong>
+          <div className="horizon-account-item">
+            <span>Roles</span>
+            <strong>{user?.roles?.join(', ')}</strong>
           </div>
         </div>
       </section>
 
+      {/* Change Password Card */}
       <ChangePasswordCard />
-    </main>
+    </div>
   )
 }

@@ -1,0 +1,582 @@
+/**
+ * FlowDesk Horizon — Shell & Layout Styling
+ * Desktop sidebar, responsive TopBar, Mobile Drawer, and main viewport
+ */
+
+.horizon-app-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--color-canvas);
+  color: var(--color-text-primary);
+  position: relative;
+}
+
+/* ==========================================================================
+   Desktop Sidebar
+   ========================================================================== */
+
+.horizon-sidebar {
+  width: var(--sidebar-width-expanded);
+  background-color: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  transition: width var(--transition-normal) cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-x: hidden;
+  user-select: none;
+}
+
+.horizon-sidebar.is-collapsed {
+  width: var(--sidebar-width-collapsed);
+}
+
+.horizon-sidebar-header {
+  height: var(--topbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.horizon-brand-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  text-decoration: none;
+  color: inherit;
+  outline: none;
+}
+
+.horizon-brand-link:focus-visible {
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+.horizon-brand-icon {
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: #ffffff;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+  flex-shrink: 0;
+}
+
+.horizon-brand-text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
+.horizon-brand-name {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+
+.horizon-brand-badge {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary-border);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+}
+
+.horizon-collapse-toggle-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-secondary);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.horizon-collapse-toggle-btn:hover {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+}
+
+.horizon-collapse-toggle-btn:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+/* Sidebar Navigation Items */
+.horizon-sidebar-nav {
+  flex: 1;
+  padding: var(--space-4) var(--space-2-5);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.horizon-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.horizon-nav-group-title {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  padding: 0 var(--space-3) var(--space-1-5);
+}
+
+.horizon-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.horizon-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  outline: none;
+}
+
+.horizon-sidebar.is-collapsed .horizon-nav-item {
+  justify-content: center;
+  padding: var(--space-2-5);
+}
+
+.horizon-nav-item:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-subtle);
+}
+
+.horizon-nav-item.is-active {
+  color: var(--color-primary);
+  background-color: var(--color-primary-subtle);
+  font-weight: var(--font-weight-semibold);
+}
+
+.horizon-nav-item:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.horizon-nav-icon {
+  flex-shrink: 0;
+}
+
+/* Sidebar Footer Profile */
+.horizon-sidebar-footer {
+  padding: var(--space-3) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.horizon-user-profile-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  min-width: 0;
+}
+
+.horizon-user-info-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.horizon-user-email {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.horizon-user-role-badge {
+  align-self: flex-start;
+  font-size: 0.6875rem !important;
+  padding: 0 6px !important;
+}
+
+.horizon-sidebar-signout-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.horizon-sidebar-signout-btn:hover {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  border-color: var(--color-danger-border);
+}
+
+.horizon-sidebar-signout-btn:focus-visible {
+  box-shadow: var(--focus-ring-danger);
+  outline: none;
+}
+
+/* ==========================================================================
+   Main Workspace Area & TopBar
+   ========================================================================== */
+
+.horizon-main-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-canvas);
+}
+
+.horizon-topbar {
+  height: var(--topbar-height);
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-6);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  gap: var(--space-4);
+}
+
+.horizon-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.horizon-mobile-menu-btn {
+  display: none;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.horizon-mobile-menu-btn:hover {
+  background: var(--color-surface-subtle);
+}
+
+.horizon-topbar-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.horizon-topbar-crumb-section {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
+.horizon-topbar-crumb-sep {
+  color: var(--color-text-muted);
+}
+
+.horizon-topbar-crumb-title {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.horizon-topbar-center {
+  flex: 1;
+  max-width: 440px;
+}
+
+.horizon-topbar-search {
+  width: 100%;
+}
+
+.horizon-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Profile Dropdown */
+.horizon-profile-menu-container {
+  position: relative;
+}
+
+.horizon-profile-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: transparent;
+  border: 1px solid transparent;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--color-text-primary);
+}
+
+.horizon-profile-btn:hover {
+  background: var(--color-surface-subtle);
+  border-color: var(--color-border);
+}
+
+.horizon-profile-btn:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.horizon-profile-email {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.horizon-profile-chevron {
+  color: var(--color-text-secondary);
+}
+
+.horizon-profile-dropdown {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  width: 220px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  z-index: 50;
+  animation: horizonDropdownFadeIn 150ms ease-out;
+}
+
+@keyframes horizonDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.horizon-dropdown-user-header {
+  padding: var(--space-2) var(--space-2-5);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.horizon-dropdown-email {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.horizon-dropdown-roles {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.horizon-dropdown-divider {
+  height: 1px;
+  background: var(--color-divider);
+  margin: var(--space-1) 0;
+}
+
+.horizon-dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2-5);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.horizon-dropdown-item:hover {
+  background: var(--color-surface-subtle);
+}
+
+.horizon-dropdown-signout:hover {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+/* Page Viewport */
+.horizon-page-viewport {
+  flex: 1;
+  padding: var(--space-6) var(--space-8);
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   Mobile Drawer
+   ========================================================================== */
+
+.horizon-mobile-drawer-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+}
+
+.horizon-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.4);
+  backdrop-filter: blur(4px);
+  animation: horizonFadeIn 200ms ease;
+}
+
+.horizon-drawer-panel {
+  position: relative;
+  width: 280px;
+  max-width: 85vw;
+  height: 100%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  flex-direction: column;
+  z-index: 61;
+  animation: horizonSlideIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.horizon-drawer-panel .horizon-sidebar {
+  width: 100% !important;
+  height: 100% !important;
+  border-right: none;
+}
+
+.horizon-drawer-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 62;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+@keyframes horizonFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes horizonSlideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+/* ==========================================================================
+   Responsive Breakpoints
+   ========================================================================== */
+
+@media (max-width: 1023px) {
+  .horizon-sidebar:not(.is-mobile) {
+    display: none !important;
+  }
+
+  .horizon-mobile-menu-btn {
+    display: flex;
+  }
+
+  .horizon-topbar {
+    padding: 0 var(--space-4);
+  }
+
+  .horizon-page-viewport {
+    padding: var(--space-4) var(--space-5);
+  }
+}
+
+@media (max-width: 640px) {
+  .horizon-topbar-center {
+    display: none;
+  }
+
+  .horizon-profile-email {
+    display: none;
+  }
+
+  .horizon-topbar-breadcrumbs {
+    font-size: var(--font-size-xs);
+  }
+
+  .horizon-page-viewport {
+    padding: var(--space-3) var(--space-3);
+  }
+}
+

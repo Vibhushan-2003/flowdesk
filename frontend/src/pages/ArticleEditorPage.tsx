@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import {
+  Save,
+  CheckCircle2,
+  AlertCircle,
+  Eye,
+  Edit3,
+  Archive,
+  Send,
+} from 'lucide-react'
+
+import {
   createDraftArticle,
   getArticleByIdForManagement,
   getCategories,
@@ -10,6 +20,10 @@ import {
 } from '../api/kb'
 import { useAuth } from '../auth/useAuth'
 import type { ArticleStatus, KbArticle, KbCategory } from '../types/kb'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Button } from '../components/ui/Button'
+import { Badge } from '../components/ui/Badge'
+import { Card } from '../components/ui/Card'
 import '../styles/kb.css'
 
 export function ArticleEditorPage() {
@@ -170,243 +184,272 @@ export function ArticleEditorPage() {
 
   if (isLoading) {
     return (
-      <main className="kb-container" style={{ textAlign: 'center', padding: '4rem 1rem', color: '#64748b' }}>
-        Loading article editor...
-      </main>
+      <div className="kb-container" style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--color-text-secondary)' }}>
+        <p>Loading article editor...</p>
+      </div>
     )
   }
 
   return (
-    <main className="kb-container">
-      {/* Header */}
-      <header className="kb-editor-header">
-        <div className="kb-editor-header-title">
-          <button
-            type="button"
-            className="dashboard-secondary-button"
-            onClick={() => navigate('/kb')}
-            style={{ marginBottom: '0.5rem' }}
-          >
-            ← Back to Knowledge Base
-          </button>
-          <h1>
-            {isEditing ? `Edit Article: ${existingArticle?.title ?? ''}` : 'Create Knowledge Base Article'}
-          </h1>
-          {existingArticle && (
-            <span
-              className={`kb-status-badge ${existingArticle.status.toLowerCase()}`}
-              style={{ marginTop: '0.4rem', display: 'inline-block' }}
-            >
-              Current Status: {existingArticle.status}
+    <div className="kb-container horizon-article-editor">
+      {/* Page Header */}
+      <PageHeader
+        title={isEditing ? 'Edit Knowledge Base Article' : 'Create Knowledge Base Article'}
+        subtitle={
+          existingArticle ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>{existingArticle.title}</span>
+              <span>&bull;</span>
+              <Badge
+                variant={existingArticle.status === 'PUBLISHED' ? 'success' : existingArticle.status === 'DRAFT' ? 'warning' : 'neutral'}
+                size="sm"
+              >
+                {existingArticle.status}
+              </Badge>
             </span>
-          )}
-        </div>
-
-        {/* Action Controls */}
-        <div className="kb-editor-header-actions">
-          <button
-            type="button"
-            className="dashboard-secondary-button"
-            disabled={isSubmitting}
-            onClick={() => navigate('/kb')}
-          >
-            Cancel
-          </button>
-
-          {!isEditing ? (
-            <>
-              <button
-                type="button"
-                className="dashboard-secondary-button"
-                disabled={isSubmitting}
-                onClick={() => handleSave('DRAFT')}
-              >
-                Save as Draft
-              </button>
-              <button
-                type="button"
-                className="kb-search-btn"
-                disabled={isSubmitting}
-                onClick={() => handleSave('PUBLISHED')}
-              >
-                {isSubmitting ? 'Saving...' : 'Publish Article'}
-              </button>
-            </>
           ) : (
-            <>
-              <button
-                type="button"
-                className="dashboard-secondary-button"
-                disabled={isSubmitting}
-                onClick={() => handleSave()}
-              >
-                Save Changes
-              </button>
+            'Draft self-service guidance and operating procedures for employees.'
+          )
+        }
+        actions={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isSubmitting}
+              onClick={() => navigate('/kb')}
+            >
+              Cancel
+            </Button>
 
-              {existingArticle?.status === 'DRAFT' && (
-                <button
-                  type="button"
-                  className="kb-search-btn"
+            {!isEditing ? (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
                   disabled={isSubmitting}
-                  onClick={() => handleStatusChange('PUBLISHED')}
+                  onClick={() => handleSave('DRAFT')}
+                  leadingIcon={<Save size={14} />}
                 >
-                  Publish Article
-                </button>
-              )}
+                  Save Draft
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={isSubmitting}
+                  onClick={() => handleSave('PUBLISHED')}
+                  leadingIcon={<Send size={14} />}
+                >
+                  Publish Immediately
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={isSubmitting}
+                  onClick={() => handleSave()}
+                  leadingIcon={<Save size={14} />}
+                >
+                  Save Changes
+                </Button>
 
-              {existingArticle?.status === 'PUBLISHED' && (
-                <>
-                  <button
-                    type="button"
-                    className="dashboard-secondary-button"
+                {existingArticle?.status === 'DRAFT' && (
+                  <Button
+                    variant="primary"
+                    size="sm"
                     disabled={isSubmitting}
-                    onClick={() => handleStatusChange('DRAFT')}
+                    onClick={() => handleStatusChange('PUBLISHED')}
+                    leadingIcon={<Send size={14} />}
                   >
-                    Unpublish to Draft
-                  </button>
-                  <button
-                    type="button"
-                    className="dashboard-secondary-button"
-                    style={{ color: '#b45309' }}
+                    Publish
+                  </Button>
+                )}
+
+                {existingArticle?.status === 'PUBLISHED' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
                     disabled={isSubmitting}
                     onClick={() => handleStatusChange('ARCHIVED')}
+                    leadingIcon={<Archive size={14} />}
                   >
                     Archive
-                  </button>
-                </>
-              )}
+                  </Button>
+                )}
 
-              {existingArticle?.status === 'ARCHIVED' && (
-                <button
-                  type="button"
-                  className="kb-search-btn"
-                  disabled={isSubmitting}
-                  onClick={() => handleStatusChange('PUBLISHED')}
-                >
-                  Republish Article
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </header>
+                {existingArticle?.status === 'ARCHIVED' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isSubmitting}
+                    onClick={() => handleStatusChange('DRAFT')}
+                    leadingIcon={<Edit3 size={14} />}
+                  >
+                    Restore to Draft
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        }
+      />
 
-      {/* Notifications */}
+      {/* Feedback Alerts */}
       {errorMessage && (
-        <div className="error-banner" style={{ marginBottom: '1.5rem' }}>
-          {errorMessage}
+        <div className="error-banner horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ marginBottom: '1.5rem' }}>
+          <AlertCircle size={18} className="horizon-auth-alert-icon" />
+          <span>{errorMessage}</span>
         </div>
       )}
 
       {successMessage && (
-        <div
-          style={{
-            padding: '1rem',
-            backgroundColor: '#ecfdf5',
-            color: '#065f46',
-            border: '1px solid #a7f3d0',
-            borderRadius: '6px',
-            marginBottom: '1.5rem',
-            fontWeight: 500,
-          }}
-        >
-          {successMessage}
+        <div className="success-banner horizon-auth-alert horizon-auth-alert--success" role="status" style={{ marginBottom: '1.5rem' }}>
+          <CheckCircle2 size={18} className="horizon-auth-alert-icon" />
+          <span>{successMessage}</span>
         </div>
       )}
 
-      {/* Form Fields */}
-      <div className="kb-editor-layout">
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
-          <div className="kb-editor-form-group">
-            <label htmlFor="article-title">Article Title *</label>
-            <input
-              id="article-title"
-              type="text"
-              className="kb-editor-input"
-              placeholder="e.g. How to Connect to FlowDesk Office VPN"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
+      {/* Editor & Preview Form Container */}
+      <Card padded style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Metadata Controls: Category & Title */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 260px', gap: '1.25rem', alignItems: 'start' }}>
+            <div className="horizon-form-field" style={{ margin: 0 }}>
+              <label htmlFor="article-title" className="horizon-label">
+                Article Title <span className="horizon-field-required">*</span>
+              </label>
+              <div className="horizon-input-wrapper">
+                <input
+                  id="article-title"
+                  type="text"
+                  className="horizon-input"
+                  placeholder="e.g. How to Connect to Corporate VPN from macOS"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  disabled={isSubmitting}
+                  required
+                />
+              </div>
+            </div>
 
-          <div className="kb-editor-form-group">
-            <label htmlFor="article-category">Category *</label>
-            <select
-              id="article-category"
-              className="kb-editor-select"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="kb-editor-form-group">
-          <label htmlFor="article-summary">
-            Summary / Overview * (Short description displayed in search results and deflection cards)
-          </label>
-          <textarea
-            id="article-summary"
-            rows={2}
-            className="kb-editor-textarea"
-            placeholder="Brief 1-2 sentence description of the solution..."
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-          />
-        </div>
-
-        {/* Markdown Editor & Preview Tabs */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <label style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-              Article Body (Markdown) *
-            </label>
-            <div className="kb-tabs">
-              <button
-                type="button"
-                className={`kb-tab-btn ${activeTab === 'edit' ? 'active' : ''}`}
-                style={{ padding: '0.35rem 0.85rem', fontSize: '0.85rem' }}
-                onClick={() => setActiveTab('edit')}
-              >
-                Edit Markdown
-              </button>
-              <button
-                type="button"
-                className={`kb-tab-btn ${activeTab === 'preview' ? 'active' : ''}`}
-                style={{ padding: '0.35rem 0.85rem', fontSize: '0.85rem' }}
-                onClick={() => setActiveTab('preview')}
-              >
-                Live Preview
-              </button>
+            <div className="horizon-form-field" style={{ margin: 0 }}>
+              <label htmlFor="article-category" className="horizon-label">
+                Category <span className="horizon-field-required">*</span>
+              </label>
+              <div className="horizon-select-wrapper">
+                <select
+                  id="article-category"
+                  className="horizon-select"
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  disabled={isSubmitting}
+                  required
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
+          {/* Short Summary */}
+          <div className="horizon-form-field" style={{ margin: 0 }}>
+            <label htmlFor="article-summary" className="horizon-label">
+              Short Summary <span className="horizon-field-required">*</span>
+            </label>
+            <div className="horizon-input-wrapper">
+              <input
+                id="article-summary"
+                type="text"
+                className="horizon-input"
+                placeholder="A concise 1-2 sentence overview shown in search results and deflection cards"
+                value={summary}
+                maxLength={300}
+                onChange={(e) => setSummary(e.target.value)}
+                disabled={isSubmitting}
+                required
+              />
+            </div>
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px', textAlign: 'right' }}>
+              {summary.length}/300
+            </span>
+          </div>
+
+          {/* Edit vs Preview Segmented Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-divider)', paddingBottom: '0.75rem', marginTop: '0.5rem' }}>
+            <div style={{ display: 'inline-flex', padding: '3px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', gap: '4px' }}>
+              <button
+                type="button"
+                className={`horizon-btn horizon-btn--sm ${activeTab === 'edit' ? 'horizon-btn--primary' : 'horizon-btn--ghost'}`}
+                onClick={() => setActiveTab('edit')}
+              >
+                <Edit3 size={14} />
+                <span>Write (Markdown)</span>
+              </button>
+              <button
+                type="button"
+                className={`horizon-btn horizon-btn--sm ${activeTab === 'preview' ? 'horizon-btn--primary' : 'horizon-btn--ghost'}`}
+                onClick={() => setActiveTab('preview')}
+              >
+                <Eye size={14} />
+                <span>Preview</span>
+              </button>
+            </div>
+
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+              GitHub Flavored Markdown supported
+            </span>
+          </div>
+
+          {/* Editor Body or Preview Display */}
           {activeTab === 'edit' ? (
-            <textarea
-              rows={18}
-              className="kb-editor-textarea kb-markdown-textarea"
-              placeholder="# Step-by-Step Guide&#10;&#10;Explain the troubleshooting procedure here using Markdown headings, lists, and code blocks...&#10;&#10;## Prerequisites&#10;- Ensure your laptop is connected to Wi-Fi.&#10;&#10;```bash&#10;ping vpn.flowdesk.internal&#10;```"
-              value={contentMarkdown}
-              onChange={(e) => setContentMarkdown(e.target.value)}
-            />
+            <div className="horizon-form-field" style={{ margin: 0 }}>
+              <label htmlFor="article-content" className="sr-only">
+                Article Content
+              </label>
+              <div className="horizon-input-wrapper">
+                <textarea
+                  id="article-content"
+                  className="horizon-textarea"
+                  style={{ minHeight: '380px', fontFamily: 'var(--font-family-mono)', fontSize: 'var(--font-size-sm)' }}
+                  placeholder="## Overview&#10;&#10;Write detailed instructions, step-by-step troubleshooting, requirements, and commands here..."
+                  value={contentMarkdown}
+                  onChange={(e) => setContentMarkdown(e.target.value)}
+                  disabled={isSubmitting}
+                  required
+                />
+              </div>
+            </div>
           ) : (
-            <div className="kb-preview-pane kb-article-body">
+            <div
+              className="kb-article-body"
+              style={{
+                minHeight: '380px',
+                padding: '1.5rem',
+                background: 'var(--color-surface-subtle)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-border)',
+                lineHeight: 'var(--line-height-relaxed)',
+                color: 'var(--color-text-primary)',
+              }}
+            >
               {contentMarkdown.trim() ? (
                 <ReactMarkdown>{contentMarkdown}</ReactMarkdown>
               ) : (
-                <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                  Nothing to preview yet. Switch back to Edit Markdown and write your guide.
+                <p style={{ color: 'var(--color-text-muted)', fontStyle: 'italic', margin: 0 }}>
+                  No content written yet. Switch back to Write mode to compose your guide.
                 </p>
               )}
             </div>
           )}
         </div>
-      </div>
-    </main>
+      </Card>
+    </div>
   )
 }

@@ -3,25 +3,29 @@ import {
   useEffect,
   useState,
 } from 'react'
-
 import {
   useNavigate,
   useParams,
 } from 'react-router-dom'
+import {
+  ArrowLeft,
+  Clock,
+  AlertCircle,
+  MessageSquare,
+  CheckCircle2,
+  XCircle,
+} from 'lucide-react'
 
 import {
   addTicketComment,
   getTicket,
   getTicketComments,
 } from '../api/ticket'
-
 import { useAuth } from '../auth/useAuth'
-
 import type {
   TicketCommentResponse,
   TicketResponse,
 } from '../types/ticket'
-
 import {
   formatDate,
   formatLabel,
@@ -29,32 +33,26 @@ import {
   formatSlaStatus,
 } from '../utils/formatters'
 import { TicketAttachmentSection } from '../components/tickets/TicketAttachmentSection'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Button } from '../components/ui/Button'
+import { Badge } from '../components/ui/Badge'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { PriorityBadge } from '../components/ui/PriorityBadge'
+import { UserAvatar } from '../components/ui/UserAvatar'
+import { Timeline, TimelineItem } from '../components/ui/Timeline'
 
 export function TicketDetailsPage() {
   const { accessToken } = useAuth()
   const { ticketNumber } = useParams()
   const navigate = useNavigate()
 
-  const [ticket, setTicket] =
-    useState<TicketResponse | null>(null)
-
-  const [comments, setComments] =
-    useState<TicketCommentResponse[]>([])
-
-  const [commentBody, setCommentBody] =
-    useState('')
-
-  const [isLoading, setIsLoading] =
-    useState(true)
-
-  const [isSendingComment, setIsSendingComment] =
-    useState(false)
-
-  const [error, setError] =
-    useState<string | null>(null)
-
-  const [commentError, setCommentError] =
-    useState<string | null>(null)
+  const [ticket, setTicket] = useState<TicketResponse | null>(null)
+  const [comments, setComments] = useState<TicketCommentResponse[]>([])
+  const [commentBody, setCommentBody] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSendingComment, setIsSendingComment] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [commentError, setCommentError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -62,13 +60,9 @@ export function TicketDetailsPage() {
     async function loadTicket() {
       if (!accessToken) {
         if (!cancelled) {
-          setError(
-            'Your session is no longer valid',
-          )
-
+          setError('Your session is no longer valid')
           setIsLoading(false)
         }
-
         return
       }
 
@@ -77,7 +71,6 @@ export function TicketDetailsPage() {
           setError('Ticket number is missing')
           setIsLoading(false)
         }
-
         return
       }
 
@@ -85,18 +78,9 @@ export function TicketDetailsPage() {
       setError(null)
 
       try {
-        const [
-          ticketResponse,
-          commentsResponse,
-        ] = await Promise.all([
-          getTicket(
-            accessToken,
-            ticketNumber,
-          ),
-          getTicketComments(
-            accessToken,
-            ticketNumber,
-          ),
+        const [ticketResponse, commentsResponse] = await Promise.all([
+          getTicket(accessToken, ticketNumber),
+          getTicketComments(accessToken, ticketNumber),
         ])
 
         if (!cancelled) {
@@ -104,16 +88,11 @@ export function TicketDetailsPage() {
           setComments(commentsResponse)
         }
       } catch (caughtError) {
-        if (cancelled) {
-          return
-        }
-
+        if (cancelled) return
         if (caughtError instanceof Error) {
           setError(caughtError.message)
         } else {
-          setError(
-            'Unable to load ticket',
-          )
+          setError('Unable to load ticket')
         }
       } finally {
         if (!cancelled) {
@@ -129,35 +108,23 @@ export function TicketDetailsPage() {
     }
   }, [accessToken, ticketNumber])
 
-  async function handleSendComment(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  async function handleSendComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     if (!accessToken || !ticketNumber) {
-      setCommentError(
-        'Your session is no longer valid',
-      )
-
+      setCommentError('Your session is no longer valid')
       return
     }
 
-    const normalizedBody =
-      commentBody.trim()
+    const normalizedBody = commentBody.trim()
 
     if (!normalizedBody) {
-      setCommentError(
-        'Please enter a message',
-      )
-
+      setCommentError('Please enter a message')
       return
     }
 
     if (normalizedBody.length > 4000) {
-      setCommentError(
-        'Message must not exceed 4000 characters',
-      )
-
+      setCommentError('Message must not exceed 4000 characters')
       return
     }
 
@@ -165,30 +132,17 @@ export function TicketDetailsPage() {
     setCommentError(null)
 
     try {
-      const response =
-        await addTicketComment(
-          accessToken,
-          ticketNumber,
-          {
-            body: normalizedBody,
-          },
-        )
+      const response = await addTicketComment(accessToken, ticketNumber, {
+        body: normalizedBody,
+      })
 
-      setComments((currentComments) => [
-        ...currentComments,
-        response,
-      ])
-
+      setComments((currentComments) => [...currentComments, response])
       setCommentBody('')
     } catch (caughtError) {
       if (caughtError instanceof Error) {
-        setCommentError(
-          caughtError.message,
-        )
+        setCommentError(caughtError.message)
       } else {
-        setCommentError(
-          'Unable to send message',
-        )
+        setCommentError('Unable to send message')
       }
     } finally {
       setIsSendingComment(false)
@@ -201,394 +155,337 @@ export function TicketDetailsPage() {
     ticket?.status === 'CANCELLED'
 
   return (
-    <main className="ticket-details-page">
-      <header className="ticket-details-header">
-        <div>
-          <p className="eyebrow">FlowDesk</p>
-
-          <h1>Ticket details</h1>
-        </div>
-
-        <button
-          type="button"
-          onClick={() =>
-            navigate('/tickets')
-          }
-        >
-          Back to my tickets
-        </button>
-      </header>
-
-      {isLoading && (
-        <p>Loading ticket...</p>
-      )}
-
-      {error && (
-        <section className="ticket-error">
-          <p
-            className="form-error"
-            role="alert"
-          >
-            {error}
-          </p>
-
-          <button
-            type="button"
-            onClick={() =>
-              navigate('/tickets')
-            }
+    <div className="ticket-details-page horizon-ticket-details-workspace">
+      {/* Header */}
+      <PageHeader
+        title="Ticket Details"
+        subtitle={
+          ticket ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontFamily: 'var(--font-family-mono)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+                {ticket.ticketNumber}
+              </span>
+              <span>&bull;</span>
+              <span>Created {formatDate(ticket.createdAt)}</span>
+            </span>
+          ) : (
+            'View ticket details and conversation thread.'
+          )
+        }
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate('/tickets')}
+            leadingIcon={<ArrowLeft size={14} />}
           >
             Back to my tickets
-          </button>
+          </Button>
+        }
+      />
+
+      {/* Loading feedback */}
+      {isLoading && (
+        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--color-text-secondary)' }}>
+          <p>Loading ticket...</p>
+        </div>
+      )}
+
+      {/* Error state */}
+      {error && (
+        <section className="ticket-error">
+          <div className="form-error horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ margin: '1.5rem 0' }}>
+            <AlertCircle size={18} className="horizon-auth-alert-icon" />
+            <span>{error}</span>
+          </div>
+
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => navigate('/tickets')}
+            leadingIcon={<ArrowLeft size={16} />}
+          >
+            Back to my tickets
+          </Button>
         </section>
       )}
 
-      {!isLoading &&
-        !error &&
-        ticket && (
-          <>
-            <article className="ticket-details-card">
-              <header>
-                <p className="ticket-number">
+      {!isLoading && !error && ticket && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Main Ticket Summary Card */}
+          <article className="ticket-details-card horizon-card" style={{ padding: '1.5rem' }}>
+            {/* Header info */}
+            <header style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid var(--color-divider)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                <p className="ticket-number" style={{ margin: 0, fontFamily: 'var(--font-family-mono)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)', fontSize: 'var(--font-size-lg)' }}>
                   {ticket.ticketNumber}
                 </p>
 
-                <h2>{ticket.title}</h2>
-
-                <div className="ticket-success-tags" style={{ marginTop: '8px' }}>
-                  <span className={`support-status support-status-${ticket.status.toLowerCase().replaceAll('_', '-')}`}>
-                    {formatLabel(ticket.status)}
-                  </span>
-                  <span className={`priority-badge priority-badge-${ticket.priority.toLowerCase()}`}>
-                    {formatLabel(ticket.priority)}
-                  </span>
-                  <span className="priority-badge priority-badge-low">
+                <div className="ticket-success-tags" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <StatusBadge status={ticket.status} size="md" />
+                  <PriorityBadge priority={ticket.priority} size="md" />
+                  <Badge variant="neutral" size="md">
                     {formatLabel(ticket.type)}
-                  </span>
+                  </Badge>
                 </div>
-              </header>
-
-              <section className="ticket-description">
-                <h3>Description</h3>
-
-                <p>
-                  {ticket.description}
-                </p>
-              </section>
-
-              <section className="ticket-details-grid">
-                <div>
-                  <strong>Ticket type</strong>
-
-                  <p>
-                    {formatLabel(
-                      ticket.type,
-                    )}
-                  </p>
-                </div>
-
-                <div>
-                  <strong>Priority</strong>
-
-                  <p>
-                    <span className={`priority-badge priority-badge-${ticket.priority.toLowerCase()}`}>
-                      {formatLabel(ticket.priority)}
-                    </span>
-                  </p>
-                </div>
-
-                <div>
-                  <strong>Status</strong>
-
-                  <p>
-                    <span className={`support-status support-status-${ticket.status.toLowerCase().replaceAll('_', '-')}`}>
-                      {formatLabel(ticket.status)}
-                    </span>
-                  </p>
-                </div>
-
-                <div>
-                  <strong>Created by</strong>
-
-                  <p>
-                    {ticket.createdByEmail}
-                  </p>
-                </div>
-
-                <div>
-                  <strong>Created</strong>
-
-                  <p>
-                    {formatDate(
-                      ticket.createdAt,
-                    )}
-                  </p>
-                </div>
-
-                <div>
-                  <strong>
-                    Last updated
-                  </strong>
-
-                  <p>
-                    {formatDate(
-                      ticket.updatedAt,
-                    )}
-                  </p>
-                </div>
-              </section>
-
-              <section className="ticket-description">
-                <h3>SLA tracking</h3>
-
-                <p>
-                  Service targets for the first support
-                  response and final resolution.
-                </p>
-
-                <div className="ticket-details-grid">
-                  <div>
-                    <strong>Response SLA</strong>
-
-                    <p>
-                      {formatSlaStatus(
-                        ticket.responseSlaStatus,
-                      )}
-                    </p>
-                  </div>
-
-                  <div>
-                    <strong>Response deadline</strong>
-
-                    <p>
-                      {formatDate(
-                        ticket.responseDueAt,
-                      )}
-                    </p>
-                  </div>
-
-                  <div>
-                    <strong>First response</strong>
-
-                    <p>
-                      {formatOptionalDate(
-                        ticket.firstRespondedAt,
-                      )}
-                    </p>
-                  </div>
-
-                  <div>
-                    <strong>Resolution SLA</strong>
-
-                    <p>
-                      {formatSlaStatus(
-                        ticket.resolutionSlaStatus,
-                      )}
-                    </p>
-                  </div>
-
-                  <div>
-                    <strong>Resolution deadline</strong>
-
-                    <p>
-                      {formatDate(
-                        ticket.resolutionDueAt,
-                      )}
-                    </p>
-                  </div>
-
-                  <div>
-                    <strong>Resolved</strong>
-
-                    <p>
-                      {formatOptionalDate(
-                        ticket.resolvedAt,
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              {ticket.resolutionSummary?.trim() && (
-                <section
-                  className="ticket-description"
-                  aria-label="Resolution summary"
-                >
-                  <h3>Resolution summary</h3>
-
-                  <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-                    {ticket.resolutionSummary}
-                  </p>
-                </section>
-              )}
-
-              {ticket.status === 'CANCELLED' && (
-                <section
-                  className="ticket-rejection-card"
-                  aria-label="Rejection details"
-                >
-                  <div className="ticket-rejection-header">
-                    <span className="support-status support-status-cancelled">
-                      Cancelled
-                    </span>
-                    <h3>Manager Rejection Reason</h3>
-                  </div>
-
-                  <p className="ticket-rejection-text">
-                    {ticket.rejectionReason?.trim()
-                      ? ticket.rejectionReason
-                      : ticket.type === 'SERVICE_REQUEST'
-                        ? 'No specific rejection reason was recorded.'
-                        : 'This ticket was cancelled.'}
-                  </p>
-                </section>
-              )}
-            </article>
-
-            <TicketAttachmentSection
-              ticketNumber={ticket.ticketNumber}
-              ticketStatus={ticket.status}
-              persona="employee"
-            />
-
-            <section className="ticket-conversation-card">
-              <header className="ticket-conversation-header">
-                <div>
-                  <p className="eyebrow">
-                    Conversation
-                  </p>
-
-                  <h2>
-                    Ticket messages
-                  </h2>
-                </div>
-
-                <span>
-                  {comments.length}{' '}
-                  {comments.length === 1
-                    ? 'message'
-                    : 'messages'}
-                </span>
-              </header>
-
-              <div className="ticket-comment-list">
-                {comments.length === 0 && (
-                  <div className="ticket-conversation-empty">
-                    <p>
-                      No messages yet.
-                    </p>
-
-                    <span>
-                      Messages between you and the
-                      support engineer will appear
-                      here.
-                    </span>
-                  </div>
-                )}
-
-                {comments.map((comment) => (
-                  <article
-                    key={comment.commentId}
-                    className="ticket-comment"
-                  >
-                    <header className="ticket-comment-header">
-                      <strong>
-                        {comment.authorName}
-                      </strong>
-
-                      <time
-                        dateTime={
-                          comment.createdAt
-                        }
-                      >
-                        {formatDate(
-                          comment.createdAt,
-                        )}
-                      </time>
-                    </header>
-
-                    <p>{comment.body}</p>
-                  </article>
-                ))}
               </div>
 
-              {isConversationReadOnly ? (
-                <div className="ticket-conversation-readonly">
-                  <strong>
-                    Conversation closed
-                  </strong>
+              <h2 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', margin: '0.75rem 0 0', color: 'var(--color-text-primary)' }}>
+                {ticket.title}
+              </h2>
+            </header>
 
-                  <p>
-                    This ticket is finished. You can
-                    still read the conversation, but
-                    new messages cannot be added.
+            {/* Description */}
+            <section className="ticket-description" style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', margin: '0 0 0.5rem' }}>
+                Description
+              </h3>
+              <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', lineHeight: 'var(--line-height-relaxed)', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {ticket.description}
+              </p>
+            </section>
+
+            {/* Metadata Grid */}
+            <section className="ticket-details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', padding: '1rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+              <div>
+                <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>Ticket type</strong>
+                <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
+                  {formatLabel(ticket.type)}
+                </p>
+              </div>
+
+              <div>
+                <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>Priority</strong>
+                <p style={{ margin: '4px 0 0' }}>
+                  <PriorityBadge priority={ticket.priority} size="sm" />
+                </p>
+              </div>
+
+              <div>
+                <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>Status</strong>
+                <p style={{ margin: '4px 0 0' }}>
+                  <StatusBadge status={ticket.status} size="sm" />
+                </p>
+              </div>
+
+              <div>
+                <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>Created by</strong>
+                <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)' }}>
+                  {ticket.createdByEmail}
+                </p>
+              </div>
+
+              <div>
+                <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>Created</strong>
+                <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                  {formatDate(ticket.createdAt)}
+                </p>
+              </div>
+
+              <div>
+                <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>Last updated</strong>
+                <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                  {formatDate(ticket.updatedAt)}
+                </p>
+              </div>
+            </section>
+
+            {/* SLA Tracking Section */}
+            <section className="ticket-description" style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--color-divider)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.75rem' }}>
+                <Clock size={16} style={{ color: 'var(--color-primary)' }} />
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)' }}>
+                  SLA tracking
+                </h3>
+              </div>
+              <p style={{ margin: '0 0 1rem', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                Service level targets for the first support response and ticket resolution.
+              </p>
+
+              <div className="ticket-details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', padding: '1rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                <div>
+                  <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>Response SLA</strong>
+                  <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: ticket.responseSlaStatus === 'BREACHED' ? 'var(--color-danger)' : ticket.responseSlaStatus === 'MET' ? 'var(--color-success)' : 'var(--color-text-primary)' }}>
+                    {formatSlaStatus(ticket.responseSlaStatus)}
                   </p>
                 </div>
-              ) : (
-                <form
-                  className="ticket-comment-form"
-                  onSubmit={
-                    handleSendComment
-                  }
-                >
-                  <label htmlFor="ticket-comment-body">
-                    Reply
-                  </label>
 
-                  <textarea
-                    id="ticket-comment-body"
-                    value={commentBody}
-                    maxLength={4000}
-                    rows={4}
-                    placeholder="Write a message to the support engineer..."
-                    disabled={
-                      isSendingComment
-                    }
-                    onChange={(event) => {
-                      setCommentBody(
-                        event.target.value,
-                      )
+                <div>
+                  <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>Response deadline</strong>
+                  <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                    {formatDate(ticket.responseDueAt)}
+                  </p>
+                </div>
 
-                      if (commentError) {
-                        setCommentError(
-                          null,
-                        )
-                      }
-                    }}
-                  />
+                <div>
+                  <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>First response</strong>
+                  <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                    {formatOptionalDate(ticket.firstRespondedAt)}
+                  </p>
+                </div>
 
-                  <div className="ticket-comment-form-footer">
-                    <span>
-                      {commentBody.length}
-                      /4000
-                    </span>
+                <div>
+                  <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>Resolution SLA</strong>
+                  <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: ticket.resolutionSlaStatus === 'BREACHED' ? 'var(--color-danger)' : ticket.resolutionSlaStatus === 'MET' ? 'var(--color-success)' : 'var(--color-text-primary)' }}>
+                    {formatSlaStatus(ticket.resolutionSlaStatus)}
+                  </p>
+                </div>
 
-                    <button
-                      type="submit"
-                      disabled={
-                        isSendingComment ||
-                        !commentBody.trim()
-                      }
-                    >
-                      {isSendingComment
-                        ? 'Sending...'
-                        : 'Send message'}
-                    </button>
-                  </div>
+                <div>
+                  <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>Resolution deadline</strong>
+                  <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                    {formatDate(ticket.resolutionDueAt)}
+                  </p>
+                </div>
 
-                  {commentError && (
-                    <p
-                      className="form-error"
-                      role="alert"
-                    >
-                      {commentError}
-                    </p>
-                  )}
-                </form>
-              )}
+                <div>
+                  <strong style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block' }}>Resolved</strong>
+                  <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                    {formatOptionalDate(ticket.resolvedAt)}
+                  </p>
+                </div>
+              </div>
             </section>
-          </>
-        )}
-    </main>
+
+            {/* Resolution Summary (when resolved) */}
+            {ticket.resolutionSummary?.trim() && (
+              <section className="ticket-description" aria-label="Resolution summary" style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', background: 'var(--color-success-subtle)', border: '1px solid var(--color-success-border)', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  <CheckCircle2 size={16} style={{ color: 'var(--color-success)' }} />
+                  <h3 style={{ margin: 0, fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-success)' }}>
+                    Resolution summary
+                  </h3>
+                </div>
+                <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {ticket.resolutionSummary}
+                </p>
+              </section>
+            )}
+
+            {/* Cancellation Reason (when cancelled) */}
+            {ticket.status === 'CANCELLED' && (
+              <section className="ticket-rejection-card" aria-label="Rejection details" style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', background: 'var(--color-danger-subtle)', border: '1px solid var(--color-danger-border)', borderRadius: 'var(--radius-md)' }}>
+                <div className="ticket-rejection-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <XCircle size={16} style={{ color: 'var(--color-danger)' }} />
+                  <h3 style={{ margin: 0, fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-danger)' }}>
+                    Rejection / Cancellation Reason
+                  </h3>
+                </div>
+                <p className="ticket-rejection-text" style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)' }}>
+                  {ticket.rejectionReason?.trim()
+                    ? ticket.rejectionReason
+                    : ticket.type === 'SERVICE_REQUEST'
+                    ? 'No specific rejection reason was recorded.'
+                    : 'This ticket was cancelled.'}
+                </p>
+              </section>
+            )}
+          </article>
+
+          {/* Attachments Section */}
+          <TicketAttachmentSection
+            ticketNumber={ticket.ticketNumber}
+            ticketStatus={ticket.status}
+            persona="employee"
+          />
+
+          {/* Conversation Thread */}
+          <section className="ticket-conversation-card horizon-card" style={{ padding: '1.5rem' }}>
+            <header className="ticket-conversation-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--color-divider)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MessageSquare size={18} style={{ color: 'var(--color-primary)' }} />
+                <h2 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>
+                  Ticket messages
+                </h2>
+              </div>
+
+              <Badge variant="neutral" size="sm">
+                {comments.length} {comments.length === 1 ? 'message' : 'messages'}
+              </Badge>
+            </header>
+
+            <div className="ticket-comment-list" style={{ marginBottom: '1.5rem' }}>
+              {comments.length === 0 ? (
+                <div className="ticket-conversation-empty" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--color-text-secondary)', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--color-border)' }}>
+                  <p style={{ margin: '0 0 4px', fontWeight: 'var(--font-weight-medium)' }}>No messages yet.</p>
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                    Messages between you and the support engineer will appear here.
+                  </span>
+                </div>
+              ) : (
+                <Timeline>
+                  {comments.map((comment) => (
+                    <TimelineItem
+                      key={comment.commentId}
+                      authorName={comment.authorName}
+                      timestamp={formatDate(comment.createdAt)}
+                      avatar={<UserAvatar email={comment.authorName} size="sm" />}
+                    >
+                      {comment.body}
+                    </TimelineItem>
+                  ))}
+                </Timeline>
+              )}
+            </div>
+
+            {/* Conversation Status: Read-Only or Active Composer */}
+            {isConversationReadOnly ? (
+              <div className="ticket-conversation-readonly" style={{ padding: '1rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', textAlign: 'center' }}>
+                <strong style={{ display: 'block', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
+                  Conversation closed
+                </strong>
+                <p style={{ margin: 0, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                  This ticket has concluded. You can still read the discussion, but additional messages cannot be posted.
+                </p>
+              </div>
+            ) : (
+              <form className="ticket-comment-form horizon-auth-form" onSubmit={handleSendComment}>
+                <div className="horizon-form-field">
+                  <label htmlFor="ticket-comment-body" className="horizon-label">
+                    Reply to support
+                  </label>
+                  <div className="horizon-input-wrapper">
+                    <textarea
+                      id="ticket-comment-body"
+                      className="horizon-textarea"
+                      value={commentBody}
+                      maxLength={4000}
+                      rows={4}
+                      placeholder="Write a message or provide additional troubleshooting info..."
+                      disabled={isSendingComment}
+                      onChange={(event) => {
+                        setCommentBody(event.target.value)
+                        if (commentError) setCommentError(null)
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="ticket-comment-form-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginTop: '0.5rem' }}>
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                    {commentBody.length}/4000
+                  </span>
+
+                  <button
+                    type="submit"
+                    className="horizon-btn horizon-btn--primary horizon-btn--md"
+                    disabled={isSendingComment || !commentBody.trim()}
+                  >
+                    {isSendingComment ? 'Sending...' : 'Send message'}
+                  </button>
+                </div>
+
+                {commentError && (
+                  <div className="form-error horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ marginTop: '0.75rem' }}>
+                    <AlertCircle size={16} className="horizon-auth-alert-icon" />
+                    <span>{commentError}</span>
+                  </div>
+                )}
+              </form>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
   )
 }

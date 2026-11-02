@@ -8,10 +8,21 @@ import {
   useNavigate,
   useSearchParams,
 } from 'react-router-dom'
+import {
+  Layers,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  AlertCircle,
+  CheckCircle2,
+} from 'lucide-react'
+
 import { acceptInvitation, getGoogleOAuthConfig } from '../api/auth'
 import { useAuth } from '../auth/useAuth'
 import type { GoogleOAuthConfigResponse } from '../types/auth'
 import { generateCodeChallenge, generateRandomString } from '../utils/pkce'
+import { ThemeSwitcher } from '../components/ui/ThemeSwitcher'
 
 export function AcceptInvitationPage() {
   const { signOut } = useAuth()
@@ -55,23 +66,38 @@ export function AcceptInvitationPage() {
 
   if (!token) {
     return (
-      <main className="login-page">
-        <section className="login-card" aria-labelledby="invitation-error-heading">
-          <div className="login-heading">
-            <p className="eyebrow">FlowDesk</p>
+      <main className="login-page horizon-auth-page">
+        <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem' }}>
+          <ThemeSwitcher variant="toggle" />
+        </div>
+
+        <section className="login-card horizon-auth-card" aria-labelledby="invitation-error-heading">
+          <div className="horizon-auth-brand-row">
+            <div className="horizon-auth-brand-icon" aria-hidden="true">
+              <Layers size={20} />
+            </div>
+            <span className="horizon-auth-brand-name eyebrow">FlowDesk</span>
+            <span className="horizon-auth-badge">Horizon</span>
+          </div>
+
+          <div className="login-heading horizon-auth-heading">
             <h1 id="invitation-error-heading">Invalid invitation link</h1>
-            <p>
+            <p className="horizon-auth-subtitle">
               This account activation link is invalid, incomplete, or has expired.
             </p>
           </div>
 
-          <p className="form-error" role="alert">
-            Please make sure you clicked or copied the complete invitation link from your email, or contact your administrator to resend the invitation.
-          </p>
+          <div className="form-error horizon-auth-alert horizon-auth-alert--error" role="alert">
+            <AlertCircle size={18} className="horizon-auth-alert-icon" />
+            <span>
+              Please make sure you clicked or copied the complete invitation link from your email, or contact your administrator to resend the invitation.
+            </span>
+          </div>
 
           <div className="login-secondary-actions" style={{ marginTop: '1.5rem' }}>
-            <Link to="/login" className="back-to-login-link">
-              &larr; Return to sign in
+            <Link to="/login" className="back-to-login-link horizon-btn horizon-btn--secondary horizon-btn--md horizon-btn--full-width">
+              <ArrowLeft size={16} />
+              <span>Return to sign in</span>
             </Link>
           </div>
         </section>
@@ -157,24 +183,38 @@ export function AcceptInvitationPage() {
   }
 
   return (
-    <main className="login-page">
-      <section className="login-card" aria-labelledby="invitation-heading">
-        <div className="login-heading">
-          <p className="eyebrow">FlowDesk</p>
+    <main className="login-page horizon-auth-page">
+      <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem' }}>
+        <ThemeSwitcher variant="toggle" />
+      </div>
+
+      <section className="login-card horizon-auth-card" aria-labelledby="invitation-heading">
+        <div className="horizon-auth-brand-row">
+          <div className="horizon-auth-brand-icon" aria-hidden="true">
+            <Layers size={20} />
+          </div>
+          <span className="horizon-auth-brand-name eyebrow">FlowDesk</span>
+          <span className="horizon-auth-badge">Horizon</span>
+        </div>
+
+        <div className="login-heading horizon-auth-heading">
           <h1 id="invitation-heading">Set up your account</h1>
-          <p>
+          <p className="horizon-auth-subtitle">
             Welcome to FlowDesk. Please choose a secure password to activate your account.
           </p>
         </div>
 
         {isSuccess ? (
           <div className="reset-success-block" role="status">
-            <p className="form-success">
-              Account activated successfully! Redirecting you to sign in...
-            </p>
+            <div className="form-success horizon-auth-alert horizon-auth-alert--success">
+              <CheckCircle2 size={18} className="horizon-auth-alert-icon" />
+              <span>
+                Account activated successfully! Redirecting you to sign in...
+              </span>
+            </div>
             <div className="login-secondary-actions" style={{ marginTop: '1.5rem' }}>
-              <Link to="/login" className="back-to-login-link">
-                Sign in now &rarr;
+              <Link to="/login" className="back-to-login-link horizon-btn horizon-btn--primary horizon-btn--md horizon-btn--full-width">
+                <span>Sign in now &rarr;</span>
               </Link>
             </div>
           </div>
@@ -184,7 +224,7 @@ export function AcceptInvitationPage() {
               <div style={{ marginBottom: '1.5rem' }}>
                 <button
                   type="button"
-                  className="google-button"
+                  className="google-button horizon-auth-google-btn"
                   onClick={handleGoogleActivate}
                   disabled={isSubmitting}
                 >
@@ -194,6 +234,7 @@ export function AcceptInvitationPage() {
                     width="18"
                     height="18"
                     xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
                   >
                     <path
                       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -214,20 +255,26 @@ export function AcceptInvitationPage() {
                   </svg>
                   <span>Activate with Google</span>
                 </button>
-                <div className="auth-divider">
+                <div className="auth-divider horizon-auth-divider">
                   <span>or set a FlowDesk password</span>
                 </div>
               </div>
             )}
 
-            <form className="login-form" onSubmit={handleSubmit} noValidate>
-              <label htmlFor="accept-new-password">
-                New password
-                <div className="password-input-wrapper">
+            <form className="login-form horizon-auth-form" onSubmit={handleSubmit} noValidate>
+              <div className="horizon-form-field">
+                <label htmlFor="accept-new-password" className="horizon-label">
+                  New password
+                </label>
+                <div className="password-input-wrapper horizon-auth-input-wrapper">
+                  <span className="horizon-auth-input-icon" aria-hidden="true">
+                    <Lock size={16} />
+                  </span>
                   <input
                     id="accept-new-password"
                     name="newPassword"
                     type={showPassword ? 'text' : 'password'}
+                    className="horizon-auth-input horizon-auth-input-with-icon"
                     autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
@@ -239,24 +286,33 @@ export function AcceptInvitationPage() {
                   />
                   <button
                     type="button"
-                    className="password-toggle-btn"
+                    className="password-toggle-btn horizon-auth-password-toggle"
                     onClick={() => setShowPassword(!showPassword)}
                     tabIndex={-1}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? 'Hide' : 'Show'}
+                    {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                    <span style={{ marginLeft: '4px' }}>{showPassword ? 'Hide' : 'Show'}</span>
                   </button>
                 </div>
-                <span className="field-hint">Must be between 8 and 72 characters</span>
-              </label>
+                <span className="field-hint horizon-form-helper" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                  Must be between 8 and 72 characters
+                </span>
+              </div>
 
-              <label htmlFor="accept-confirm-password">
-                Confirm new password
-                <div className="password-input-wrapper">
+              <div className="horizon-form-field">
+                <label htmlFor="accept-confirm-password" className="horizon-label">
+                  Confirm new password
+                </label>
+                <div className="password-input-wrapper horizon-auth-input-wrapper">
+                  <span className="horizon-auth-input-icon" aria-hidden="true">
+                    <Lock size={16} />
+                  </span>
                   <input
                     id="accept-confirm-password"
                     name="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
+                    className="horizon-auth-input horizon-auth-input-with-icon"
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -268,38 +324,46 @@ export function AcceptInvitationPage() {
                   />
                   <button
                     type="button"
-                    className="password-toggle-btn"
+                    className="password-toggle-btn horizon-auth-password-toggle"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     tabIndex={-1}
                     aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showConfirmPassword ? 'Hide' : 'Show'}
+                    {showConfirmPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                    <span style={{ marginLeft: '4px' }}>{showConfirmPassword ? 'Hide' : 'Show'}</span>
                   </button>
                 </div>
-              </label>
+              </div>
 
               {error && (
-                <p className="form-error" role="alert">
-                  {error}
-                </p>
+                <div className="form-error horizon-auth-alert horizon-auth-alert--error" role="alert">
+                  <AlertCircle size={18} className="horizon-auth-alert-icon" />
+                  <span>{error}</span>
+                </div>
               )}
 
               <button
                 type="submit"
+                className="horizon-btn horizon-btn--primary horizon-btn--md horizon-btn--full-width"
                 disabled={isSubmitting}
                 style={{ marginTop: '0.5rem' }}
               >
                 {isSubmitting ? 'Activating account...' : 'Activate account'}
               </button>
 
-              <div className="login-secondary-actions" style={{ textAlign: 'center' }}>
-                <Link to="/login" className="back-to-login-link">
-                  &larr; Already have a password? Sign in
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <Link to="/login" className="back-to-login-link horizon-auth-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <ArrowLeft size={14} />
+                  <span>Already have a password? Sign in</span>
                 </Link>
               </div>
             </form>
           </div>
         )}
+
+        <div className="horizon-auth-footer">
+          <p>FlowDesk Horizon &bull; Account Activation</p>
+        </div>
       </section>
     </main>
   )
