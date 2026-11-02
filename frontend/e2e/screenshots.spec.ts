@@ -1482,4 +1482,43 @@ test.describe('Horizon Visual Screenshots Suite', () => {
       fullPage: false,
     })
   })
+
+  test('20: Profile and Account Settings Desktop and Dark Mode', async ({ page }) => {
+    await setupApiMocks(page, MOCK_EMPLOYEE)
+    const token = createMockToken(MOCK_EMPLOYEE)
+    await page.addInitScript((t) => {
+      sessionStorage.setItem('flowdesk_access_token', t)
+      localStorage.setItem('flowdesk_theme', 'light')
+    }, token)
+
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/profile')
+    await expect(page.getByRole('heading', { name: /my profile/i })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, '20a-user-profile-desktop.png'),
+      fullPage: false,
+    })
+
+    await page.goto('/account')
+    await expect(page.getByRole('heading', { name: /account settings/i })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, '20b-account-settings-desktop.png'),
+      fullPage: false,
+    })
+
+    // Dark mode
+    await page.evaluate(() => {
+      localStorage.setItem('flowdesk_theme', 'dark')
+      document.documentElement.setAttribute('data-theme', 'dark')
+      document.documentElement.classList.remove('theme-light')
+      document.documentElement.classList.add('theme-dark')
+    })
+    await page.waitForTimeout(400)
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, '20c-account-settings-dark.png'),
+      fullPage: false,
+    })
+  })
 })
