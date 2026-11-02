@@ -135,9 +135,9 @@ test.describe('Real-Stack Live: Attachments & Session Continuity', () => {
       },
     })
     expect(refreshRes.status).toBe(200)
-    const refreshData = (await refreshRes.json()) as { accessToken: string; userEmail: string }
+    const refreshData = (await refreshRes.json()) as { accessToken: string; email: string }
     expect(refreshData.accessToken).toBeTruthy()
-    expect(refreshData.userEmail).toBe(E2E_EMPLOYEE_A.email)
+    expect(refreshData.email).toBe(E2E_EMPLOYEE_A.email)
 
     // Verify cookie was rotated
     const rotatedCookie = refreshRes.headers.get('set-cookie') || ''
