@@ -189,48 +189,53 @@ class TicketTest {
     }
 
     @Test
-    void priorityChangeIsRejectedAfterSupportWorkStarts() {
-        Ticket ticket =
-                createTicket();
-
-        ticket.applySlaPolicy(
-                createMediumSlaPolicy(),
-                OffsetDateTime.parse(
-                        "2026-10-13T04:00:00Z"
-                )
-        );
-
+    void priorityChangeAllowedWhileInProgressAndWaitingForUser() {
+        Ticket ticket = createTicket();
+        OffsetDateTime originalSlaStart = OffsetDateTime.parse("2026-10-13T04:00:00Z");
+        ticket.applySlaPolicy(createMediumSlaPolicy(), originalSlaStart);
         ticket.markAssigned();
+        ticket.transitionSupportStatus(TicketStatus.IN_PROGRESS);
 
-        ticket.transitionSupportStatus(
-                TicketStatus.IN_PROGRESS
+        SlaPolicy highPolicy = new SlaPolicy(TicketPriority.HIGH, 30, 480);
+        ticket.applyPriorityAndRecalculateSla(TicketPriority.HIGH, highPolicy);
+
+        assertEquals(TicketPriority.HIGH, ticket.getPriority());
+        assertEquals(originalSlaStart.plusMinutes(480), ticket.getResolutionDueAt());
+
+        ticket.transitionSupportStatus(TicketStatus.WAITING_FOR_USER);
+        SlaPolicy mediumPolicy = createMediumSlaPolicy();
+        ticket.applyPriorityAndRecalculateSla(TicketPriority.MEDIUM, mediumPolicy);
+
+        assertEquals(TicketPriority.MEDIUM, ticket.getPriority());
+        assertEquals(originalSlaStart.plusMinutes(mediumPolicy.getResolutionMinutes()), ticket.getResolutionDueAt());
+    }
+
+    @Test
+    void priorityChangeRejectedInNonOperationalStates() {
+        Ticket ticket = createTicket();
+        SlaPolicy highPolicy = new SlaPolicy(TicketPriority.HIGH, 30, 480);
+
+        IllegalStateException ex1 = assertThrows(
+                IllegalStateException.class,
+                () -> ticket.applyPriorityAndRecalculateSla(TicketPriority.HIGH, highPolicy)
+        );
+        assertEquals(
+                "Ticket priority can only be changed while operationally active (ASSIGNED, IN_PROGRESS, or WAITING_FOR_USER)",
+                ex1.getMessage()
         );
 
-        SlaPolicy highPolicy =
-                new SlaPolicy(
-                        TicketPriority.HIGH,
-                        30,
-                        480
-                );
+        ticket.applySlaPolicy(createMediumSlaPolicy(), OffsetDateTime.parse("2026-10-13T04:00:00Z"));
+        ticket.markAssigned();
+        ticket.transitionSupportStatus(TicketStatus.IN_PROGRESS);
+        ticket.resolve("Fixed");
 
-        IllegalStateException exception =
-                assertThrows(
-                        IllegalStateException.class,
-                        () ->
-                                ticket.applyPriorityAndRecalculateSla(
-                                        TicketPriority.HIGH,
-                                        highPolicy
-                                )
-                );
-
-        assertEquals(
-                "Ticket priority can only be changed while assigned",
-                exception.getMessage()
+        IllegalStateException ex2 = assertThrows(
+                IllegalStateException.class,
+                () -> ticket.applyPriorityAndRecalculateSla(TicketPriority.HIGH, highPolicy)
         );
-
         assertEquals(
-                TicketPriority.MEDIUM,
-                ticket.getPriority()
+                "Ticket priority can only be changed while operationally active (ASSIGNED, IN_PROGRESS, or WAITING_FOR_USER)",
+                ex2.getMessage()
         );
     }
 

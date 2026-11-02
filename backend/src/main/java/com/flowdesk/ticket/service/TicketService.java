@@ -226,7 +226,8 @@ public class TicketService {
     public static String computeRequestHash(CreateTicketRequest request) {
         String normalized = (request.type() != null ? request.type().name() : "")
                 + "|" + (request.title() != null ? request.title().trim() : "")
-                + "|" + (request.description() != null ? request.description().trim() : "");
+                + "|" + (request.description() != null ? request.description().trim() : "")
+                + "|" + (request.priority() != null ? request.priority().name() : "");
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hashBytes = digest.digest(normalized.getBytes(StandardCharsets.UTF_8));
@@ -269,13 +270,20 @@ public class TicketService {
                         sequenceValue
                 );
 
+        TicketPriority initialPriority =
+                determineInitialPriority(
+                        creator,
+                        request.priority()
+                );
+
         Ticket ticket =
                 new Ticket(
                         ticketNumber,
                         request.type(),
                         request.title().trim(),
                         request.description().trim(),
-                        creator
+                        creator,
+                        initialPriority
                 );
 
         if (ticket.getType()
@@ -370,6 +378,23 @@ public class TicketService {
                         ticket,
                         requester
                 );
+    }
+
+    private TicketPriority determineInitialPriority(User creator, TicketPriority requestedPriority) {
+        if (requestedPriority == null) {
+            return TicketPriority.MEDIUM;
+        }
+        boolean isPrivilegedStaff = creator.getRoles().stream()
+                .anyMatch(r -> r.getCode() == RoleCode.SUPPORT_ENGINEER
+                        || r.getCode() == RoleCode.TEAM_LEAD
+                        || r.getCode() == RoleCode.ADMIN);
+        if (!isPrivilegedStaff && requestedPriority == TicketPriority.CRITICAL) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Requesters may only submit LOW, MEDIUM, or HIGH urgency. CRITICAL priority requires staff escalation."
+            );
+        }
+        return requestedPriority;
     }
 
     private void applyActiveSlaPolicy(

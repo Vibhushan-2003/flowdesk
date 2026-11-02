@@ -11,6 +11,7 @@ import com.flowdesk.ticket.dto.ResolveTicketRequest;
 import com.flowdesk.ticket.dto.SupportTicketResponse;
 import com.flowdesk.ticket.dto.SupportTicketSummaryResponse;
 import com.flowdesk.ticket.dto.TicketCommentResponse;
+import com.flowdesk.ticket.dto.UpdateTicketPriorityRequest;
 import com.flowdesk.ticket.dto.UpdateTicketStatusRequest;
 
 import com.flowdesk.ticket.service.SupportTicketService;
@@ -171,6 +172,27 @@ public class SupportTicketController {
                 supportTicketService.getMyAssignedTicket(
                         authenticatedUserId,
                         ticketNumber
+                );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{ticketNumber}/priority")
+    public ResponseEntity<SupportTicketResponse>
+            updatePriority(
+                    @AuthenticationPrincipal Jwt jwt,
+                    @PathVariable String ticketNumber,
+                    @Valid @RequestBody UpdateTicketPriorityRequest request
+            ) {
+
+        UUID authenticatedUserId =
+                UUID.fromString(jwt.getSubject());
+
+        SupportTicketResponse response =
+                supportTicketService.updatePriority(
+                        authenticatedUserId,
+                        ticketNumber,
+                        request
                 );
 
         return ResponseEntity.ok(response);

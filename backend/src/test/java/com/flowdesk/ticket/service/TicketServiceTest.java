@@ -1466,4 +1466,85 @@ class TicketServiceTest {
                 auditService
         );
     }
+    @Test
+    void createTicketRejectsEmployeeCriticalPriorityWithBadRequest() {
+        CreateTicketRequest request = new CreateTicketRequest(
+                TicketType.INCIDENT,
+                "Outage",
+                "Entire office internet is down",
+                TicketPriority.CRITICAL
+        );
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(creator));
+        when(creator.getRoles()).thenReturn(Set.of(new Role(RoleCode.EMPLOYEE, "Employee")));
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> ticketService.createTicket(userId, request)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Requesters may only submit LOW, MEDIUM, or HIGH urgency. CRITICAL priority requires staff escalation.", exception.getReason());
+    }
+
+    @Test
+    void createTicketAllowsEmployeeLowMediumHighPriorities() {
+        when(userRepository.findById(userId)).thenReturn(Optional.of(creator));
+        when(creator.getId()).thenReturn(userId);
+        when(creator.getEmail()).thenReturn("employee@example.com");
+        when(creator.getRoles()).thenReturn(Set.of(new Role(RoleCode.EMPLOYEE, "Employee")));
+        when(ticketRepository.getNextTicketNumberSequenceValue()).thenReturn(20L);
+
+        SlaPolicy lowSlaPolicy = mock(SlaPolicy.class);
+        when(lowSlaPolicy.isActive()).thenReturn(true);
+        when(lowSlaPolicy.getPriority()).thenReturn(TicketPriority.LOW);
+        when(lowSlaPolicy.getResponseMinutes()).thenReturn(120);
+        when(lowSlaPolicy.getResolutionMinutes()).thenReturn(2880);
+        when(slaPolicyRepository.findByPriorityAndActiveTrue(TicketPriority.LOW))
+                .thenReturn(Optional.of(lowSlaPolicy));
+
+        when(ticketRepository.saveAndFlush(any(Ticket.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateTicketRequest request = new CreateTicketRequest(
+                TicketType.INCIDENT,
+                "Low issue",
+                "Minor formatting issue",
+                TicketPriority.LOW
+        );
+
+        TicketResponse response = ticketService.createTicket(userId, request);
+        assertEquals(TicketPriority.LOW, response.priority());
+    }
+
+    @Test
+    void createTicketPreservesStaffCriticalPriority() {
+        CreateTicketRequest request = new CreateTicketRequest(
+                TicketType.INCIDENT,
+                "Critical Infrastructure Outage",
+                "Core router offline",
+                TicketPriority.CRITICAL
+        );
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(creator));
+        when(creator.getId()).thenReturn(userId);
+        when(creator.getEmail()).thenReturn("lead@example.com");
+        when(creator.getRoles()).thenReturn(Set.of(new Role(RoleCode.TEAM_LEAD, "Team Lead")));
+        when(ticketRepository.getNextTicketNumberSequenceValue()).thenReturn(11L);
+
+        SlaPolicy criticalSlaPolicy = mock(SlaPolicy.class);
+        when(criticalSlaPolicy.isActive()).thenReturn(true);
+        when(criticalSlaPolicy.getPriority()).thenReturn(TicketPriority.CRITICAL);
+        when(criticalSlaPolicy.getResponseMinutes()).thenReturn(15);
+        when(criticalSlaPolicy.getResolutionMinutes()).thenReturn(120);
+        when(slaPolicyRepository.findByPriorityAndActiveTrue(TicketPriority.CRITICAL))
+                .thenReturn(Optional.of(criticalSlaPolicy));
+
+        when(ticketRepository.saveAndFlush(any(Ticket.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        TicketResponse response = ticketService.createTicket(userId, request);
+
+        assertEquals(TicketPriority.CRITICAL, response.priority());
+    }
 }

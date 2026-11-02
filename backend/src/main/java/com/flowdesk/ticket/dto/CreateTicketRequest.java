@@ -1,5 +1,6 @@
 package com.flowdesk.ticket.dto;
 
+import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketType;
 
 import jakarta.validation.constraints.NotBlank;
@@ -17,7 +18,17 @@ public record CreateTicketRequest(
 
         @NotBlank(message = "Description is required")
         @Size(max = 5000, message = "Description must not exceed 5000 characters")
-        String description
+        String description,
+
+        TicketPriority priority
 
 ) {
+
+    public CreateTicketRequest(
+            TicketType type,
+            String title,
+            String description
+    ) {
+        this(type, title, description, null);
+    }
 }

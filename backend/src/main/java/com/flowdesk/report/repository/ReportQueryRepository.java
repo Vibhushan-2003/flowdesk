@@ -61,6 +61,16 @@ public interface ReportQueryRepository extends JpaRepository<Ticket, UUID> {
     );
 
     @Query(value = """
+            SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)))
+            FROM tickets t
+            WHERE t.resolved_at >= :start AND t.resolved_at < :end
+            """, nativeQuery = true)
+    Double getOverallMedianResolutionDurationSeconds(
+            @Param("start") OffsetDateTime start,
+            @Param("end") OffsetDateTime end
+    );
+
+    @Query(value = """
             SELECT t.priority AS priority, COUNT(t.id) AS count
             FROM tickets t
             WHERE t.created_at >= :start AND t.created_at < :end
@@ -144,7 +154,7 @@ public interface ReportQueryRepository extends JpaRepository<Ticket, UUID> {
             SELECT u.id AS userId, u.first_name AS firstName, u.last_name AS lastName, u.email AS email,
                    COUNT(DISTINCT CASE WHEN ta.released_at IS NULL THEN ta.id END) AS activeAssigned,
                    COUNT(DISTINCT CASE WHEN ta.assigned_at >= :start AND ta.assigned_at < :end THEN ta.id END) AS assignedInPeriod,
-                   COUNT(DISTINCT CASE WHEN t.status IN ('RESOLVED', 'CLOSED') AND t.resolved_at >= :start AND t.resolved_at < :end AND ta.released_at IS NOT NULL THEN t.id END) AS resolvedInPeriod
+                   COUNT(DISTINCT CASE WHEN t.status IN ('RESOLVED', 'CLOSED') AND t.resolved_at >= :start AND t.resolved_at < :end AND ta.assigned_at <= t.resolved_at AND (ta.released_at >= t.resolved_at OR ta.released_at IS NULL) THEN t.id END) AS resolvedInPeriod
             FROM users u
             JOIN user_roles ur ON u.id = ur.user_id
             JOIN roles r ON ur.role_id = r.id AND r.code = 'SUPPORT_ENGINEER'

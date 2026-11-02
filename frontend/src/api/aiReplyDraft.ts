@@ -67,7 +67,7 @@ export async function generateAiReplyDraft(
 
     if (response.status === 503) {
       throw new AiReplyDraftApiError(
-        'AI reply drafting is temporarily unavailable. No message was sent.',
+        'AI reply drafting is temporarily unavailable. You can compose your reply directly in the message box.',
         response.status,
       )
     }

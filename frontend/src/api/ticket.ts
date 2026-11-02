@@ -15,6 +15,7 @@ import type {
   TicketResponse,
   TicketStatus,
   TicketSummary,
+  UpdateTicketPriorityRequest,
   UpdateTicketStatusRequest,
 } from '../types/ticket'
 
@@ -628,6 +629,57 @@ export async function addSupportTicketComment(
   return response.json() as Promise<
     TicketCommentResponse
   >
+}
+
+export async function updateSupportTicketPriority(
+  accessToken: string,
+  ticketNumber: string,
+  priority: TicketPriority,
+): Promise<SupportTicketResponse> {
+  const request: UpdateTicketPriorityRequest = {
+    priority,
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/support/tickets/${encodeURIComponent(
+      ticketNumber,
+    )}/priority`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(request),
+    },
+  )
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      notifySessionExpired()
+      throw new Error('Your session is no longer valid')
+    }
+
+    if (response.status === 403) {
+      throw new Error('You do not have permission to update ticket priority')
+    }
+
+    if (response.status === 404) {
+      throw new Error('Ticket not found or it is no longer assigned to you')
+    }
+
+    if (response.status === 409) {
+      const errorData = await response.json().catch(() => null)
+      throw new Error(
+        errorData?.message ||
+          'Ticket priority can only be changed while assigned and before an SLA breach is recorded',
+      )
+    }
+
+    throw new Error('Unable to update ticket priority. Please try again.')
+  }
+
+  return response.json() as Promise<SupportTicketResponse>
 }
 
 export async function updateSupportTicketStatus(

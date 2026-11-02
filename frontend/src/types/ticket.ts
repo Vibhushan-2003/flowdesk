@@ -124,6 +124,10 @@ export interface SupportTicketResponse {
   resolutionSlaStatus: SlaStatus
 }
 
+export interface UpdateTicketPriorityRequest {
+  priority: TicketPriority
+}
+
 export interface UpdateTicketStatusRequest {
   status: TicketStatus
 }
