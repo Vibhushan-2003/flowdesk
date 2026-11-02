@@ -60,20 +60,20 @@ export function TicketDeflectionCard({
     return (
       <div
         className="kb-deflection-card"
-        style={{ backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }}
+        style={{ backgroundColor: 'var(--color-success-subtle)', borderColor: 'var(--color-success-border)' }}
         role="region"
         aria-label="Issue resolved confirmation"
       >
-        <div className="kb-deflection-header" style={{ color: '#065f46' }}>
+        <div className="kb-deflection-header" style={{ color: 'var(--color-success-text)' }}>
           <span>🎉 Great! We are glad a Knowledge Base guide solved your issue.</span>
         </div>
-        <p style={{ margin: '0.25rem 0 0.5rem 0', fontSize: '0.875rem', color: '#047857' }}>
+        <p style={{ margin: '0.25rem 0 0.5rem 0', fontSize: '0.875rem', color: 'var(--color-success-text)' }}>
           No ticket was submitted. You can safely return to the dashboard.
         </p>
         <button
           type="button"
           className="kb-deflection-solved-btn"
-          style={{ backgroundColor: '#059669', marginTop: '0.5rem' }}
+          style={{ backgroundColor: 'var(--color-success)', color: '#ffffff', marginTop: '0.5rem' }}
           onClick={() => {
             sessionStorage.removeItem('flowdesk_ticket_draft')
             if (onDeflected) {

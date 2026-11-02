@@ -151,9 +151,13 @@ export function AiWorkbench({
               className="horizon-btn horizon-btn--primary horizon-btn--sm"
               style={{ width: '100%', marginTop: '4px' }}
               onClick={onGenerateReplyDraft}
-              disabled={isGeneratingReplyDraft}
+              disabled={isGeneratingReplyDraft || ticketStatus === 'RESOLVED' || ticketStatus === 'CLOSED' || ticketStatus === 'CANCELLED'}
             >
-              {isGeneratingReplyDraft ? 'Generating Draft...' : 'Generate AI Reply Draft'}
+              {isGeneratingReplyDraft
+                ? 'Generating Draft...'
+                : ticketStatus === 'RESOLVED' || ticketStatus === 'CLOSED' || ticketStatus === 'CANCELLED'
+                ? 'Ticket Finalized (Drafts Unavailable)'
+                : 'Generate AI Reply Draft'}
             </button>
           </div>
         )}
@@ -198,6 +202,25 @@ export function AiWorkbench({
             </button>
           </div>
         )}
+
+        {/* Human-in-the-Loop Advisory Disclaimer */}
+        <div
+          className="horizon-ai-advisory"
+          style={{
+            marginTop: '1rem',
+            padding: '0.5rem 0.75rem',
+            background: 'var(--color-surface-subtle)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+            🛡️ <strong>Human-in-the-Loop:</strong> AI recommendations and drafts are assistive suggestions. Support engineers retain full operational authority and must review all outputs before applying or sending.
+          </span>
+        </div>
       </div>
     </div>
   )

@@ -24,6 +24,7 @@ import {
   getSupportTicket,
   getSupportTicketComments,
   resolveSupportTicket,
+  updateSupportTicketPriority,
   updateSupportTicketStatus,
 } from '../api/ticket'
 import { useAuth } from '../auth/useAuth'
@@ -42,6 +43,7 @@ import { Modal } from '../components/ui/Modal'
 import type {
   SupportTicketResponse,
   TicketCommentResponse,
+  TicketPriority,
   TicketStatus,
 } from '../types/ticket'
 import {
@@ -75,6 +77,7 @@ export function SupportTicketDetailsPage() {
 
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isUpdatingPriority, setIsUpdatingPriority] = useState(false)
   const [isResolving, setIsResolving] = useState(false)
   const [isSendingComment, setIsSendingComment] = useState(false)
 
@@ -160,6 +163,25 @@ export function SupportTicketDetailsPage() {
     setSuccessMessage(`AI recommendation applied. Ticket priority is now ${refreshedTicket.priority}.`)
   }
 
+  async function handlePriorityChange(nextPriority: TicketPriority) {
+    if (!accessToken || !ticketNumber || !ticket) return
+    if (nextPriority === ticket.priority) return
+
+    setIsUpdatingPriority(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const response = await updateSupportTicketPriority(accessToken, ticketNumber, nextPriority)
+      setTicket(response)
+      setSuccessMessage(`Priority updated to ${formatLabel(nextPriority)}. SLA deadlines recalculated from original ticket creation.`)
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to update ticket priority')
+    } finally {
+      setIsUpdatingPriority(false)
+    }
+  }
+
   async function handleStatusChange(nextStatus: TicketStatus) {
     if (!accessToken || !ticketNumber) {
       setError('Your session is no longer valid')
@@ -186,6 +208,11 @@ export function SupportTicketDetailsPage() {
   async function handleGenerateAiReplyDraft() {
     if (!accessToken || !ticketNumber) {
       setAiReplyDraftError('Your session is no longer valid')
+      return
+    }
+
+    if (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED' || ticket?.status === 'CANCELLED') {
+      setAiReplyDraftError('AI reply drafts cannot be generated for this finished ticket')
       return
     }
 
@@ -407,7 +434,27 @@ export function SupportTicketDetailsPage() {
                 Status:
               </span>
               <StatusBadge status={ticket.status} size="md" />
-              <PriorityBadge priority={ticket.priority} size="md" />
+              {(ticket.status === 'ASSIGNED' || ticket.status === 'IN_PROGRESS' || ticket.status === 'WAITING_FOR_USER') ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <PriorityBadge priority={ticket.priority} size="md" />
+                  <select
+                    id="ticket-priority-update-select"
+                    aria-label="Update ticket priority"
+                    className="horizon-select"
+                    style={{ height: '28px', padding: '0 0.5rem', fontSize: 'var(--font-size-xs)', width: 'auto', minWidth: '95px' }}
+                    value={ticket.priority}
+                    disabled={isUpdatingPriority || isUpdating}
+                    onChange={(e) => void handlePriorityChange(e.target.value as TicketPriority)}
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                    <option value="CRITICAL">Critical</option>
+                  </select>
+                </div>
+              ) : (
+                <PriorityBadge priority={ticket.priority} size="md" />
+              )}
               <Badge variant="neutral" size="md">
                 {formatLabel(ticket.type)}
               </Badge>
@@ -579,54 +626,31 @@ export function SupportTicketDetailsPage() {
 
                 {/* Reply & Internal Note Composer */}
                 {!isConversationReadOnly ? (
-                  <div className="horizon-composer-container" style={{ marginTop: '1.5rem' }}>
+                  <div className={`horizon-composer-container ${isInternalComment ? 'horizon-composer-container--internal' : ''}`} style={{ marginTop: '1.5rem' }}>
                     <form onSubmit={handleSendComment}>
-                      {/* Public vs Internal Selection Tabs */}
-                      <div className="horizon-composer-tabs" role="tablist">
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={!isInternalComment}
-                          className={`horizon-composer-tab horizon-composer-tab--public ${!isInternalComment ? 'is-active' : ''}`}
-                          onClick={() => setIsInternalComment(false)}
-                        >
-                          <Globe size={14} />
-                          <span>Public Reply</span>
-                        </button>
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={isInternalComment}
-                          className={`horizon-composer-tab horizon-composer-tab--internal ${isInternalComment ? 'is-active' : ''}`}
-                          onClick={() => setIsInternalComment(true)}
-                        >
-                          <Lock size={14} />
-                          <span>Internal Staff Note</span>
-                        </button>
-                      </div>
-
-                      {/* Checkbox for internal note (accessible and regression-safe) */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0.75rem 0' }}>
-                        <input
-                          type="checkbox"
-                          id="comment-is-internal"
-                          checked={isInternalComment}
-                          onChange={(e) => setIsInternalComment(e.target.checked)}
-                          className="horizon-checkbox"
-                          style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--color-primary)' }}
-                        />
+                      {/* Unified Visibility Selector (Unambiguous single control with accessible checkbox) */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                         <label
                           htmlFor="comment-is-internal"
-                          style={{
-                            fontSize: 'var(--font-size-sm)',
-                            fontWeight: 'var(--font-weight-medium)',
-                            color: 'var(--color-text-secondary)',
-                            cursor: 'pointer',
-                            userSelect: 'none',
-                          }}
+                          className={`horizon-visibility-toggle-pill ${isInternalComment ? 'is-internal' : ''}`}
                         >
-                          Mark as internal note (staff only)
+                          <input
+                            type="checkbox"
+                            id="comment-is-internal"
+                            checked={isInternalComment}
+                            onChange={(e) => setIsInternalComment(e.target.checked)}
+                            className="horizon-checkbox"
+                            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: isInternalComment ? '#d97706' : 'var(--color-primary)' }}
+                          />
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>
+                            {isInternalComment ? <Lock size={12} /> : <Globe size={12} />}
+                            {isInternalComment ? 'Internal Staff Note (Confidential)' : 'Public Customer Reply'}
+                          </span>
                         </label>
+
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: isInternalComment ? 'var(--color-warning-text, #92400e)' : 'var(--color-text-muted)' }}>
+                          {isInternalComment ? '🔒 Hidden from requester' : '🌐 Customer will see this'}
+                        </span>
                       </div>
 
                       {/* Visibility indicator notice */}
@@ -691,7 +715,7 @@ export function SupportTicketDetailsPage() {
                           type="button"
                           onClick={handleGenerateAiReplyDraft}
                           isLoading={isGeneratingReplyDraft}
-                          disabled={isSendingComment || Boolean(commentBody.trim())}
+                          disabled={isSendingComment || Boolean(commentBody.trim()) || ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED' || ticket?.status === 'CANCELLED'}
                           leadingIcon={<Sparkles size={14} />}
                         >
                           AI Reply Draft
@@ -708,6 +732,12 @@ export function SupportTicketDetailsPage() {
                             isLoading={isSendingComment}
                             disabled={!commentBody.trim()}
                             aria-label={isInternalComment ? 'Add internal note' : 'Send message'}
+                            style={isInternalComment ? {
+                              backgroundColor: '#d97706',
+                              borderColor: '#b45309',
+                              color: '#ffffff',
+                              fontWeight: 'var(--font-weight-semibold)',
+                            } : undefined}
                           >
                             {isInternalComment ? 'Add Internal Note' : 'Send Public Reply'}
                           </Button>

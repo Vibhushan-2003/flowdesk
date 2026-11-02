@@ -74,6 +74,12 @@ const ArticleEditorPage = lazy(() =>
 const ReportsPage = lazy(() =>
   import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage }))
 )
+const ProfilePage = lazy(() =>
+  import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage }))
+)
+const AccountSettingsPage = lazy(() =>
+  import('./pages/AccountSettingsPage').then((m) => ({ default: m.AccountSettingsPage }))
+)
 
 function PageLoading() {
   return (
@@ -143,6 +149,16 @@ function App() {
           <Route
             path="/tickets/:ticketNumber"
             element={<TicketDetailsPage />}
+          />
+
+          <Route
+            path="/profile"
+            element={<ProfilePage />}
+          />
+
+          <Route
+            path="/account"
+            element={<AccountSettingsPage />}
           />
 
           <Route

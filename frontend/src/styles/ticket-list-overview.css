@@ -7,8 +7,8 @@
   gap: 16px;
   padding: 16px 20px;
   margin: 0 0 24px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
 }
 
@@ -25,12 +25,12 @@
 }
 
 .ticket-list-result-count strong {
-  color: #0f172a;
+  color: var(--color-text-primary);
   font-size: 17px;
 }
 
 .ticket-list-visible-count {
-  color: #64748b;
+  color: var(--color-text-secondary);
 }
 
 .ticket-list-active-filters {
@@ -53,7 +53,7 @@
 
 .ticket-list-no-filters {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-secondary);
 }
 
 .ticket-list-refresh-button {

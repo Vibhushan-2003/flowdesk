@@ -30,6 +30,14 @@
   --color-border-strong: #cbd5e1;
   --color-divider: #e2e8f0;
 
+  /* Form Controls - Light */
+  --color-input-bg: #ffffff;
+  --color-input-border: #cbd5e1;
+  --color-input-border-hover: #94a3b8;
+  --color-input-border-focus: #2563eb;
+  --color-input-text: #101828;
+  --color-input-placeholder: #94a3b8;
+
   /* Semantic Feedback - Light */
   --color-success: #0f766e;
   --color-success-hover: #115e59;
@@ -155,6 +163,14 @@
   --color-border-subtle: #172033;
   --color-border-strong: #334155;
   --color-divider: #1e293b;
+
+  /* Form Controls - Dark */
+  --color-input-bg: #1a243b;
+  --color-input-border: #334155;
+  --color-input-border-hover: #475569;
+  --color-input-border-focus: #3b82f6;
+  --color-input-text: #f8fafc;
+  --color-input-placeholder: #64748b;
 
   /* Semantic Feedback - Dark */
   --color-success: #14b8a6;

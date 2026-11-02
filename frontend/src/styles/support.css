@@ -242,6 +242,53 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.horizon-composer-container--internal {
+  border-color: rgba(245, 158, 11, 0.45);
+  background-color: rgba(254, 243, 199, 0.12);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+}
+
+[data-theme='dark'] .horizon-composer-container--internal {
+  border-color: rgba(245, 158, 11, 0.4);
+  background-color: rgba(146, 64, 14, 0.12);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+}
+
+.horizon-composer-container--internal .horizon-textarea {
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.horizon-composer-container--internal .horizon-textarea:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+}
+
+.horizon-visibility-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface-subtle);
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.horizon-visibility-toggle-pill.is-internal {
+  border-color: #fcd34d;
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+[data-theme='dark'] .horizon-visibility-toggle-pill.is-internal {
+  border-color: rgba(251, 191, 36, 0.35);
+  background-color: rgba(146, 64, 14, 0.3);
+  color: #fde68a;
 }
 
 .horizon-composer-tabs {

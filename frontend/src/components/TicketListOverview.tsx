@@ -6,7 +6,8 @@ interface TicketListOverviewProps {
   totalElements: number | null
   visibleCount: number
   isLoading: boolean
-  onRefresh: () => void
+  onRefresh?: () => void
+  showRefresh?: boolean
 }
 
 export function TicketListOverview({
@@ -15,6 +16,7 @@ export function TicketListOverview({
   visibleCount,
   isLoading,
   onRefresh,
+  showRefresh = false,
 }: TicketListOverviewProps) {
   const activeFilters: string[] = []
 
@@ -79,14 +81,16 @@ export function TicketListOverview({
         </div>
       </div>
 
-      <button
-        className="ticket-list-refresh-button"
-        type="button"
-        onClick={onRefresh}
-        disabled={isLoading}
-      >
-        {isLoading ? 'Refreshing...' : '↻ Refresh'}
-      </button>
+      {showRefresh && onRefresh && (
+        <button
+          className="ticket-list-refresh-button"
+          type="button"
+          onClick={onRefresh}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Refreshing...' : '↻ Refresh'}
+        </button>
+      )}
     </section>
   )
 }

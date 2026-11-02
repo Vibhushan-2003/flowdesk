@@ -12,6 +12,7 @@ import {
 import { createTicket } from '../api/ticket'
 import { useAuth } from '../auth/useAuth'
 import type {
+  TicketPriority,
   TicketResponse,
   TicketType,
 } from '../types/ticket'
@@ -65,6 +66,7 @@ export function CreateTicketPage() {
   const [type, setType] = useState<TicketType>(initialDraft?.type ?? 'INCIDENT')
   const [title, setTitle] = useState(initialDraft?.title ?? '')
   const [description, setDescription] = useState(initialDraft?.description ?? '')
+  const [priority, setPriority] = useState<TicketPriority>('MEDIUM')
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const isSubmittingRef = useRef(false)
@@ -90,6 +92,7 @@ export function CreateTicketPage() {
     setType('INCIDENT')
     setTitle('')
     setDescription('')
+    setPriority('MEDIUM')
     setError(null)
     sessionStorage.removeItem(TICKET_DRAFT_KEY)
     idempotencyKeyRef.current = null
@@ -307,6 +310,32 @@ export function CreateTicketPage() {
                     <option value="SERVICE_REQUEST">Service request (request new access/hardware)</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Urgency / Initial Priority */}
+              <div className="horizon-form-field">
+                <label htmlFor="ticket-priority-select" className="horizon-label">
+                  Urgency / Priority
+                </label>
+                <div className="horizon-select-wrapper">
+                  <select
+                    id="ticket-priority-select"
+                    className="horizon-select"
+                    value={priority}
+                    onChange={(event) => {
+                      setPriority(event.target.value as TicketPriority)
+                      idempotencyKeyRef.current = null
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    <option value="LOW">Low (minor inconvenience or cosmetic issue)</option>
+                    <option value="MEDIUM">Medium (standard business impact)</option>
+                    <option value="HIGH">High (significant impact on daily work)</option>
+                  </select>
+                </div>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                  Critical priorities are reserved for major system outages triaged directly by support staff.
+                </span>
               </div>
 
               {/* Title Input */}

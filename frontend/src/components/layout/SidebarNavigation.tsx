@@ -300,20 +300,28 @@ export function SidebarNavigation({
       {/* User Footer Profile */}
       <div className="horizon-sidebar-footer">
         <div className="horizon-user-profile-row">
-          <UserAvatar
-            email={user?.email}
-            size={isCollapsed && !isMobile ? 'sm' : 'md'}
-          />
-          {(!isCollapsed || isMobile) && (
-            <div className="horizon-user-info-text">
-              <span className="horizon-user-email" title={user?.email}>
-                {user?.email?.split('@')[0]}
-              </span>
-              <Badge variant="neutral" size="sm" className="horizon-user-role-badge">
-                {primaryRole.replace('_', ' ')}
-              </Badge>
-            </div>
-          )}
+          <NavLink
+            to="/profile"
+            className="horizon-sidebar-profile-link"
+            onClick={onNavigate}
+            title={isCollapsed && !isMobile ? 'View Profile' : undefined}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit', flex: 1, minWidth: 0 }}
+          >
+            <UserAvatar
+              email={user?.email}
+              size={isCollapsed && !isMobile ? 'sm' : 'md'}
+            />
+            {(!isCollapsed || isMobile) && (
+              <div className="horizon-user-info-text">
+                <span className="horizon-user-email" title={user?.email}>
+                  {user?.email?.split('@')[0]}
+                </span>
+                <Badge variant="neutral" size="sm" className="horizon-user-role-badge">
+                  {primaryRole.replace('_', ' ')}
+                </Badge>
+              </div>
+            )}
+          </NavLink>
           <button
             type="button"
             className="horizon-sidebar-signout-btn"

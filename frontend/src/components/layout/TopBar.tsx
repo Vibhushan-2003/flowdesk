@@ -3,8 +3,10 @@ import {
   Menu,
   LogOut,
   ChevronDown,
+  User,
+  KeyRound,
 } from 'lucide-react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { ThemeSwitcher } from '../ui/ThemeSwitcher'
 import { NotificationBell } from '../NotificationBell'
@@ -29,6 +31,9 @@ function getRouteBreadcrumb(pathname: string): { section: string; title: string 
   if (pathname === '/reports') return { section: 'Operations', title: 'Reports' }
   if (pathname === '/admin/users') return { section: 'Administration', title: 'User Management' }
   if (pathname === '/audit') return { section: 'Administration', title: 'Audit Trail' }
+  if (pathname === '/admin/attachments') return { section: 'Administration', title: 'Attachment Security' }
+  if (pathname === '/profile') return { section: 'Account', title: 'My Profile' }
+  if (pathname.startsWith('/account')) return { section: 'Account', title: 'Account Settings' }
   return { section: 'FlowDesk', title: 'Workspace' }
 }
 
@@ -106,6 +111,28 @@ export function TopBar({ onOpenMobileMenu }: TopBarProps) {
                   {user?.roles?.join(', ')}
                 </span>
               </div>
+
+              <div className="horizon-dropdown-divider" />
+
+              <Link
+                to="/profile"
+                role="menuitem"
+                className="horizon-dropdown-item"
+                onClick={() => setIsProfileOpen(false)}
+              >
+                <User size={16} />
+                <span>My Profile</span>
+              </Link>
+
+              <Link
+                to="/account"
+                role="menuitem"
+                className="horizon-dropdown-item"
+                onClick={() => setIsProfileOpen(false)}
+              >
+                <KeyRound size={16} />
+                <span>Account Settings</span>
+              </Link>
 
               <div className="horizon-dropdown-divider" />
 

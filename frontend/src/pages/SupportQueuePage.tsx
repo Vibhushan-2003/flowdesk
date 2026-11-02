@@ -114,12 +114,20 @@ export function SupportQueuePage() {
   // Filtered and sorted tickets on current page
   let displayedTickets = queue?.content ? [...queue.content] : []
   if (searchFilter.trim()) {
-    const q = searchFilter.toLowerCase().trim()
-    displayedTickets = displayedTickets.filter(
-      (t) =>
-        t.ticketNumber.toLowerCase().includes(q) ||
-        t.title.toLowerCase().includes(q),
-    )
+    const raw = searchFilter.trim()
+    const q = raw.toLowerCase()
+    const digitsOnly = raw.replace(/^#?fd-?/i, '').replace(/\D/g, '')
+    const paddedTicketNumber = digitsOnly ? `fd-${digitsOnly.padStart(6, '0')}` : null
+
+    displayedTickets = displayedTickets.filter((t) => {
+      const lowerTicket = t.ticketNumber.toLowerCase()
+      const lowerTitle = t.title.toLowerCase()
+      return (
+        lowerTicket.includes(q) ||
+        (paddedTicketNumber !== null && lowerTicket === paddedTicketNumber) ||
+        lowerTitle.includes(q)
+      )
+    })
   }
 
   if (priorityFilter !== 'ALL') {
