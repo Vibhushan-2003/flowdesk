@@ -707,6 +707,7 @@ export function SupportTicketDetailsPage() {
                             type="submit"
                             isLoading={isSendingComment}
                             disabled={!commentBody.trim()}
+                            aria-label={isInternalComment ? 'Add internal note' : 'Send message'}
                           >
                             {isInternalComment ? 'Add Internal Note' : 'Send Public Reply'}
                           </Button>
