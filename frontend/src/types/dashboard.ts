@@ -15,7 +15,8 @@ export interface OperationsMetrics {
   totalActiveTickets: number
   unassignedQueueTickets: number
   pendingApprovals: number
-  slaBreaches: number
+  slaBreaches?: number
+  activeSlaBreaches?: number
 }
 
 export interface DashboardMetricsResponse {
@@ -23,4 +24,3 @@ export interface DashboardMetricsResponse {
   support: SupportEngineerMetrics | null
   operations: OperationsMetrics | null
 }
-

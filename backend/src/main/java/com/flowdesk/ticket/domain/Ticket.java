@@ -126,6 +126,24 @@ public class Ticket {
             String description,
             User createdByUser
     ) {
+        this(
+                ticketNumber,
+                type,
+                title,
+                description,
+                createdByUser,
+                TicketPriority.MEDIUM
+        );
+    }
+
+    public Ticket(
+            String ticketNumber,
+            TicketType type,
+            String title,
+            String description,
+            User createdByUser,
+            TicketPriority priority
+    ) {
         this.ticketNumber =
                 ticketNumber;
 
@@ -142,7 +160,9 @@ public class Ticket {
                 createdByUser;
 
         this.priority =
-                TicketPriority.MEDIUM;
+                priority != null
+                        ? priority
+                        : TicketPriority.MEDIUM;
 
         this.status =
                 initialStatusFor(
@@ -317,11 +337,12 @@ public class Ticket {
                 "New SLA policy is required"
         );
 
-        if (status
-                != TicketStatus.ASSIGNED) {
+        if (status != TicketStatus.ASSIGNED
+                && status != TicketStatus.IN_PROGRESS
+                && status != TicketStatus.WAITING_FOR_USER) {
 
             throw new IllegalStateException(
-                    "Ticket priority can only be changed while assigned"
+                    "Ticket priority can only be changed while operationally active (ASSIGNED, IN_PROGRESS, or WAITING_FOR_USER)"
             );
         }
 
@@ -348,13 +369,6 @@ public class Ticket {
             );
         }
 
-        OffsetDateTime responseSlaStartedAt =
-                responseDueAt
-                        .minusMinutes(
-                                slaPolicy
-                                        .getResponseMinutes()
-                        );
-
         OffsetDateTime resolutionSlaStartedAt =
                 resolutionDueAt
                         .minusMinutes(
@@ -362,36 +376,45 @@ public class Ticket {
                                         .getResolutionMinutes()
                         );
 
-        if (!responseSlaStartedAt
-                .toInstant()
-                .equals(
-                        resolutionSlaStartedAt
-                                .toInstant()
-                )) {
-
-            throw new IllegalStateException(
-                    "Existing SLA deadlines are inconsistent"
-            );
-        }
-
         OffsetDateTime preservedSlaStart =
-                responseSlaStartedAt
+                resolutionSlaStartedAt
                         .withOffsetSameInstant(
                                 ZoneOffset.UTC
                         );
+
+        if (firstRespondedAt == null) {
+            OffsetDateTime responseSlaStartedAt =
+                    responseDueAt
+                            .minusMinutes(
+                                    slaPolicy
+                                            .getResponseMinutes()
+                            );
+
+            if (!responseSlaStartedAt
+                    .toInstant()
+                    .equals(
+                            resolutionSlaStartedAt
+                                    .toInstant()
+                    )) {
+
+                throw new IllegalStateException(
+                        "Existing SLA deadlines are inconsistent"
+                );
+            }
+
+            responseDueAt =
+                    preservedSlaStart
+                            .plusMinutes(
+                                    newSlaPolicy
+                                            .getResponseMinutes()
+                            );
+        }
 
         priority =
                 newPriority;
 
         slaPolicy =
                 newSlaPolicy;
-
-        responseDueAt =
-                preservedSlaStart
-                        .plusMinutes(
-                                newSlaPolicy
-                                        .getResponseMinutes()
-                        );
 
         resolutionDueAt =
                 preservedSlaStart

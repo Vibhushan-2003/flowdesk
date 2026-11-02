@@ -12,6 +12,7 @@ import com.flowdesk.notification.service.NotificationService;
 
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.sla.domain.SlaStatus;
 import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketStatus;
 
@@ -19,6 +20,14 @@ import com.flowdesk.ticket.dto.ResolveTicketRequest;
 import com.flowdesk.ticket.dto.SupportTicketResponse;
 import com.flowdesk.ticket.dto.SupportTicketSummaryResponse;
 import com.flowdesk.ticket.dto.UpdateTicketStatusRequest;
+import com.flowdesk.sla.domain.SlaPolicy;
+import com.flowdesk.sla.repository.SlaEventRepository;
+import com.flowdesk.sla.repository.SlaPolicyRepository;
+import com.flowdesk.ticket.dto.UpdateTicketPriorityRequest;
+import com.flowdesk.ticket.repository.TicketRepository;
+import com.flowdesk.user.domain.RoleCode;
+import com.flowdesk.user.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import com.flowdesk.ticket.repository.TicketAssignmentRepository;
 
@@ -46,15 +55,44 @@ public class SupportTicketService {
     private final TicketAssignmentRepository ticketAssignmentRepository;
     private final NotificationService notificationService;
     private final AuditService auditService;
+    private final TicketRepository ticketRepository;
+    private final UserRepository userRepository;
+    private final SlaPolicyRepository slaPolicyRepository;
+    private final SlaEventRepository slaEventRepository;
 
     public SupportTicketService(
             TicketAssignmentRepository ticketAssignmentRepository,
             NotificationService notificationService,
             AuditService auditService
     ) {
+        this(
+                ticketAssignmentRepository,
+                notificationService,
+                auditService,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    @Autowired
+    public SupportTicketService(
+            TicketAssignmentRepository ticketAssignmentRepository,
+            NotificationService notificationService,
+            AuditService auditService,
+            TicketRepository ticketRepository,
+            UserRepository userRepository,
+            SlaPolicyRepository slaPolicyRepository,
+            SlaEventRepository slaEventRepository
+    ) {
         this.ticketAssignmentRepository = ticketAssignmentRepository;
         this.notificationService = notificationService;
         this.auditService = auditService;
+        this.ticketRepository = ticketRepository;
+        this.userRepository = userRepository;
+        this.slaPolicyRepository = slaPolicyRepository;
+        this.slaEventRepository = slaEventRepository;
     }
 
     @Transactional(readOnly = true)
@@ -432,6 +470,119 @@ public class SupportTicketService {
                 previousStatus,
                 ticket.getStatus()
         );
+
+        return toResponse(assignment);
+    }
+
+    @Transactional
+    public SupportTicketResponse
+            updatePriority(
+                    UUID authenticatedUserId,
+                    String ticketNumber,
+                    UpdateTicketPriorityRequest request
+            ) {
+
+        String normalizedTicketNumber =
+                normalizeTicketNumber(ticketNumber);
+
+        if (request == null || request.priority() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Priority request is required"
+            );
+        }
+
+        if (userRepository == null || ticketRepository == null
+                || slaPolicyRepository == null || slaEventRepository == null) {
+            throw new IllegalStateException("SupportTicketService dependencies are not fully configured");
+        }
+
+        User actor = userRepository.findById(authenticatedUserId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        "User not found"
+                ));
+
+        boolean isLeadOrAdmin = actor.getRoles().stream()
+                .anyMatch(r -> r.getCode() == RoleCode.TEAM_LEAD || r.getCode() == RoleCode.ADMIN);
+
+        TicketAssignment assignment = ticketAssignmentRepository
+                .findActiveAssignmentForUpdate(normalizedTicketNumber, authenticatedUserId)
+                .orElseGet(() -> {
+                    if (isLeadOrAdmin) {
+                        Ticket ticket = ticketRepository.findByTicketNumber(normalizedTicketNumber)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Ticket not found"
+                                ));
+                        return ticketAssignmentRepository
+                                .findActiveAssignmentByTicketIdForUpdate(ticket.getId())
+                                .orElseThrow(() -> new ResponseStatusException(
+                                        HttpStatus.CONFLICT,
+                                        "Ticket priority can only be changed while operationally active and assigned"
+                                ));
+                    }
+                    throw new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Ticket not found"
+                    );
+                });
+
+        Ticket ticket = assignment.getTicket();
+
+        if (ticket.getStatus() != TicketStatus.ASSIGNED
+                && ticket.getStatus() != TicketStatus.IN_PROGRESS
+                && ticket.getStatus() != TicketStatus.WAITING_FOR_USER) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Ticket priority can only be changed while operationally active (ASSIGNED, IN_PROGRESS, or WAITING_FOR_USER)"
+            );
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (slaEventRepository.existsByTicket_Id(ticket.getId())
+                || ticket.evaluateResponseSla(now) == SlaStatus.BREACHED
+                || ticket.evaluateResolutionSla(now) == SlaStatus.BREACHED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Ticket priority cannot be changed after an SLA breach has occurred or been recorded"
+            );
+        }
+
+        TicketPriority previousPriority = ticket.getPriority();
+        TicketPriority newPriority = request.priority();
+
+        if (previousPriority != newPriority) {
+            SlaPolicy newSlaPolicy = slaPolicyRepository
+                    .findByPriorityAndActiveTrue(newPriority)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "No active SLA policy configured for priority " + newPriority
+                    ));
+
+            try {
+                ticket.applyPriorityAndRecalculateSla(newPriority, newSlaPolicy);
+            } catch (IllegalArgumentException | IllegalStateException e) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        e.getMessage()
+                );
+            }
+
+            ticketRepository.saveAndFlush(ticket);
+
+            auditService.recordUserAction(
+                    actor,
+                    AuditAction.TICKET_PRIORITY_CHANGED,
+                    AuditTargetType.TICKET,
+                    ticket.getId(),
+                    ticket.getTicketNumber(),
+                    Map.of(
+                            "fromPriority", previousPriority.name(),
+                            "toPriority", newPriority.name()
+                    )
+            );
+        }
 
         return toResponse(assignment);
     }

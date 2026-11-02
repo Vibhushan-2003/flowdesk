@@ -64,9 +64,10 @@ function isFileSupported(file: File): boolean {
   return true
 }
 
-function getFileIcon(filename: string, contentType: string): string {
-  const lower = filename.toLowerCase()
-  if (lower.endsWith('.pdf') || contentType.includes('pdf')) {
+function getFileIcon(filename?: string, contentType?: string): string {
+  const lower = (filename || '').toLowerCase()
+  const cType = (contentType || '').toLowerCase()
+  if (lower.endsWith('.pdf') || cType.includes('pdf')) {
     return '📄'
   }
   if (
@@ -74,11 +75,11 @@ function getFileIcon(filename: string, contentType: string): string {
     lower.endsWith('.jpg') ||
     lower.endsWith('.jpeg') ||
     lower.endsWith('.webp') ||
-    contentType.startsWith('image/')
+    cType.startsWith('image/')
   ) {
     return '🖼️'
   }
-  if (lower.endsWith('.csv') || contentType.includes('csv')) {
+  if (lower.endsWith('.csv') || cType.includes('csv')) {
     return '📊'
   }
   return '📝'
@@ -391,7 +392,7 @@ export function TicketAttachmentSection({
                 </div>
 
                 <div className="attachment-item-details">
-                  <strong className="attachment-item-name" title={item.filename}>
+                  <strong className="attachment-item-name" title={item.filename || 'Attachment'}>
                     {item.filename}
                   </strong>
                   <div className="attachment-item-meta">

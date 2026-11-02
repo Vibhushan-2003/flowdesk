@@ -12,3 +12,12 @@ export interface TicketAttachmentResponse {
   scanStatus?: AttachmentScanStatus
   scanDetails?: string | null
 }
+
+export interface AttachmentRescanReport {
+  totalPending: number
+  scannedCount: number
+  cleanCount: number
+  infectedCount: number
+  failedCount: number
+  message: string
+}

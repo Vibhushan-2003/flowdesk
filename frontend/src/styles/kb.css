@@ -11,15 +11,15 @@
   text-align: center;
   padding: 2.5rem 1rem 2rem;
   margin-bottom: 2rem;
-  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  background: var(--color-surface);
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
 }
 
 .kb-hero h1 {
   font-size: 2.25rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
   margin-bottom: 0.5rem;
 }
 
@@ -41,7 +41,7 @@
   flex: 1;
   padding: 0.85rem 1.25rem;
   font-size: 1rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -82,9 +82,9 @@
   font-size: 0.9rem;
   font-weight: 500;
   border-radius: 9999px;
-  border: 1px solid #e2e8f0;
-  background-color: #ffffff;
-  color: #475569;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -95,9 +95,9 @@
 }
 
 .kb-category-pill.active {
-  background-color: #0f172a;
+  background-color: var(--color-text-primary);
   color: #ffffff;
-  border-color: #0f172a;
+  border-color: var(--color-text-primary);
 }
 
 /* Management Tabs */
@@ -120,9 +120,9 @@
   font-size: 0.95rem;
   font-weight: 600;
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
-  background-color: #ffffff;
-  color: #475569;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
   cursor: pointer;
 }
 
@@ -144,8 +144,8 @@
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   text-decoration: none;
   color: inherit;
@@ -180,7 +180,7 @@
 .kb-article-card h3 {
   font-size: 1.2rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-text-primary);
   margin: 0 0 0.5rem 0;
   line-height: 1.4;
 }
@@ -224,7 +224,7 @@
 
 .kb-status-badge.archived {
   background-color: #f1f5f9;
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 /* Article View Page */
@@ -262,7 +262,7 @@
 .kb-view-title-row h1 {
   font-size: 2rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
   margin: 0.5rem 0;
 }
 
@@ -284,7 +284,7 @@
 .kb-article-body h1,
 .kb-article-body h2,
 .kb-article-body h3 {
-  color: #0f172a;
+  color: var(--color-text-primary);
   margin-top: 2rem;
   margin-bottom: 0.75rem;
 }
@@ -294,7 +294,7 @@
 }
 
 .kb-article-body pre {
-  background-color: #0f172a;
+  background-color: var(--color-text-primary);
   color: #e2e8f0;
   padding: 1rem 1.25rem;
   border-radius: 8px;
@@ -305,7 +305,7 @@
 
 .kb-article-body code {
   background-color: #f1f5f9;
-  color: #0f172a;
+  color: var(--color-text-primary);
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
   font-size: 0.9em;
@@ -327,14 +327,14 @@
   border-left: 4px solid #3b82f6;
   padding-left: 1rem;
   margin: 1.25rem 0;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-style: italic;
 }
 
 /* Feedback Box */
 .kb-feedback-box {
   background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 1.5rem;
   text-align: center;
@@ -353,8 +353,8 @@
   font-size: 0.9rem;
   font-weight: 500;
   border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background-color: #ffffff;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
   cursor: pointer;
 }
 
@@ -380,7 +380,7 @@
 .kb-editor-header-title h1 {
   font-size: 1.75rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-primary);
   margin: 0.35rem 0 0.25rem 0;
   line-height: 1.3;
   word-break: break-word;
@@ -430,7 +430,7 @@
 .kb-editor-select,
 .kb-editor-textarea {
   padding: 0.75rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 0.95rem;
   outline: none;
@@ -463,10 +463,10 @@
 }
 
 .kb-preview-pane {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 1rem 1.5rem;
-  background-color: #ffffff;
+  background-color: var(--color-surface);
   overflow-y: auto;
   max-height: 600px;
   box-sizing: border-box;
@@ -510,7 +510,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  background-color: #ffffff;
+  background-color: var(--color-surface);
   padding: 1rem 1.25rem;
   border: 1px solid #dbeafe;
   border-radius: 8px;
@@ -540,7 +540,7 @@
 
 .kb-deflection-info p {
   font-size: 0.875rem;
-  color: #475569;
+  color: var(--color-text-secondary);
   margin: 0;
   line-height: 1.5;
 }

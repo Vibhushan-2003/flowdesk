@@ -114,7 +114,7 @@ test.describe('Real-Stack Live: Internal Staff Notes Privacy & Visibility Enforc
     await expect(internalCheckbox).not.toBeChecked()
     const publicReplyText = `Public customer assistance reply - ${Date.now()}`
     await page.locator('#support-comment-body').fill(publicReplyText)
-    const publicSubmitBtn = page.getByRole('button', { name: /send message/i })
+    const publicSubmitBtn = page.getByRole('button', { name: /send (message|public reply)/i })
     await publicSubmitBtn.click()
 
     await expect(page.getByText(publicReplyText)).toBeVisible()

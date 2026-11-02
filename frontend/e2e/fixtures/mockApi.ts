@@ -158,4 +158,39 @@ export async function setupApiMocks(page: Page, currentUser: MockUser = MOCK_EMP
       }),
     })
   })
+
+  // Default attachments GET fallback
+  await page.route('**/api/tickets/*/attachments', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      })
+    } else {
+      await route.fallback()
+    }
+  })
+
+  await page.route('**/api/support/tickets/*/attachments', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'att-1',
+            filename: 'system-diagnostic-report.log',
+            sanitizedFilename: 'system-diagnostic-report.log',
+            contentType: 'text/plain',
+            sizeBytes: 1048576,
+            scanStatus: 'CLEAN',
+            createdAt: '2026-11-02T08:35:00Z',
+          },
+        ]),
+      })
+    } else {
+      await route.fallback()
+    }
+  })
 }

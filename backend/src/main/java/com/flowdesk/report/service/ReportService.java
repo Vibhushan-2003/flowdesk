@@ -119,6 +119,11 @@ public class ReportService {
                 ? roundToOneDecimal(overallAvgSec / 3600.0)
                 : 0.0;
 
+        Double overallMedianSec = reportQueryRepository.getOverallMedianResolutionDurationSeconds(startUtc, endUtc);
+        Double medianDurationHours = overallMedianSec != null
+                ? roundToOneDecimal(overallMedianSec / 3600.0)
+                : 0.0;
+
         Map<String, Double> avgByPriority = new LinkedHashMap<>();
         for (TicketPriority p : TicketPriority.values()) {
             avgByPriority.put(p.name(), 0.0);
@@ -133,7 +138,7 @@ public class ReportService {
                 new OperationalReportResponse.ResolutionDurationMetrics(
                         totalResolvedInPeriod,
                         avgDurationHours,
-                        avgDurationHours, // Approximate median from sample
+                        medianDurationHours,
                         avgByPriority
                 );
 

@@ -21,6 +21,15 @@ import com.flowdesk.ticket.dto.ResolveTicketRequest;
 import com.flowdesk.ticket.dto.SupportTicketResponse;
 import com.flowdesk.ticket.dto.SupportTicketSummaryResponse;
 import com.flowdesk.ticket.dto.UpdateTicketStatusRequest;
+import com.flowdesk.ticket.dto.UpdateTicketPriorityRequest;
+import com.flowdesk.ticket.repository.TicketRepository;
+import com.flowdesk.user.domain.Role;
+import com.flowdesk.user.domain.RoleCode;
+import com.flowdesk.user.repository.UserRepository;
+import com.flowdesk.sla.repository.SlaPolicyRepository;
+import com.flowdesk.sla.repository.SlaEventRepository;
+import java.util.Set;
+
 
 import com.flowdesk.ticket.repository.TicketAssignmentRepository;
 
@@ -78,6 +87,18 @@ class SupportTicketServiceTest {
     @Mock
     private AuditService
             auditService;
+
+    @Mock
+    private TicketRepository ticketRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private SlaPolicyRepository slaPolicyRepository;
+
+    @Mock
+    private SlaEventRepository slaEventRepository;
 
     @InjectMocks
     private SupportTicketService
@@ -1146,6 +1167,209 @@ class SupportTicketServiceTest {
         return new TicketAssignment(
                 ticket,
                 supportEngineer
+        );
+    }
+    @Test
+    void updatePriorityWhenAssignedUpdatesPriorityAndRecalculatesSla() {
+        UUID engineerId = UUID.randomUUID();
+        User engineer = mock(User.class);
+        when(engineer.getRoles()).thenReturn(Set.of(new Role(RoleCode.SUPPORT_ENGINEER, "Support Engineer")));
+        when(userRepository.findById(engineerId)).thenReturn(Optional.of(engineer));
+
+        TicketAssignment assignment = createAssignedTicketAssignment();
+        Ticket ticket = assignment.getTicket();
+        String ticketNumber = ticket.getTicketNumber();
+
+        when(ticketAssignmentRepository.findActiveAssignmentForUpdate(eq(ticketNumber), eq(engineerId)))
+                .thenReturn(Optional.of(assignment));
+        when(slaEventRepository.existsByTicket_Id(ticket.getId())).thenReturn(false);
+
+        SlaPolicy highSlaPolicy = new SlaPolicy(TicketPriority.HIGH, 30, 480);
+        when(slaPolicyRepository.findByPriorityAndActiveTrue(TicketPriority.HIGH))
+                .thenReturn(Optional.of(highSlaPolicy));
+
+        UpdateTicketPriorityRequest request = new UpdateTicketPriorityRequest(TicketPriority.HIGH);
+        SupportTicketResponse response = supportTicketService.updatePriority(engineerId, ticketNumber, request);
+
+        assertNotNull(response);
+        assertEquals(TicketPriority.HIGH, response.priority());
+        assertEquals(TicketPriority.HIGH, ticket.getPriority());
+
+        verify(ticketRepository).saveAndFlush(ticket);
+        verify(auditService).recordUserAction(
+                eq(engineer),
+                eq(AuditAction.TICKET_PRIORITY_CHANGED),
+                eq(AuditTargetType.TICKET),
+                eq(ticket.getId()),
+                eq(ticket.getTicketNumber()),
+                eq(Map.of("fromPriority", "MEDIUM", "toPriority", "HIGH"))
+        );
+    }
+
+    @Test
+    void updatePriorityWhenInProgressUpdatesPriorityAndRecalculatesResolutionSla() {
+        UUID engineerId = UUID.randomUUID();
+        User engineer = mock(User.class);
+        when(engineer.getRoles()).thenReturn(Set.of(new Role(RoleCode.SUPPORT_ENGINEER, "Support Engineer")));
+        when(userRepository.findById(engineerId)).thenReturn(Optional.of(engineer));
+
+        TicketAssignment assignment = createAssignedTicketAssignment();
+        Ticket ticket = assignment.getTicket();
+        ticket.transitionSupportStatus(TicketStatus.IN_PROGRESS);
+        String ticketNumber = ticket.getTicketNumber();
+
+        when(ticketAssignmentRepository.findActiveAssignmentForUpdate(eq(ticketNumber), eq(engineerId)))
+                .thenReturn(Optional.of(assignment));
+        when(slaEventRepository.existsByTicket_Id(ticket.getId())).thenReturn(false);
+
+        SlaPolicy lowSlaPolicy = new SlaPolicy(TicketPriority.LOW, 120, 2880);
+        when(slaPolicyRepository.findByPriorityAndActiveTrue(TicketPriority.LOW))
+                .thenReturn(Optional.of(lowSlaPolicy));
+
+        UpdateTicketPriorityRequest request = new UpdateTicketPriorityRequest(TicketPriority.LOW);
+        SupportTicketResponse response = supportTicketService.updatePriority(engineerId, ticketNumber, request);
+
+        assertNotNull(response);
+        assertEquals(TicketPriority.LOW, response.priority());
+        assertEquals(TicketPriority.LOW, ticket.getPriority());
+    }
+
+    @Test
+    void updatePriorityWhenWaitingForUserUpdatesPriority() {
+        UUID engineerId = UUID.randomUUID();
+        User engineer = mock(User.class);
+        when(engineer.getRoles()).thenReturn(Set.of(new Role(RoleCode.SUPPORT_ENGINEER, "Support Engineer")));
+        when(userRepository.findById(engineerId)).thenReturn(Optional.of(engineer));
+
+        TicketAssignment assignment = createAssignedTicketAssignment();
+        Ticket ticket = assignment.getTicket();
+        ticket.transitionSupportStatus(TicketStatus.IN_PROGRESS);
+        ticket.transitionSupportStatus(TicketStatus.WAITING_FOR_USER);
+        String ticketNumber = ticket.getTicketNumber();
+
+        when(ticketAssignmentRepository.findActiveAssignmentForUpdate(eq(ticketNumber), eq(engineerId)))
+                .thenReturn(Optional.of(assignment));
+        when(slaEventRepository.existsByTicket_Id(ticket.getId())).thenReturn(false);
+
+        SlaPolicy highSlaPolicy = new SlaPolicy(TicketPriority.HIGH, 30, 480);
+        when(slaPolicyRepository.findByPriorityAndActiveTrue(TicketPriority.HIGH))
+                .thenReturn(Optional.of(highSlaPolicy));
+
+        UpdateTicketPriorityRequest request = new UpdateTicketPriorityRequest(TicketPriority.HIGH);
+        SupportTicketResponse response = supportTicketService.updatePriority(engineerId, ticketNumber, request);
+
+        assertNotNull(response);
+        assertEquals(TicketPriority.HIGH, response.priority());
+        assertEquals(TicketPriority.HIGH, ticket.getPriority());
+    }
+
+    @Test
+    void updatePriorityWhenNotAssignedToCallerThrowsNotFound() {
+        UUID engineerId = UUID.randomUUID();
+        User engineer = mock(User.class);
+        when(engineer.getRoles()).thenReturn(Set.of(new Role(RoleCode.SUPPORT_ENGINEER, "Support Engineer")));
+        when(userRepository.findById(engineerId)).thenReturn(Optional.of(engineer));
+
+        when(ticketAssignmentRepository.findActiveAssignmentForUpdate(eq("FD-TEST-001"), eq(engineerId)))
+                .thenReturn(Optional.empty());
+
+        UpdateTicketPriorityRequest request = new UpdateTicketPriorityRequest(TicketPriority.HIGH);
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> supportTicketService.updatePriority(engineerId, "FD-TEST-001", request)
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        verifyNoInteractions(ticketRepository);
+    }
+
+    @Test
+    void updatePriorityWhenTicketNotInActiveStatusThrowsConflict() {
+        UUID engineerId = UUID.randomUUID();
+        User engineer = mock(User.class);
+        when(engineer.getRoles()).thenReturn(Set.of(new Role(RoleCode.SUPPORT_ENGINEER, "Support Engineer")));
+        when(userRepository.findById(engineerId)).thenReturn(Optional.of(engineer));
+
+        TicketAssignment assignment = createAssignedTicketAssignment();
+        Ticket ticket = assignment.getTicket();
+        ticket.transitionSupportStatus(TicketStatus.IN_PROGRESS);
+        ticket.resolve("Resolved issue"); // Transitions to RESOLVED
+
+        when(ticketAssignmentRepository.findActiveAssignmentForUpdate(eq(ticket.getTicketNumber()), eq(engineerId)))
+                .thenReturn(Optional.of(assignment));
+
+        UpdateTicketPriorityRequest request = new UpdateTicketPriorityRequest(TicketPriority.HIGH);
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> supportTicketService.updatePriority(engineerId, ticket.getTicketNumber(), request)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+        assertEquals("Ticket priority can only be changed while operationally active (ASSIGNED, IN_PROGRESS, or WAITING_FOR_USER)", exception.getReason());
+    }
+
+    @Test
+    void updatePriorityWhenSlaBreachRecordedThrowsConflict() {
+        UUID engineerId = UUID.randomUUID();
+        User engineer = mock(User.class);
+        when(engineer.getRoles()).thenReturn(Set.of(new Role(RoleCode.SUPPORT_ENGINEER, "Support Engineer")));
+        when(userRepository.findById(engineerId)).thenReturn(Optional.of(engineer));
+
+        TicketAssignment assignment = createAssignedTicketAssignment();
+        Ticket ticket = assignment.getTicket();
+
+        when(ticketAssignmentRepository.findActiveAssignmentForUpdate(eq(ticket.getTicketNumber()), eq(engineerId)))
+                .thenReturn(Optional.of(assignment));
+        when(slaEventRepository.existsByTicket_Id(ticket.getId())).thenReturn(true);
+
+        UpdateTicketPriorityRequest request = new UpdateTicketPriorityRequest(TicketPriority.HIGH);
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> supportTicketService.updatePriority(engineerId, ticket.getTicketNumber(), request)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+        assertEquals("Ticket priority cannot be changed after an SLA breach has occurred or been recorded", exception.getReason());
+    }
+
+    @Test
+    void updatePriorityWhenTeamLeadUpdatesOtherEngineerTicket() {
+        UUID leadId = UUID.randomUUID();
+        User teamLead = mock(User.class);
+        when(teamLead.getRoles()).thenReturn(Set.of(new Role(RoleCode.TEAM_LEAD, "Team Lead")));
+        when(userRepository.findById(leadId)).thenReturn(Optional.of(teamLead));
+
+        TicketAssignment assignment = createAssignedTicketAssignment();
+        Ticket ticket = assignment.getTicket();
+        String ticketNumber = ticket.getTicketNumber();
+
+        // Lead not assigned directly
+        when(ticketAssignmentRepository.findActiveAssignmentForUpdate(eq(ticketNumber), eq(leadId)))
+                .thenReturn(Optional.empty());
+        when(ticketRepository.findByTicketNumber(eq(ticketNumber))).thenReturn(Optional.of(ticket));
+        when(ticketAssignmentRepository.findActiveAssignmentByTicketIdForUpdate(eq(ticket.getId())))
+                .thenReturn(Optional.of(assignment));
+        when(slaEventRepository.existsByTicket_Id(ticket.getId())).thenReturn(false);
+
+        SlaPolicy criticalSlaPolicy = new SlaPolicy(TicketPriority.CRITICAL, 15, 120);
+        when(slaPolicyRepository.findByPriorityAndActiveTrue(TicketPriority.CRITICAL))
+                .thenReturn(Optional.of(criticalSlaPolicy));
+
+        UpdateTicketPriorityRequest request = new UpdateTicketPriorityRequest(TicketPriority.CRITICAL);
+        SupportTicketResponse response = supportTicketService.updatePriority(leadId, ticketNumber, request);
+
+        assertNotNull(response);
+        assertEquals(TicketPriority.CRITICAL, response.priority());
+        assertEquals(TicketPriority.CRITICAL, ticket.getPriority());
+
+        verify(ticketRepository).saveAndFlush(ticket);
+        verify(auditService).recordUserAction(
+                eq(teamLead),
+                eq(AuditAction.TICKET_PRIORITY_CHANGED),
+                eq(AuditTargetType.TICKET),
+                eq(ticket.getId()),
+                eq(ticket.getTicketNumber()),
+                eq(Map.of("fromPriority", "MEDIUM", "toPriority", "CRITICAL"))
         );
     }
 }

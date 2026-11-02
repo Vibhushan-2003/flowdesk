@@ -1,87 +1,53 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
-  type FormEvent,
-  useEffect,
-  useState,
-} from 'react'
-
-import {
-  useNavigate,
-} from 'react-router-dom'
+  CheckSquare,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  ShieldAlert,
+  Clock,
+  User,
+  RefreshCw,
+  X,
+} from 'lucide-react'
 
 import {
   approveApproval,
   getPendingApprovals,
   rejectApproval,
 } from '../api/approvals'
-
-import {
-  useAuth,
-} from '../auth/useAuth'
-
-import {
-  NotificationBell,
-} from '../components/NotificationBell'
-
-import type {
-  Approval,
-  ApprovalsPage,
-} from '../types/approval'
+import { useAuth } from '../auth/useAuth'
+import type { Approval, ApprovalsPage } from '../types/approval'
+import { formatDate, formatLabel } from '../utils/formatters'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { Badge } from '../components/ui/Badge'
+import { PriorityBadge } from '../components/ui/PriorityBadge'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
+import { Modal } from '../components/ui/Modal'
 
 const PAGE_SIZE = 10
 
 export function ApprovalInboxPage() {
-  const {
-    accessToken,
-    user,
-    signOut,
-  } = useAuth()
+  const { accessToken, user } = useAuth()
+  const navigate = useNavigate()
 
-  const navigate =
-    useNavigate()
+  const [page, setPage] = useState(0)
+  const [approvalPage, setApprovalPage] = useState<ApprovalsPage | null>(null)
+  const [refreshVersion, setRefreshVersion] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  const [
-    page,
-    setPage,
-  ] =
-    useState(0)
-
-  const [
-    approvalPage,
-    setApprovalPage,
-  ] =
-    useState<ApprovalsPage | null>(
-      null,
-    )
-
-  const [
-    refreshVersion,
-    setRefreshVersion,
-  ] =
-    useState(0)
-
-  const [
-    isLoading,
-    setIsLoading,
-  ] =
-    useState(true)
-
-  const [
-    decisionApprovalId,
-    setDecisionApprovalId,
-  ] =
-    useState<string | null>(null)
-
-  const [
-    error,
-    setError,
-  ] =
-    useState<string | null>(null)
-
-  const [
-    successMessage,
-    setSuccessMessage,
-  ] =
-    useState<string | null>(null)
+  // Decision state
+  const [activeApproval, setActiveApproval] = useState<Approval | null>(null)
+  const [decisionType, setDecisionType] = useState<'approve' | 'reject' | null>(null)
+  const [decisionNote, setDecisionNote] = useState('')
+  const [decisionError, setDecisionError] = useState<string | null>(null)
+  const [isDeciding, setIsDeciding] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -89,13 +55,9 @@ export function ApprovalInboxPage() {
     async function loadApprovals() {
       if (!accessToken) {
         if (!cancelled) {
-          setError(
-            'Your session is no longer valid',
-          )
-
+          setError('Your session is no longer valid')
           setIsLoading(false)
         }
-
         return
       }
 
@@ -103,23 +65,12 @@ export function ApprovalInboxPage() {
       setError(null)
 
       try {
-        const response =
-          await getPendingApprovals(
-            accessToken,
-            page,
-            PAGE_SIZE,
-          )
-
+        const response = await getPendingApprovals(accessToken, page, PAGE_SIZE)
         if (!cancelled) {
-          setApprovalPage(
-            response,
-          )
+          setApprovalPage(response)
         }
       } catch (caughtError) {
-        if (cancelled) {
-          return
-        }
-
+        if (cancelled) return
         setError(
           caughtError instanceof Error
             ? caughtError.message
@@ -137,644 +88,304 @@ export function ApprovalInboxPage() {
     return () => {
       cancelled = true
     }
-  }, [
-    accessToken,
-    page,
-    refreshVersion,
-  ])
+  }, [accessToken, page, refreshVersion])
 
-  function handleSignOut() {
-    signOut()
-
-    navigate('/login')
+  function handleOpenDecisionModal(approval: Approval, type: 'approve' | 'reject') {
+    setActiveApproval(approval)
+    setDecisionType(type)
+    setDecisionNote('')
+    setDecisionError(null)
   }
 
-  function refreshAfterDecision(
-    ticketNumber: string,
-    decision: 'approved' | 'rejected',
-  ) {
-    setSuccessMessage(
-      `${ticketNumber} ${decision} successfully.`,
-    )
+  function handleCloseModal() {
+    if (isDeciding) return
+    setActiveApproval(null)
+    setDecisionType(null)
+    setDecisionNote('')
+    setDecisionError(null)
+  }
 
-    if (
-      approvalPage &&
-      approvalPage.content.length === 1 &&
-      page > 0
-    ) {
-      setPage(
-        (currentPage) =>
-          Math.max(
-            0,
-            currentPage - 1,
-          ),
-      )
+  async function handleConfirmDecision() {
+    if (!accessToken || !activeApproval || !decisionType) return
 
+    if (decisionType === 'reject' && !decisionNote.trim()) {
+      setDecisionError('Rejection reason is required.')
       return
     }
 
-    setRefreshVersion(
-      (currentVersion) =>
-        currentVersion + 1,
-    )
-  }
-
-  async function handleApprove(
-    approval: Approval,
-    note: string,
-  ) {
-    if (!accessToken) {
-      setError(
-        'Your session is no longer valid',
-      )
-
-      return
-    }
-
-    setDecisionApprovalId(
-      approval.id,
-    )
-
-    setError(null)
-    setSuccessMessage(null)
+    setIsDeciding(true)
+    setDecisionError(null)
 
     try {
-      await approveApproval(
-        accessToken,
-        approval.id,
-        note,
-      )
+      if (decisionType === 'approve') {
+        await approveApproval(accessToken, activeApproval.id, decisionNote)
+        setSuccessMessage(`Ticket ${activeApproval.ticketNumber} approved successfully. It has now entered the support queue.`)
+      } else {
+        await rejectApproval(accessToken, activeApproval.id, decisionNote.trim())
+        setSuccessMessage(`Ticket ${activeApproval.ticketNumber} rejected. The requester has been notified.`)
+      }
 
-      refreshAfterDecision(
-        approval.ticketNumber,
-        'approved',
-      )
+      handleCloseModal()
+
+      // Adjust page if needed or refresh
+      if (approvalPage && approvalPage.content.length === 1 && page > 0) {
+        setPage((p) => Math.max(0, p - 1))
+      } else {
+        setRefreshVersion((v) => v + 1)
+      }
     } catch (caughtError) {
-      setError(
+      setDecisionError(
         caughtError instanceof Error
           ? caughtError.message
-          : 'Unable to approve this request.',
+          : `Unable to ${decisionType} this request. Please try again.`,
       )
     } finally {
-      setDecisionApprovalId(
-        null,
-      )
+      setIsDeciding(false)
     }
-  }
-
-  async function handleReject(
-    approval: Approval,
-    reason: string,
-  ) {
-    if (!accessToken) {
-      setError(
-        'Your session is no longer valid',
-      )
-
-      return
-    }
-
-    const normalizedReason =
-      reason.trim()
-
-    if (normalizedReason === '') {
-      setError(
-        'Rejection reason is required.',
-      )
-
-      return
-    }
-
-    setDecisionApprovalId(
-      approval.id,
-    )
-
-    setError(null)
-    setSuccessMessage(null)
-
-    try {
-      await rejectApproval(
-        accessToken,
-        approval.id,
-        normalizedReason,
-      )
-
-      refreshAfterDecision(
-        approval.ticketNumber,
-        'rejected',
-      )
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : 'Unable to reject this request.',
-      )
-    } finally {
-      setDecisionApprovalId(
-        null,
-      )
-    }
-  }
-
-  function handlePreviousPage() {
-    setPage(
-      (currentPage) =>
-        Math.max(
-          0,
-          currentPage - 1,
-        ),
-    )
-  }
-
-  function handleNextPage() {
-    if (
-      approvalPage?.last
-    ) {
-      return
-    }
-
-    setPage(
-      (currentPage) =>
-        currentPage + 1,
-    )
   }
 
   return (
-    <main className="dashboard-page">
-      <header className="dashboard-header">
-        <div>
-          <p className="eyebrow">
-            FlowDesk
-          </p>
+    <div className="approvals-page horizon-page-container">
+      {/* Page Header */}
+      <PageHeader
+        title="Approval Inbox"
+        subtitle="Review and authorize service requests before they enter the support queue and begin SLA tracking."
+        actions={
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setRefreshVersion((v) => v + 1)}
+              leadingIcon={<RefreshCw size={14} className={isLoading ? 'horizon-spin' : ''} />}
+              disabled={isLoading}
+            >
+              Refresh
+            </Button>
+          </div>
+        }
+      />
 
-          <h1>
-            Approval Inbox
-          </h1>
-
-          <p className="dashboard-subtitle">
-            Review pending service requests
-            before they enter the support
-            workflow and begin SLA tracking.
-          </p>
+      {/* Global Alerts */}
+      {error && (
+        <div className="horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ marginBottom: '1.5rem' }}>
+          <AlertCircle size={18} className="horizon-auth-alert-icon" />
+          <span>{error}</span>
         </div>
-
-        <div className="dashboard-header-actions">
-          <NotificationBell />
-
-          <button
-            type="button"
-            className="dashboard-secondary-button"
-            onClick={() =>
-              navigate(
-                '/dashboard',
-              )
-            }
-          >
-            Dashboard
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSignOut}
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
+      )}
 
       {successMessage && (
-        <p className="support-alert support-alert-success">
-          {successMessage}
-        </p>
+        <div className="horizon-auth-alert horizon-auth-alert--success" role="status" style={{ marginBottom: '1.5rem' }}>
+          <CheckCircle2 size={18} className="horizon-auth-alert-icon" />
+          <span>{successMessage}</span>
+        </div>
       )}
 
-      {error && (
-        <p className="support-alert support-alert-error">
-          {error}
-        </p>
-      )}
-
-      {isLoading && (
-        <section className="support-loading-state">
-          <div className="support-loading-dot" />
-
-          <p>
-            Loading pending approvals...
-          </p>
-        </section>
-      )}
-
-      {!isLoading &&
-        approvalPage &&
-        approvalPage.content.length === 0 && (
-          <section className="support-empty-state">
-            <div className="support-empty-mark">
-              ✓
-            </div>
-
-            <h2>
-              Approval inbox is clear
-            </h2>
-
-            <p>
-              There are currently no pending
-              service requests waiting for a
-              decision.
-            </p>
-          </section>
-        )}
-
-      {!isLoading &&
-        approvalPage &&
-        approvalPage.content.length > 0 && (
-          <>
-            <section className="user-card">
-              <div className="account-card-heading">
-                <div>
-                  <p className="dashboard-card-label">
-                    Pending decisions
-                  </p>
-
-                  <h2>
-                    Service requests awaiting approval
-                  </h2>
-                </div>
-
-                <span className="account-status">
-                  {
-                    approvalPage
-                      .totalElements
-                  }{' '}
-                  pending
-                </span>
-              </div>
-
-              <div className="approval-inbox-grid">
-                {approvalPage.content.map(
-                  (approval) => (
-                    <ApprovalCard
-                      key={
-                        approval.id
-                      }
-                      approval={
-                        approval
-                      }
-                      isOwnRequest={
-                        approval
-                          .requestedByUserId ===
-                        user?.userId
-                      }
-                      isSubmitting={
-                        decisionApprovalId ===
-                        approval.id
-                      }
-                      onApprove={
-                        handleApprove
-                      }
-                      onReject={
-                        handleReject
-                      }
-                    />
-                  ),
-                )}
-              </div>
-            </section>
-
-            {approvalPage.totalPages > 1 && (
-              <nav
-                className="pagination"
-                aria-label="Approval inbox pagination"
-              >
-                <button
-                  type="button"
-                  disabled={
-                    approvalPage.first
-                  }
-                  onClick={
-                    handlePreviousPage
-                  }
-                >
-                  Previous
-                </button>
-
-                <span>
-                  Page{' '}
-                  {
-                    approvalPage.page +
-                    1
-                  }{' '}
-                  of{' '}
-                  {
-                    approvalPage
-                      .totalPages
-                  }
-                </span>
-
-                <button
-                  type="button"
-                  disabled={
-                    approvalPage.last
-                  }
-                  onClick={
-                    handleNextPage
-                  }
-                >
-                  Next
-                </button>
-              </nav>
-            )}
-          </>
-        )}
-    </main>
-  )
-}
-
-interface ApprovalCardProps {
-  approval: Approval
-  isOwnRequest: boolean
-  isSubmitting: boolean
-  onApprove: (
-    approval: Approval,
-    note: string,
-  ) => Promise<void>
-  onReject: (
-    approval: Approval,
-    reason: string,
-  ) => Promise<void>
-}
-
-function ApprovalCard({
-  approval,
-  isOwnRequest,
-  isSubmitting,
-  onApprove,
-  onReject,
-}: ApprovalCardProps) {
-  const [activeDecision, setActiveDecision] =
-    useState<'approve' | 'reject'>('approve')
-
-  const [
-    approvalNote,
-    setApprovalNote,
-  ] =
-    useState('')
-
-  const [
-    rejectionReason,
-    setRejectionReason,
-  ] =
-    useState('')
-
-  function handleApproveSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault()
-
-    void onApprove(
-      approval,
-      approvalNote,
-    )
-  }
-
-  function handleRejectSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault()
-
-    void onReject(
-      approval,
-      rejectionReason,
-    )
-  }
-
-  const priorityClass = `priority-badge priority-badge-${approval.priority.toLowerCase()}`
-
-  return (
-    <article className="approval-card">
-      <div className="approval-card-header">
-        <div className="approval-card-tags">
-          <span className="approval-ticket-number">
-            {approval.ticketNumber}
-          </span>
-
-          <span className={priorityClass}>
-            {formatLabel(approval.priority)}
-          </span>
-
-          <span className="support-status support-status-pending-approval">
-            Pending Decision
-          </span>
+      {/* Loading state */}
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--color-text-secondary)' }}>
+          <p>Loading pending approvals...</p>
         </div>
-
-        <span className="approval-meta-label">
-          Requested {formatDate(approval.requestedAt)}
-        </span>
-      </div>
-
-      <h2 className="approval-card-title">
-        {approval.ticketTitle}
-      </h2>
-
-      <div className="approval-card-description">
-        {approval.ticketDescription}
-      </div>
-
-      <div className="approval-metadata-strip">
-        <div className="approval-meta-item">
-          <span className="approval-meta-label">
-            Requester
-          </span>
-
-          <strong className="approval-meta-value">
-            {approval.requestedByEmail}
-          </strong>
-        </div>
-
-        <div className="approval-meta-item">
-          <span className="approval-meta-label">
-            Request Type
-          </span>
-
-          <strong className="approval-meta-value">
-            Service Request
-          </strong>
-        </div>
-
-        <div className="approval-meta-item">
-          <span className="approval-meta-label">
-            Priority Level
-          </span>
-
-          <strong className="approval-meta-value">
-            {formatLabel(approval.priority)}
-          </strong>
-        </div>
-      </div>
-
-      {isOwnRequest ? (
-        <p className="support-alert support-alert-error">
-          You requested this service.
-          Another Team Lead or Admin must
-          decide it.
-        </p>
+      ) : !approvalPage || approvalPage.content.length === 0 ? (
+        <EmptyState
+          icon={<CheckSquare size={36} />}
+          title="All caught up!"
+          description="There are currently no service requests pending management approval."
+          action={
+            <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
+              Return to Dashboard
+            </Button>
+          }
+        />
       ) : (
-        <div className="approval-decision-panel">
-          <div className="approval-decision-tabs" role="tablist" aria-label="Decision options">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeDecision === 'approve'}
-              className={`approval-tab-btn ${
-                activeDecision === 'approve' ? 'active' : ''
-              }`}
-              onClick={() => setActiveDecision('approve')}
-              disabled={isSubmitting}
-            >
-              Approve Request
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeDecision === 'reject'}
-              className={`approval-tab-btn ${
-                activeDecision === 'reject' ? 'active' : ''
-              }`}
-              onClick={() => setActiveDecision('reject')}
-              disabled={isSubmitting}
-            >
-              Reject Request
-            </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Header count indicator */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', paddingBottom: '0.5rem' }}>
+            <span>
+              <strong>{approvalPage.totalElements}</strong> {approvalPage.totalElements === 1 ? 'request' : 'requests'} awaiting decision
+            </span>
+            <span style={{ fontSize: 'var(--font-size-xs)' }}>
+              Team Lead / Admin authorization required
+            </span>
           </div>
 
-          {activeDecision === 'approve' ? (
-            <form
-              className="approval-decision-box"
-              onSubmit={handleApproveSubmit}
-            >
-              <div className="approval-decision-box-heading">
-                <h3>Approve Service Request</h3>
-                <p>
-                  Approving will transition this ticket to OPEN and place it in the support queue.
+          {/* List of Approval Cards */}
+          {approvalPage.content.map((approval) => {
+            const isSelfRequest = user?.userId === approval.requestedByUserId
+
+            return (
+              <Card key={approval.id} padded className="horizon-approval-card">
+                {/* Header row */}
+                <div className="horizon-approval-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-family-mono)',
+                        fontWeight: 'var(--font-weight-bold)',
+                        color: 'var(--color-primary)',
+                        fontSize: 'var(--font-size-base)',
+                      }}
+                    >
+                      {approval.ticketNumber}
+                    </span>
+                    <PriorityBadge priority={approval.priority} size="sm" />
+                    <Badge variant="neutral" size="sm">
+                      {formatLabel(approval.ticketType)}
+                    </Badge>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={12} />
+                      Requested {formatDate(approval.requestedAt)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Title & Description */}
+                <h3 style={{ margin: '0 0 0.5rem', fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)' }}>
+                  {approval.ticketTitle}
+                </h3>
+
+                <p style={{ margin: '0 0 1rem', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 'var(--line-height-relaxed)', whiteSpace: 'pre-wrap' }}>
+                  {approval.ticketDescription}
                 </p>
-              </div>
 
-              <label className="approval-form-label">
-                Approval note (optional)
+                {/* Requester Info & Self-Approval Notice */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', padding: '0.75rem 1rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                    <User size={14} />
+                    <span>Requester: <strong style={{ color: 'var(--color-text-primary)' }}>{approval.requestedByEmail}</strong></span>
+                  </div>
 
-                <textarea
-                  value={approvalNote}
-                  maxLength={500}
-                  rows={3}
-                  disabled={isSubmitting}
-                  placeholder="Optional note or context for this approval..."
-                  onChange={(event) =>
-                    setApprovalNote(event.target.value)
-                  }
-                />
+                  {isSelfRequest && (
+                    <Badge variant="warning" size="sm" dot>
+                      <ShieldAlert size={12} style={{ marginRight: '4px' }} />
+                      Self-Approval Forbidden (Must be decided by another lead)
+                    </Badge>
+                  )}
+                </div>
 
-                <span className="approval-char-count">
-                  {approvalNote.length}/500
-                </span>
-              </label>
+                {/* Actions */}
+                <div className="horizon-approval-actions">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isSelfRequest}
+                    onClick={() => handleOpenDecisionModal(approval, 'reject')}
+                    leadingIcon={<XCircle size={14} style={{ color: 'var(--color-danger)' }} />}
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={isSelfRequest}
+                    onClick={() => handleOpenDecisionModal(approval, 'approve')}
+                    leadingIcon={<CheckCircle2 size={14} />}
+                  >
+                    Approve Service Request
+                  </Button>
+                </div>
+              </Card>
+            )
+          })}
 
-              <div className="approval-form-actions">
-                <button
-                  type="submit"
-                  className="primary-button"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting
-                    ? 'Processing approval...'
-                    : 'Confirm Approval'}
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form
-              className="approval-decision-box"
-              onSubmit={handleRejectSubmit}
-            >
-              <div className="approval-decision-box-heading">
-                <h3>Reject Service Request</h3>
-                <p>
-                  Rejecting will cancel the service request and record your reason for the requester.
-                </p>
-              </div>
-
-              <label className="approval-form-label">
-                Rejection reason (required)
-
-                <textarea
-                  value={rejectionReason}
-                  maxLength={500}
-                  rows={3}
-                  required
-                  disabled={isSubmitting}
-                  placeholder="Provide a clear explanation for the requester..."
-                  onChange={(event) =>
-                    setRejectionReason(event.target.value)
-                  }
-                />
-
-                <span className="approval-char-count">
-                  {rejectionReason.length}/500
-                </span>
-              </label>
-
-              <div className="approval-form-actions">
-                <button
-                  type="submit"
-                  className="btn-reject-submit"
-                  disabled={
-                    isSubmitting ||
-                    rejectionReason.trim() === ''
-                  }
-                >
-                  {isSubmitting
-                    ? 'Processing rejection...'
-                    : 'Confirm Rejection'}
-                </button>
-              </div>
-            </form>
+          {/* Pagination */}
+          {approvalPage.totalPages > 1 && (
+            <Pagination
+              page={approvalPage.page}
+              totalPages={approvalPage.totalPages}
+              totalElements={approvalPage.totalElements}
+              onPageChange={(p) => setPage(p)}
+            />
           )}
         </div>
       )}
-    </article>
+
+      {/* Decision Modal (Approve / Reject) */}
+      <Modal
+        isOpen={activeApproval !== null && decisionType !== null}
+        onClose={handleCloseModal}
+        title={
+          decisionType === 'approve'
+            ? `Approve ${activeApproval?.ticketNumber}`
+            : `Reject ${activeApproval?.ticketNumber}`
+        }
+        subtitle={
+          decisionType === 'approve'
+            ? 'Approving this service request will promote it to OPEN in the support queue and initiate SLA policy tracking.'
+            : 'Rejecting this service request will transition it to CANCELLED and notify the requester with your mandatory explanation.'
+        }
+        footer={
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" size="sm" onClick={handleCloseModal} disabled={isDeciding}>
+              Cancel
+            </Button>
+            <Button
+              variant={decisionType === 'approve' ? 'primary' : 'danger'}
+              size="sm"
+              onClick={() => void handleConfirmDecision()}
+              isLoading={isDeciding}
+              disabled={decisionType === 'reject' && !decisionNote.trim()}
+              leadingIcon={decisionType === 'approve' ? <CheckCircle2 size={14} /> : <X size={14} />}
+            >
+              {decisionType === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
+            </Button>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0.5rem 0' }}>
+          {decisionError && (
+            <div className="horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ margin: 0, padding: '0.5rem' }}>
+              <AlertCircle size={16} className="horizon-auth-alert-icon" />
+              <span style={{ fontSize: 'var(--font-size-xs)' }}>{decisionError}</span>
+            </div>
+          )}
+
+          {/* Context box */}
+          <div style={{ padding: '0.75rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-secondary)' }}>
+              Ticket Subject:
+            </p>
+            <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-primary)' }}>
+              {activeApproval?.ticketTitle}
+            </p>
+          </div>
+
+          {/* Decision note input */}
+          <div className="horizon-form-field" style={{ margin: 0 }}>
+            <label htmlFor="approval-decision-note" className="horizon-label" style={{ margin: '0 0 4px' }}>
+              {decisionType === 'approve' ? (
+                'Approval Note (Optional)'
+              ) : (
+                <span>
+                  Rejection Reason <span className="horizon-field-required">*</span>
+                </span>
+              )}
+            </label>
+            <div className="horizon-input-wrapper">
+              <textarea
+                id="approval-decision-note"
+                className="horizon-textarea"
+                style={{ minHeight: '100px' }}
+                placeholder={
+                  decisionType === 'approve'
+                    ? 'Add any conditions, provisioning instructions, or notes for the support team...'
+                    : 'Explain why this service request cannot be fulfilled at this time...'
+                }
+                value={decisionNote}
+                onChange={(e) => setDecisionNote(e.target.value)}
+                disabled={isDeciding}
+                maxLength={2000}
+                required={decisionType === 'reject'}
+              />
+            </div>
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px', textAlign: 'right' }}>
+              {decisionNote.length}/2000
+            </span>
+          </div>
+        </div>
+      </Modal>
+    </div>
   )
-}
-
-function formatLabel(
-  value: string,
-) {
-  return value
-    .replaceAll(
-      '_',
-      ' ',
-    )
-    .toLowerCase()
-    .replace(
-      /\b\w/g,
-      (character) =>
-        character.toUpperCase(),
-    )
-}
-
-function formatDate(
-  value: string,
-) {
-  const date =
-    new Date(
-      value,
-    )
-
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
-    return value
-  }
-
-  return date.toLocaleString()
 }

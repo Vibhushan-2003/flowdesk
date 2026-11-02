@@ -7,6 +7,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   timeout: 30000,
+  expect: {
+    timeout: 10000,
+  },
   reporter: [
     ['list'],
     ['html', { outputFolder: 'playwright-live-report', open: 'never' }],

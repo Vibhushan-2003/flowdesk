@@ -9,6 +9,7 @@ import './App.css'
 
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { RoleProtectedRoute } from './components/RoleProtectedRoute'
+import { AppShell } from './components/layout/AppShell'
 
 const ApprovalInboxPage = lazy(() =>
   import('./pages/ApprovalInboxPage').then((m) => ({ default: m.ApprovalInboxPage }))
@@ -55,6 +56,9 @@ const SupportTicketDetailsPage = lazy(() =>
 const TicketDetailsPage = lazy(() =>
   import('./pages/TicketDetailsPage').then((m) => ({ default: m.TicketDetailsPage }))
 )
+const AttachmentSecurityPage = lazy(() =>
+  import('./pages/AttachmentSecurityPage').then((m) => ({ default: m.AttachmentSecurityPage }))
+)
 const UserManagementPage = lazy(() =>
   import('./pages/UserManagementPage').then((m) => ({ default: m.UserManagementPage }))
 )
@@ -69,6 +73,12 @@ const ArticleEditorPage = lazy(() =>
 )
 const ReportsPage = lazy(() =>
   import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage }))
+)
+const ProfilePage = lazy(() =>
+  import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage }))
+)
+const AccountSettingsPage = lazy(() =>
+  import('./pages/AccountSettingsPage').then((m) => ({ default: m.AccountSettingsPage }))
 )
 
 function PageLoading() {
@@ -120,6 +130,7 @@ function App() {
         />
 
         <Route element={<ProtectedRoute />}>
+          <Route element={<AppShell />}>
           <Route
             path="/dashboard"
             element={<DashboardPage />}
@@ -141,19 +152,48 @@ function App() {
           />
 
           <Route
-            path="/support/queue"
-            element={<SupportQueuePage />}
+            path="/profile"
+            element={<ProfilePage />}
           />
 
           <Route
-            path="/support/tickets"
-            element={<MyAssignedTicketsPage />}
+            path="/account"
+            element={<AccountSettingsPage />}
           />
 
           <Route
-            path="/support/tickets/:ticketNumber"
-            element={<SupportTicketDetailsPage />}
-          />
+            element={
+              <RoleProtectedRoute
+                allowedRoles={['SUPPORT_ENGINEER']}
+              />
+            }
+          >
+            <Route
+              path="/support/queue"
+              element={<SupportQueuePage />}
+            />
+          </Route>
+
+          <Route
+            element={
+              <RoleProtectedRoute
+                allowedRoles={[
+                  'SUPPORT_ENGINEER',
+                  'TEAM_LEAD',
+                  'ADMIN',
+                ]}
+              />
+            }
+          >
+            <Route
+              path="/support/tickets"
+              element={<MyAssignedTicketsPage />}
+            />
+            <Route
+              path="/support/tickets/:ticketNumber"
+              element={<SupportTicketDetailsPage />}
+            />
+          </Route>
 
           <Route
             path="/kb"
@@ -230,6 +270,11 @@ function App() {
               path="/admin/users"
               element={<UserManagementPage />}
             />
+            <Route
+              path="/admin/attachments"
+              element={<AttachmentSecurityPage />}
+            />
+          </Route>
           </Route>
         </Route>
 

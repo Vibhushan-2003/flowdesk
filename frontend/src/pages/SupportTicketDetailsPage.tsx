@@ -3,40 +3,49 @@ import {
   useEffect,
   useState,
 } from 'react'
-
+import { useNavigate, useParams } from 'react-router-dom'
 import {
-  useNavigate,
-  useParams,
-} from 'react-router-dom'
+  ArrowLeft,
+  CheckCircle2,
+  AlertCircle,
+  Play,
+  Pause,
+  Lock,
+  Globe,
+  Sparkles,
+  MessageSquare,
+  FileCheck2,
+} from 'lucide-react'
 
-import {
-  generateAiReplyDraft,
-} from '../api/aiReplyDraft'
-
-import {
-  generateAiResolutionSummary,
-} from '../api/aiResolutionSummary'
-
+import { generateAiReplyDraft } from '../api/aiReplyDraft'
+import { generateAiResolutionSummary } from '../api/aiResolutionSummary'
 import {
   addSupportTicketComment,
   getSupportTicket,
   getSupportTicketComments,
   resolveSupportTicket,
+  updateSupportTicketPriority,
   updateSupportTicketStatus,
 } from '../api/ticket'
-
 import { useAuth } from '../auth/useAuth'
-
-import { AiTriageCard } from '../components/AiTriageCard'
-import { AiSupportCopilotCard } from '../components/AiSupportCopilotCard'
 import { TicketAttachmentSection } from '../components/tickets/TicketAttachmentSection'
+import { AiWorkbench } from '../components/AiWorkbench'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { Badge } from '../components/ui/Badge'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { PriorityBadge } from '../components/ui/PriorityBadge'
+import { UserAvatar } from '../components/ui/UserAvatar'
+import { Timeline, TimelineItem } from '../components/ui/Timeline'
+import { Modal } from '../components/ui/Modal'
 
 import type {
   SupportTicketResponse,
   TicketCommentResponse,
+  TicketPriority,
   TicketStatus,
 } from '../types/ticket'
-
 import {
   formatDate,
   formatLabel,
@@ -44,117 +53,50 @@ import {
   formatSlaStatus,
 } from '../utils/formatters'
 
-function getStatusClass(status: string) {
-  return `support-status support-status-${status
-    .toLowerCase()
-    .replaceAll('_', '-')}`
-}
-
-function getActionMessage(
-  status: TicketStatus,
-) {
+function getActionMessage(status: TicketStatus) {
   switch (status) {
     case 'IN_PROGRESS':
       return 'Ticket is now in progress.'
-
     case 'WAITING_FOR_USER':
-      return 'Ticket is now waiting for the requester.'
-
+      return 'Ticket is now waiting for user response.'
     default:
       return 'Ticket status updated successfully.'
   }
 }
 
 export function SupportTicketDetailsPage() {
-  const { accessToken } = useAuth()
-
+  const { accessToken, user } = useAuth()
   const { ticketNumber } = useParams()
-
   const navigate = useNavigate()
 
-  const [ticket, setTicket] =
-    useState<SupportTicketResponse | null>(
-      null,
-    )
+  const [ticket, setTicket] = useState<SupportTicketResponse | null>(null)
+  const [comments, setComments] = useState<TicketCommentResponse[]>([])
+  const [commentBody, setCommentBody] = useState('')
+  const [isInternalComment, setIsInternalComment] = useState(false)
+  const [resolutionSummary, setResolutionSummary] = useState('')
 
-  const [comments, setComments] =
-    useState<TicketCommentResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [isUpdatingPriority, setIsUpdatingPriority] = useState(false)
+  const [isResolving, setIsResolving] = useState(false)
+  const [isSendingComment, setIsSendingComment] = useState(false)
 
-  const [commentBody, setCommentBody] =
-    useState('')
+  // AI draft states
+  const [isGeneratingReplyDraft, setIsGeneratingReplyDraft] = useState(false)
+  const [isGeneratingResolutionSummary, setIsGeneratingResolutionSummary] = useState(false)
+  const [aiReplyDraftError, setAiReplyDraftError] = useState<string | null>(null)
+  const [aiReplyDraftNotice, setAiReplyDraftNotice] = useState<string | null>(null)
+  const [aiResolutionSummaryError, setAiResolutionSummaryError] = useState<string | null>(null)
+  const [aiResolutionSummaryNotice, setAiResolutionSummaryNotice] = useState<string | null>(null)
 
-  const [isInternalComment, setIsInternalComment] =
-    useState(false)
+  // Feedback alerts
+  const [error, setError] = useState<string | null>(null)
+  const [commentError, setCommentError] = useState<string | null>(null)
+  const [resolutionError, setResolutionError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  const [
-    resolutionSummary,
-    setResolutionSummary,
-  ] = useState('')
-
-  const [isLoading, setIsLoading] =
-    useState(true)
-
-  const [isUpdating, setIsUpdating] =
-    useState(false)
-
-  const [
-    isResolving,
-    setIsResolving,
-  ] = useState(false)
-
-  const [isSendingComment, setIsSendingComment] =
-    useState(false)
-
-  const [
-    isGeneratingReplyDraft,
-    setIsGeneratingReplyDraft,
-  ] =
-    useState(false)
-
-  const [
-    isGeneratingResolutionSummary,
-    setIsGeneratingResolutionSummary,
-  ] =
-    useState(false)
-
-  const [error, setError] =
-    useState<string | null>(null)
-
-  const [commentError, setCommentError] =
-    useState<string | null>(null)
-
-  const [
-    resolutionError,
-    setResolutionError,
-  ] =
-    useState<string | null>(null)
-
-  const [
-    aiReplyDraftError,
-    setAiReplyDraftError,
-  ] =
-    useState<string | null>(null)
-
-  const [
-    aiReplyDraftNotice,
-    setAiReplyDraftNotice,
-  ] =
-    useState<string | null>(null)
-
-  const [
-    aiResolutionSummaryError,
-    setAiResolutionSummaryError,
-  ] =
-    useState<string | null>(null)
-
-  const [
-    aiResolutionSummaryNotice,
-    setAiResolutionSummaryNotice,
-  ] =
-    useState<string | null>(null)
-
-  const [successMessage, setSuccessMessage] =
-    useState<string | null>(null)
+  // Modal dialog states
+  const [isResolveModalOpen, setIsResolveModalOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -162,25 +104,17 @@ export function SupportTicketDetailsPage() {
     async function loadTicket() {
       if (!accessToken) {
         if (!cancelled) {
-          setError(
-            'Your session is no longer valid',
-          )
-
+          setError('Your session is no longer valid')
           setIsLoading(false)
         }
-
         return
       }
 
       if (!ticketNumber) {
         if (!cancelled) {
-          setError(
-            'Ticket number is missing',
-          )
-
+          setError('Ticket number is missing')
           setIsLoading(false)
         }
-
         return
       }
 
@@ -188,45 +122,23 @@ export function SupportTicketDetailsPage() {
       setError(null)
 
       try {
-        const [
-          ticketResponse,
-          commentsResponse,
-        ] = await Promise.all([
-          getSupportTicket(
-            accessToken,
-            ticketNumber,
-          ),
-          getSupportTicketComments(
-            accessToken,
-            ticketNumber,
-          ),
+        const [ticketResponse, commentsResponse] = await Promise.all([
+          getSupportTicket(accessToken, ticketNumber),
+          getSupportTicketComments(accessToken, ticketNumber),
         ])
 
         if (!cancelled) {
           setTicket(ticketResponse)
-
-          setComments(
-            commentsResponse,
-          )
-
-          setResolutionSummary(
-            ticketResponse.resolutionSummary ?? '',
-          )
+          setComments(commentsResponse)
+          setResolutionSummary(ticketResponse.resolutionSummary ?? '')
         }
       } catch (caughtError) {
-        if (cancelled) {
-          return
-        }
-
-        if (caughtError instanceof Error) {
-          setError(
-            caughtError.message,
-          )
-        } else {
-          setError(
-            'Unable to load support ticket',
-          )
-        }
+        if (cancelled) return
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : 'Unable to load support ticket. Please verify your permissions.',
+        )
       } finally {
         if (!cancelled) {
           setIsLoading(false)
@@ -239,41 +151,40 @@ export function SupportTicketDetailsPage() {
     return () => {
       cancelled = true
     }
-  }, [
-    accessToken,
-    ticketNumber,
-  ])
+  }, [accessToken, ticketNumber])
 
   async function handleAiTriageApplied() {
     if (!accessToken || !ticketNumber) {
-      throw new Error(
-        'Your session is no longer valid',
-      )
+      throw new Error('Your session is no longer valid')
     }
 
-    const refreshedTicket =
-      await getSupportTicket(
-        accessToken,
-        ticketNumber,
-      )
-
-    setTicket(
-      refreshedTicket,
-    )
-
-    setSuccessMessage(
-      `AI recommendation applied. Ticket priority is now ${refreshedTicket.priority}.`,
-    )
+    const refreshedTicket = await getSupportTicket(accessToken, ticketNumber)
+    setTicket(refreshedTicket)
+    setSuccessMessage(`AI recommendation applied. Ticket priority is now ${refreshedTicket.priority}.`)
   }
 
-  async function handleStatusChange(
-    nextStatus: TicketStatus,
-  ) {
-    if (!accessToken || !ticketNumber) {
-      setError(
-        'Your session is no longer valid',
-      )
+  async function handlePriorityChange(nextPriority: TicketPriority) {
+    if (!accessToken || !ticketNumber || !ticket) return
+    if (nextPriority === ticket.priority) return
 
+    setIsUpdatingPriority(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const response = await updateSupportTicketPriority(accessToken, ticketNumber, nextPriority)
+      setTicket(response)
+      setSuccessMessage(`Priority updated to ${formatLabel(nextPriority)}. SLA deadlines recalculated from original ticket creation.`)
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to update ticket priority')
+    } finally {
+      setIsUpdatingPriority(false)
+    }
+  }
+
+  async function handleStatusChange(nextStatus: TicketStatus) {
+    if (!accessToken || !ticketNumber) {
+      setError('Your session is no longer valid')
       return
     }
 
@@ -282,30 +193,13 @@ export function SupportTicketDetailsPage() {
     setSuccessMessage(null)
 
     try {
-      const response =
-        await updateSupportTicketStatus(
-          accessToken,
-          ticketNumber,
-          nextStatus,
-        )
-
+      const response = await updateSupportTicketStatus(accessToken, ticketNumber, nextStatus)
       setTicket(response)
-
-      setSuccessMessage(
-        getActionMessage(
-          response.status,
-        ),
-      )
+      setSuccessMessage(getActionMessage(response.status))
     } catch (caughtError) {
-      if (caughtError instanceof Error) {
-        setError(
-          caughtError.message,
-        )
-      } else {
-        setError(
-          'Unable to update ticket status',
-        )
-      }
+      setError(
+        caughtError instanceof Error ? caughtError.message : 'Unable to update ticket status',
+      )
     } finally {
       setIsUpdating(false)
     }
@@ -313,22 +207,17 @@ export function SupportTicketDetailsPage() {
 
   async function handleGenerateAiReplyDraft() {
     if (!accessToken || !ticketNumber) {
-      setAiReplyDraftError(
-        'Your session is no longer valid',
-      )
-
+      setAiReplyDraftError('Your session is no longer valid')
       return
     }
 
-    /*
-     * Never overwrite something that the engineer
-     * has already typed or edited.
-     */
-    if (commentBody.trim()) {
-      setAiReplyDraftError(
-        'Clear the current message before generating a new AI draft',
-      )
+    if (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED' || ticket?.status === 'CANCELLED') {
+      setAiReplyDraftError('AI reply drafts cannot be generated for this finished ticket')
+      return
+    }
 
+    if (commentBody.trim()) {
+      setAiReplyDraftError('Clear current message text before generating a new AI draft')
       return
     }
 
@@ -338,67 +227,31 @@ export function SupportTicketDetailsPage() {
     setCommentError(null)
 
     try {
-      const response =
-        await generateAiReplyDraft(
-          accessToken,
-          ticketNumber,
-        )
-
-      /*
-       * The AI result only fills the normal editable
-       * message textarea.
-       *
-       * This does NOT send or persist a comment.
-       */
-      setCommentBody(
-        response.draft,
-      )
-
-      setAiReplyDraftNotice(
-        `AI draft generated with ${response.model}. Review and edit it before sending.`,
-      )
+      const response = await generateAiReplyDraft(accessToken, ticketNumber)
+      setCommentBody(response.draft)
+      setAiReplyDraftNotice(`AI draft generated with ${response.model}. Review and edit before sending.`)
     } catch (caughtError) {
-      if (caughtError instanceof Error) {
-        setAiReplyDraftError(
-          caughtError.message,
-        )
-      } else {
-        setAiReplyDraftError(
-          'Unable to generate AI reply draft',
-        )
-      }
+      setAiReplyDraftError(
+        caughtError instanceof Error ? caughtError.message : 'Unable to generate AI reply draft',
+      )
     } finally {
       setIsGeneratingReplyDraft(false)
     }
   }
 
-  async function
-  handleGenerateAiResolutionSummary() {
+  async function handleGenerateAiResolutionSummary() {
     if (!accessToken || !ticketNumber) {
-      setAiResolutionSummaryError(
-        'Your session is no longer valid',
-      )
-
+      setAiResolutionSummaryError('Your session is no longer valid')
       return
     }
 
     if (ticket?.status !== 'IN_PROGRESS') {
-      setAiResolutionSummaryError(
-        'AI resolution summaries can only be generated while the ticket is in progress',
-      )
-
+      setAiResolutionSummaryError('AI resolution summaries can only be generated while in progress')
       return
     }
 
-    /*
-     * Never overwrite a manual summary or an
-     * AI draft that the engineer has edited.
-     */
     if (resolutionSummary.trim()) {
-      setAiResolutionSummaryError(
-        'Clear the current resolution summary before generating a new AI draft',
-      )
-
+      setAiResolutionSummaryError('Clear the current summary before generating a new draft')
       return
     }
 
@@ -408,35 +261,15 @@ export function SupportTicketDetailsPage() {
     setResolutionError(null)
 
     try {
-      const response =
-        await generateAiResolutionSummary(
-          accessToken,
-          ticketNumber,
-        )
-
-      /*
-       * AI only fills this editable textarea.
-       *
-       * Nothing is persisted and the ticket
-       * remains IN_PROGRESS.
-       */
-      setResolutionSummary(
-        response.draft,
-      )
-
+      const response = await generateAiResolutionSummary(accessToken, ticketNumber)
+      setResolutionSummary(response.draft)
       setAiResolutionSummaryNotice(
-        `AI draft generated with ${response.model}. Review and edit it before resolving the ticket.`,
+        `AI draft generated with ${response.model}. Review and edit before resolving.`,
       )
     } catch (caughtError) {
-      if (caughtError instanceof Error) {
-        setAiResolutionSummaryError(
-          caughtError.message,
-        )
-      } else {
-        setAiResolutionSummaryError(
-          'Unable to generate AI resolution summary',
-        )
-      }
+      setAiResolutionSummaryError(
+        caughtError instanceof Error ? caughtError.message : 'Unable to generate AI resolution summary',
+      )
     } finally {
       setIsGeneratingResolutionSummary(false)
     }
@@ -444,37 +277,23 @@ export function SupportTicketDetailsPage() {
 
   async function handleResolveTicket() {
     if (!accessToken || !ticketNumber) {
-      setResolutionError(
-        'Your session is no longer valid',
-      )
-
+      setResolutionError('Your session is no longer valid')
       return
     }
 
     if (ticket?.status !== 'IN_PROGRESS') {
-      setResolutionError(
-        'This ticket can only be resolved while it is in progress',
-      )
-
+      setResolutionError('This ticket can only be resolved while it is in progress')
       return
     }
 
-    const normalizedSummary =
-      resolutionSummary.trim()
-
+    const normalizedSummary = resolutionSummary.trim()
     if (!normalizedSummary) {
-      setResolutionError(
-        'Enter a resolution summary before resolving the ticket',
-      )
-
+      setResolutionError('Enter a resolution summary before resolving the ticket')
       return
     }
 
     if (normalizedSummary.length > 4000) {
-      setResolutionError(
-        'Resolution summary must not exceed 4000 characters',
-      )
-
+      setResolutionError('Resolution summary must not exceed 4000 characters')
       return
     }
 
@@ -484,69 +303,37 @@ export function SupportTicketDetailsPage() {
     setSuccessMessage(null)
 
     try {
-      const response =
-        await resolveSupportTicket(
-          accessToken,
-          ticketNumber,
-          normalizedSummary,
-        )
-
+      const response = await resolveSupportTicket(accessToken, ticketNumber, normalizedSummary)
       setTicket(response)
-
-      setResolutionSummary(
-        response.resolutionSummary ??
-          normalizedSummary,
-      )
-
+      setResolutionSummary(response.resolutionSummary ?? normalizedSummary)
       setAiResolutionSummaryNotice(null)
-
-      setSuccessMessage(
-        'Ticket has been resolved successfully.',
-      )
+      setIsResolveModalOpen(false)
+      setSuccessMessage('Ticket has been resolved successfully.')
     } catch (caughtError) {
-      if (caughtError instanceof Error) {
-        setResolutionError(
-          caughtError.message,
-        )
-      } else {
-        setResolutionError(
-          'Unable to resolve ticket',
-        )
-      }
+      setResolutionError(
+        caughtError instanceof Error ? caughtError.message : 'Unable to resolve ticket',
+      )
     } finally {
       setIsResolving(false)
     }
   }
 
-  async function handleSendComment(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  async function handleSendComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     if (!accessToken || !ticketNumber) {
-      setCommentError(
-        'Your session is no longer valid',
-      )
-
+      setCommentError('Your session is no longer valid')
       return
     }
 
-    const normalizedBody =
-      commentBody.trim()
-
+    const normalizedBody = commentBody.trim()
     if (!normalizedBody) {
-      setCommentError(
-        'Please enter a message',
-      )
-
+      setCommentError('Please enter a message')
       return
     }
 
     if (normalizedBody.length > 4000) {
-      setCommentError(
-        'Message must not exceed 4000 characters',
-      )
-
+      setCommentError('Message must not exceed 4000 characters')
       return
     }
 
@@ -554,893 +341,577 @@ export function SupportTicketDetailsPage() {
     setCommentError(null)
 
     try {
-      const response =
-        await addSupportTicketComment(
-          accessToken,
-          ticketNumber,
-          {
-            body: normalizedBody,
-            visibility: isInternalComment ? 'INTERNAL' : 'PUBLIC',
-          },
-        )
+      const response = await addSupportTicketComment(accessToken, ticketNumber, {
+        body: normalizedBody,
+        visibility: isInternalComment ? 'INTERNAL' : 'PUBLIC',
+      })
 
-      setComments((currentComments) => [
-        ...currentComments,
-        response,
-      ])
-
+      setComments((currentComments) => [...currentComments, response])
       setCommentBody('')
       setIsInternalComment(false)
       setAiReplyDraftNotice(null)
       setAiReplyDraftError(null)
     } catch (caughtError) {
-      if (caughtError instanceof Error) {
-        setCommentError(
-          caughtError.message,
-        )
-      } else {
-        setCommentError(
-          'Unable to send message',
-        )
-      }
+      setCommentError(
+        caughtError instanceof Error ? caughtError.message : 'Unable to send message',
+      )
     } finally {
       setIsSendingComment(false)
     }
   }
 
   const isConversationReadOnly =
-    ticket?.status === 'RESOLVED' ||
-    ticket?.status === 'CLOSED' ||
-    ticket?.status === 'CANCELLED'
-
-  const hasDraftableMessage =
-    Boolean(
-      commentBody.trim(),
-    )
-
-  const hasResolutionSummary =
-    Boolean(
-      resolutionSummary.trim(),
-    )
+    ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED' || ticket?.status === 'CANCELLED'
 
   return (
-    <main className="support-ticket-details-page">
-      <header className="support-page-header">
-        <div>
-          <p className="eyebrow">
-            FlowDesk Operations
-          </p>
+    <div className="support-ticket-workbench horizon-page-container">
+      {/* Workbench Header */}
+      <PageHeader
+        title="Support Ticket Details"
+        subtitle={
+          ticket ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-family-mono)',
+                  fontWeight: 'var(--font-weight-bold)',
+                  color: 'var(--color-primary)',
+                }}
+              >
+                {ticket.ticketNumber}
+              </span>
+              <span>&bull;</span>
+              <span>Created {formatDate(ticket.createdAt)}</span>
+              <span>&bull;</span>
+              <span>Requester: {ticket.createdByEmail}</span>
+            </span>
+          ) : (
+            'Manage, troubleshoot and resolve support ticket.'
+          )
+        }
+        actions={
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate('/support/tickets')}
+              leadingIcon={<ArrowLeft size={14} />}
+            >
+              My Assignments
+            </Button>
+          </div>
+        }
+      />
 
-          <h1>Support ticket</h1>
-
-          <p className="support-page-description">
-            Review the requester&apos;s issue and
-            move the ticket through the support
-            workflow.
-          </p>
-        </div>
-
-        <div className="support-header-actions">
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() =>
-              navigate('/support/tickets')
-            }
-          >
-            My assignments
-          </button>
-
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() =>
-              navigate('/support/queue')
-            }
-          >
-            Support queue
-          </button>
-        </div>
-      </header>
-
+      {/* Global Alerts */}
       {error && (
-        <div
-          className="support-alert support-alert-error"
-          role="alert"
-        >
-          {error}
+        <div className="horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ marginBottom: '1.5rem' }}>
+          <AlertCircle size={18} className="horizon-auth-alert-icon" />
+          <span>{error}</span>
         </div>
       )}
 
       {successMessage && (
-        <div
-          className="support-alert support-alert-success"
-          aria-live="polite"
-        >
-          {successMessage}
+        <div className="horizon-auth-alert horizon-auth-alert--success" role="status" style={{ marginBottom: '1.5rem' }}>
+          <CheckCircle2 size={18} className="horizon-auth-alert-icon" />
+          <span>{successMessage}</span>
         </div>
       )}
 
+      {/* Loading state */}
       {isLoading && (
-        <section className="support-loading-state">
-          <div className="support-loading-dot" />
-
-          <p>
-            Loading support ticket...
-          </p>
-        </section>
+        <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--color-text-secondary)' }}>
+          <p>Loading support workbench...</p>
+        </div>
       )}
 
-      {!isLoading &&
-        !ticket &&
-        error && (
-          <section className="support-empty-state">
-            <h2>
-              Ticket unavailable
-            </h2>
-
-            <p>
-              This ticket may no longer be assigned
-              to you.
-            </p>
-
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() =>
-                navigate('/support/tickets')
-              }
-            >
-              Back to my assignments
-            </button>
-          </section>
-        )}
-
       {!isLoading && ticket && (
-        <>
-          <div className="support-ticket-layout">
-            <article className="support-ticket-detail-card">
-              <header className="support-ticket-detail-heading">
-                <div>
-                  <p className="support-ticket-number">
-                    {ticket.ticketNumber}
-                  </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Status Workflow Ribbon */}
+          <div className="horizon-workflow-ribbon">
+            <div className="horizon-workflow-status-meta">
+              <span style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-semibold)' }}>
+                Status:
+              </span>
+              <StatusBadge status={ticket.status} size="md" />
+              {(ticket.status === 'ASSIGNED' || ticket.status === 'IN_PROGRESS' || ticket.status === 'WAITING_FOR_USER') ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <PriorityBadge priority={ticket.priority} size="md" />
+                  <select
+                    id="ticket-priority-update-select"
+                    aria-label="Update ticket priority"
+                    className="horizon-select"
+                    style={{ height: '28px', padding: '0 0.5rem', fontSize: 'var(--font-size-xs)', width: 'auto', minWidth: '95px' }}
+                    value={ticket.priority}
+                    disabled={isUpdatingPriority || isUpdating}
+                    onChange={(e) => void handlePriorityChange(e.target.value as TicketPriority)}
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                    <option value="CRITICAL">Critical</option>
+                  </select>
+                </div>
+              ) : (
+                <PriorityBadge priority={ticket.priority} size="md" />
+              )}
+              <Badge variant="neutral" size="md">
+                {formatLabel(ticket.type)}
+              </Badge>
+            </div>
 
-                  <h2>
+            <div className="horizon-workflow-actions">
+              {/* Step Transitions */}
+              {ticket.status === 'ASSIGNED' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => void handleStatusChange('IN_PROGRESS')}
+                  isLoading={isUpdating}
+                  leadingIcon={<Play size={14} />}
+                >
+                  Start Working
+                </Button>
+              )}
+
+              {ticket.status === 'IN_PROGRESS' && (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleStatusChange('WAITING_FOR_USER')}
+                    isLoading={isUpdating}
+                    leadingIcon={<Pause size={14} />}
+                  >
+                    Wait for User
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setIsResolveModalOpen(true)}
+                    leadingIcon={<FileCheck2 size={14} />}
+                  >
+                    Resolve Ticket
+                  </Button>
+                </>
+              )}
+
+              {ticket.status === 'WAITING_FOR_USER' && (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleStatusChange('IN_PROGRESS')}
+                    isLoading={isUpdating}
+                    leadingIcon={<Play size={14} />}
+                  >
+                    Resume Progress
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setIsResolveModalOpen(true)}
+                    leadingIcon={<FileCheck2 size={14} />}
+                  >
+                    Resolve Ticket
+                  </Button>
+                </>
+              )}
+
+              {isConversationReadOnly && (
+                <Badge variant="success" size="md">
+                  Ticket Closed
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {/* 2-Column Responsive Flagship Grid */}
+          <div className="horizon-workbench-grid">
+            {/* Left Column: Main Workflow & Conversation */}
+            <div className="horizon-workbench-main">
+              {/* Ticket Description Card */}
+              <Card padded>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', borderBottom: '1px solid var(--color-divider)', paddingBottom: '0.75rem' }}>
+                  <h2 style={{ margin: 0, fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)' }}>
                     {ticket.title}
                   </h2>
                 </div>
 
-                <span
-                  className={getStatusClass(
-                    ticket.status,
-                  )}
-                >
-                  {formatLabel(
-                    ticket.status,
-                  )}
-                </span>
-              </header>
-
-              <section className="support-description-section">
-                <p className="support-section-label">
-                  Issue description
-                </p>
-
-                <p className="support-ticket-description-text">
-                  {ticket.description}
-                </p>
-              </section>
-
-              {!isConversationReadOnly && (
-                <AiTriageCard
-                  accessToken={accessToken}
-                  ticketNumber={
-                    ticket.ticketNumber
-                  }
-                  currentPriority={
-                    ticket.priority
-                  }
-                  ticketStatus={
-                    ticket.status
-                  }
-                  onApplied={
-                    handleAiTriageApplied
-                  }
-                />
-              )}
-
-              {!isConversationReadOnly && (
-                <AiSupportCopilotCard
-                  key={ticket.ticketNumber}
-                  accessToken={accessToken}
-                  ticketNumber={ticket.ticketNumber}
-                />
-              )}
-
-              <section className="support-detail-grid">
-                <div>
-                  <span>Type</span>
-
-                  <strong>
-                    {formatLabel(
-                      ticket.type,
-                    )}
-                  </strong>
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <h3 style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', margin: '0 0 0.5rem' }}>
+                    Incident Description
+                  </h3>
+                  <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', lineHeight: 'var(--line-height-relaxed)', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {ticket.description}
+                  </p>
                 </div>
 
-                <div>
-                  <span>Priority</span>
-
-                  <strong>
-                    <span
-                      className={`priority-badge priority-${ticket.priority.toLowerCase()}`}
-                    >
-                      {formatLabel(ticket.priority)}
-                    </span>
-                  </strong>
-                </div>
-
-                <div>
-                  <span>Requester</span>
-
-                  <strong>
-                    {ticket.createdByEmail}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>Created</span>
-
-                  <strong>
-                    {formatDate(
-                      ticket.createdAt,
-                    )}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>Assigned</span>
-
-                  <strong>
-                    {formatDate(
-                      ticket.assignedAt,
-                    )}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>
-                    Last updated
-                  </span>
-
-                  <strong>
-                    {formatDate(
-                      ticket.updatedAt,
-                    )}
-                  </strong>
-                </div>
-
-                {ticket.resolvedAt && (
-                  <div>
-                    <span>Resolved</span>
-
-                    <strong>
-                      {formatDate(
-                        ticket.resolvedAt,
-                      )}
-                    </strong>
+                {/* Resolution Summary Banner if resolved */}
+                {ticket.resolutionSummary && (
+                  <div style={{ marginTop: '1rem', padding: '1rem', background: 'var(--color-success-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', color: 'var(--color-success)', fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)' }}>
+                      <CheckCircle2 size={16} />
+                      <span>Resolution Summary</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>
+                      {ticket.resolutionSummary}
+                    </p>
                   </div>
                 )}
-              </section>
+              </Card>
 
-              <section className="support-description-section">
-                <p className="support-section-label">
-                  SLA tracking
-                </p>
+              {/* Attachments Section */}
+              <Card padded>
+                <TicketAttachmentSection
+                  ticketNumber={ticket.ticketNumber}
+                  ticketStatus={ticket.status}
+                  persona="support"
+                />
+              </Card>
 
-                <div className="support-detail-grid">
-                  <div>
-                    <span>Response SLA</span>
-
-                    <strong>
-                      {formatSlaStatus(
-                        ticket.responseSlaStatus,
-                      )}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Response deadline</span>
-
-                    <strong>
-                      {formatDate(
-                        ticket.responseDueAt,
-                      )}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>First response</span>
-
-                    <strong>
-                      {formatOptionalDate(
-                        ticket.firstRespondedAt,
-                      )}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Resolution SLA</span>
-
-                    <strong>
-                      {formatSlaStatus(
-                        ticket.resolutionSlaStatus,
-                      )}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Resolution deadline</span>
-
-                    <strong>
-                      {formatDate(
-                        ticket.resolutionDueAt,
-                      )}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Resolved</span>
-
-                    <strong>
-                      {formatOptionalDate(
-                        ticket.resolvedAt,
-                      )}
-                    </strong>
-                  </div>
-                </div>
-              </section>
-
-              {ticket.resolutionSummary && (
-                <section className="support-description-section">
-                  <p className="support-section-label">
-                    Resolution
-                  </p>
-
-                  <p className="support-ticket-description-text">
-                    {ticket.resolutionSummary}
-                  </p>
-                </section>
-              )}
-            </article>
-
-            <aside className="support-workflow-panel">
-              <p className="support-section-label">
-                Workflow
-              </p>
-
-              <h2>Next action</h2>
-
-              {ticket.status ===
-                'ASSIGNED' && (
-                <>
-                  <p>
-                    The ticket is assigned to you
-                    but work has not started yet.
-                  </p>
-
-                  <button
-                    type="button"
-                    className="primary-button support-workflow-button"
-                    disabled={
-                      isUpdating
-                    }
-                    onClick={() =>
-                      void handleStatusChange(
-                        'IN_PROGRESS',
-                      )
-                    }
-                  >
-                    {isUpdating
-                      ? 'Starting...'
-                      : 'Start work'}
-                  </button>
-                </>
-              )}
-
-              {ticket.status ===
-                'IN_PROGRESS' && (
-                <>
-                  <p>
-                    You are actively working on
-                    this ticket.
-                  </p>
-
-                  <button
-                    type="button"
-                    className="secondary-button support-workflow-button"
-                    disabled={
-                      isUpdating ||
-                      isResolving ||
-                      isGeneratingResolutionSummary
-                    }
-                    onClick={() =>
-                      void handleStatusChange(
-                        'WAITING_FOR_USER',
-                      )
-                    }
-                  >
-                    {isUpdating
-                      ? 'Updating...'
-                      : 'Wait for user'}
-                  </button>
-
-                  <div className="resolution-workflow">
-                    <p className="support-section-label">
-                      Resolution summary
-                    </p>
-
-                    <h3>
-                      Resolve ticket
+              {/* Conversation Timeline */}
+              <Card padded>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--color-divider)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <MessageSquare size={18} style={{ color: 'var(--color-primary)' }} />
+                    <h3 style={{ margin: 0, fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)' }}>
+                      Conversation & Staff Notes
                     </h3>
+                  </div>
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                    {comments.length} {comments.length === 1 ? 'message' : 'messages'}
+                  </span>
+                </div>
 
-                    <p className="resolution-workflow-description">
-                      Record what was actually done and
-                      the verified outcome. You can write
-                      this manually or ask AI to prepare
-                      an editable draft.
-                    </p>
+                {comments.length === 0 ? (
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', fontStyle: 'italic', margin: '1rem 0' }}>
+                    No messages or notes posted yet on this ticket.
+                  </p>
+                ) : (
+                  <Timeline>
+                    {comments.map((comment) => {
+                      const isInternal = comment.visibility === 'INTERNAL'
+                      const authorDisplayName = comment.authorName || 'Support Staff'
 
-                    <button
-                      type="button"
-                      className="secondary-button support-workflow-button"
-                      disabled={
-                        isGeneratingResolutionSummary ||
-                        isResolving ||
-                        isUpdating ||
-                        hasResolutionSummary
-                      }
-                      onClick={() =>
-                        void handleGenerateAiResolutionSummary()
-                      }
-                    >
-                      {isGeneratingResolutionSummary
-                        ? 'Drafting...'
-                        : 'Draft summary with AI'}
-                    </button>
+                      return (
+                        <TimelineItem
+                          key={comment.commentId}
+                          avatar={<UserAvatar name={authorDisplayName} size="sm" />}
+                          authorName={authorDisplayName}
+                          badge={
+                            <Badge variant={isInternal ? 'warning' : 'neutral'} size="sm">
+                              {isInternal ? 'Staff Only' : 'Public'}
+                            </Badge>
+                          }
+                          timestamp={formatDate(comment.createdAt)}
+                          isInternal={isInternal}
+                        >
+                          {isInternal && (
+                            <div style={{ marginBottom: '6px' }}>
+                              <span data-testid="internal-note-badge" className="horizon-internal-badge">
+                                <Lock size={10} />
+                                <span>Internal Note</span>
+                              </span>
+                            </div>
+                          )}
+                          <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--color-text-primary)' }}>
+                            {comment.body}
+                          </p>
+                        </TimelineItem>
+                      )
+                    })}
+                  </Timeline>
+                )}
 
-                    {aiResolutionSummaryNotice && (
-                      <p
-                        className="resolution-ai-notice"
-                        aria-live="polite"
+                {/* Reply & Internal Note Composer */}
+                {!isConversationReadOnly ? (
+                  <div className={`horizon-composer-container ${isInternalComment ? 'horizon-composer-container--internal' : ''}`} style={{ marginTop: '1.5rem' }}>
+                    <form onSubmit={handleSendComment}>
+                      {/* Unified Visibility Selector (Unambiguous single control with accessible checkbox) */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <label
+                          htmlFor="comment-is-internal"
+                          className={`horizon-visibility-toggle-pill ${isInternalComment ? 'is-internal' : ''}`}
+                        >
+                          <input
+                            type="checkbox"
+                            id="comment-is-internal"
+                            checked={isInternalComment}
+                            onChange={(e) => setIsInternalComment(e.target.checked)}
+                            className="horizon-checkbox"
+                            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: isInternalComment ? '#d97706' : 'var(--color-primary)' }}
+                          />
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>
+                            {isInternalComment ? <Lock size={12} /> : <Globe size={12} />}
+                            {isInternalComment ? 'Internal Staff Note (Confidential)' : 'Public Customer Reply'}
+                          </span>
+                        </label>
+
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: isInternalComment ? 'var(--color-warning-text, #92400e)' : 'var(--color-text-muted)' }}>
+                          {isInternalComment ? '🔒 Hidden from requester' : '🌐 Customer will see this'}
+                        </span>
+                      </div>
+
+                      {/* Visibility indicator notice */}
+                      <div
+                        className={`horizon-composer-visibility-indicator ${
+                          isInternalComment
+                            ? 'horizon-composer-visibility-indicator--internal'
+                            : 'horizon-composer-visibility-indicator--public'
+                        }`}
                       >
-                        {aiResolutionSummaryNotice}
-                      </p>
-                    )}
-
-                    {aiResolutionSummaryError && (
-                      <div className="ai-error-box" role="alert">
-                        <p className="form-error">
-                          {aiResolutionSummaryError}
-                        </p>
-                        {!hasResolutionSummary && (
-                          <button
-                            type="button"
-                            className="ai-retry-btn"
-                            disabled={isGeneratingResolutionSummary}
-                            onClick={() =>
-                              void handleGenerateAiResolutionSummary()
-                            }
-                          >
-                            ↻ Retry AI draft
-                          </button>
+                        {isInternalComment ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Lock size={12} />
+                            <strong>Private Staff Note:</strong> Hidden from the ticket requester. Only staff members with authorized access can view this note.
+                          </span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Globe size={12} />
+                            <strong>Public Response:</strong> Visible to the customer and sent as a notification.
+                          </span>
                         )}
                       </div>
-                    )}
 
-                    <label
-                      className="resolution-summary-label"
-                      htmlFor="resolution-summary"
-                    >
-                      Final resolution summary
-                    </label>
+                      {/* Message Textarea */}
+                      <div className="horizon-form-field" style={{ margin: 0 }}>
+                        <div className="horizon-input-wrapper">
+                          <textarea
+                            id="support-comment-body"
+                            className="horizon-textarea"
+                            style={{ minHeight: '120px' }}
+                            placeholder={
+                              isInternalComment
+                                ? 'Add confidential investigation notes, replica checks, or staff handoff details...'
+                                : 'Type a clear, professional reply to the requester...'
+                            }
+                            value={commentBody}
+                            onChange={(e) => setCommentBody(e.target.value)}
+                            disabled={isSendingComment}
+                            maxLength={4000}
+                          />
+                        </div>
+                      </div>
 
-                    <textarea
-                      id="resolution-summary"
-                      value={resolutionSummary}
-                      maxLength={4000}
-                      rows={7}
-                      placeholder="Describe the verified action taken and outcome..."
-                      disabled={
-                        isResolving ||
-                        isGeneratingResolutionSummary ||
-                        isUpdating
-                      }
-                      onChange={(event) => {
-                        setResolutionSummary(
-                          event.target.value,
-                        )
+                      {/* Composer Notices & Errors */}
+                      {aiReplyDraftNotice && (
+                        <div className="horizon-auth-alert horizon-auth-alert--success" style={{ margin: '0.75rem 0 0', padding: '0.5rem' }}>
+                          <span style={{ fontSize: 'var(--font-size-xs)' }}>{aiReplyDraftNotice}</span>
+                        </div>
+                      )}
 
-                        if (resolutionError) {
-                          setResolutionError(
-                            null,
-                          )
-                        }
+                      {commentError && (
+                        <div className="horizon-auth-alert horizon-auth-alert--error" style={{ margin: '0.75rem 0 0', padding: '0.5rem' }}>
+                          <span style={{ fontSize: 'var(--font-size-xs)' }}>{commentError}</span>
+                        </div>
+                      )}
 
-                        if (
-                          aiResolutionSummaryError
-                        ) {
-                          setAiResolutionSummaryError(
-                            null,
-                          )
-                        }
-                      }}
-                    />
-
-                    <div className="resolution-summary-footer">
-                      <span>
-                        {resolutionSummary.length}
-                        /4000
-                      </span>
-                    </div>
-
-                    {resolutionError && (
-                      <p
-                        className="form-error"
-                        role="alert"
-                      >
-                        {resolutionError}
-                      </p>
-                    )}
-
-                    <button
-                      type="button"
-                      className="resolve-button support-workflow-button"
-                      disabled={
-                        isResolving ||
-                        isUpdating ||
-                        isGeneratingResolutionSummary ||
-                        !hasResolutionSummary
-                      }
-                      onClick={() =>
-                        void handleResolveTicket()
-                      }
-                    >
-                      {isResolving
-                        ? 'Resolving...'
-                        : 'Resolve ticket'}
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {ticket.status ===
-                'WAITING_FOR_USER' && (
-                <>
-                  <p>
-                    Work is paused while waiting
-                    for information from the
-                    requester.
-                  </p>
-
-                  <button
-                    type="button"
-                    className="primary-button support-workflow-button"
-                    disabled={
-                      isUpdating
-                    }
-                    onClick={() =>
-                      void handleStatusChange(
-                        'IN_PROGRESS',
-                      )
-                    }
-                  >
-                    {isUpdating
-                      ? 'Resuming...'
-                      : 'Resume work'}
-                  </button>
-                </>
-              )}
-
-              {ticket.status ===
-                'RESOLVED' && (
-                <div className="resolved-workflow-state">
-                  <div className="resolved-workflow-icon">
-                    ✓
-                  </div>
-
-                  <h3>
-                    Ticket resolved
-                  </h3>
-
-                  <p>
-                    This ticket has been completed
-                    and removed from your active
-                    assignments.
-                  </p>
-
-                  {ticket.resolutionSummary && (
-                    <div className="resolved-summary-box">
-                      <strong>
-                        Resolution summary
-                      </strong>
-
-                      <p>
-                        {
-                          ticket.resolutionSummary
-                        }
-                      </p>
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    className="primary-button support-workflow-button"
-                    onClick={() =>
-                      navigate(
-                        '/support/tickets',
-                      )
-                    }
-                  >
-                    Back to my assignments
-                  </button>
-                </div>
-              )}
-
-              <div className="workflow-rule">
-                <span>
-                  Current status
-                </span>
-
-                <strong>
-                  {formatLabel(
-                    ticket.status,
-                  )}
-                </strong>
-              </div>
-            </aside>
-          </div>
-
-          <TicketAttachmentSection
-            ticketNumber={ticket.ticketNumber}
-            ticketStatus={ticket.status}
-            persona="support"
-          />
-
-          <section className="support-conversation-card">
-            <header className="ticket-conversation-header">
-              <div>
-                <p className="support-section-label">
-                  Conversation
-                </p>
-
-                <h2>
-                  Requester messages
-                </h2>
-              </div>
-
-              <span>
-                {comments.length}{' '}
-                {comments.length === 1
-                  ? 'message'
-                  : 'messages'}
-              </span>
-            </header>
-
-            <div className="ticket-comment-list">
-              {comments.length === 0 && (
-                <div className="ticket-conversation-empty">
-                  <p>
-                    No messages yet.
-                  </p>
-
-                  <span>
-                    Ask the requester for more
-                    information when needed.
-                  </span>
-                </div>
-              )}
-
-              {comments.map((comment) => (
-                <article
-                  key={comment.commentId}
-                  className={`ticket-comment ${
-                    comment.visibility === 'INTERNAL'
-                      ? 'ticket-comment-internal'
-                      : ''
-                  }`}
-                >
-                  <header className="ticket-comment-header">
-                    <div>
-                      <strong>
-                        {comment.authorName}
-                      </strong>
-                      {comment.visibility === 'INTERNAL' && (
-                        <span
-                          className="ticket-comment-badge-internal"
-                          data-testid="internal-note-badge"
+                      {/* Composer Actions */}
+                      <div className="horizon-composer-actions">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          type="button"
+                          onClick={handleGenerateAiReplyDraft}
+                          isLoading={isGeneratingReplyDraft}
+                          disabled={isSendingComment || Boolean(commentBody.trim()) || ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED' || ticket?.status === 'CANCELLED'}
+                          leadingIcon={<Sparkles size={14} />}
                         >
-                          🔒 Internal Staff Note
-                        </span>
-                      )}
-                    </div>
+                          AI Reply Draft
+                        </Button>
 
-                    <time
-                      dateTime={
-                        comment.createdAt
-                      }
-                    >
-                      {formatDate(
-                        comment.createdAt,
-                      )}
-                    </time>
-                  </header>
-
-                  <p>
-                    {comment.body}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                            {commentBody.length}/4000
+                          </span>
+                          <Button
+                            variant={isInternalComment ? 'secondary' : 'primary'}
+                            size="sm"
+                            type="submit"
+                            isLoading={isSendingComment}
+                            disabled={!commentBody.trim()}
+                            aria-label={isInternalComment ? 'Add internal note' : 'Send message'}
+                            style={isInternalComment ? {
+                              backgroundColor: '#d97706',
+                              borderColor: '#b45309',
+                              color: '#ffffff',
+                              fontWeight: 'var(--font-weight-semibold)',
+                            } : undefined}
+                          >
+                            {isInternalComment ? 'Add Internal Note' : 'Send Public Reply'}
+                          </Button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', textAlign: 'center', margin: '1.5rem 0 0' }}>
+                    This ticket is finalized ({ticket.status}). New messages or notes can no longer be posted.
                   </p>
-                </article>
-              ))}
+                )}
+              </Card>
             </div>
 
-            {isConversationReadOnly ? (
-              <div className="ticket-conversation-readonly">
-                <strong>
-                  Conversation closed
-                </strong>
+            {/* Right Column: Context Cards & Integrated AI Assistant */}
+            <div className="horizon-workbench-sidebar">
+              {/* Context Summary Card */}
+              <div className="horizon-context-card">
+                <div className="horizon-context-header">
+                  <h4 className="horizon-context-title">Ticket Context</h4>
+                  <Badge variant="neutral" size="sm">
+                    {ticket.ticketNumber}
+                  </Badge>
+                </div>
 
-                <p>
-                  The ticket is resolved. Existing
-                  messages remain visible, but new
-                  messages cannot be added.
-                </p>
-              </div>
-            ) : (
-              <form
-                className="ticket-comment-form"
-                onSubmit={
-                  handleSendComment
-                }
-              >
-                <label htmlFor="support-comment-body">
-                  {isInternalComment ? 'Internal staff note' : 'Message requester'}
-                </label>
+                <div className="horizon-context-row">
+                  <span className="horizon-context-row-label">Requester</span>
+                  <span className="horizon-context-row-value">{ticket.createdByEmail}</span>
+                </div>
 
-                <div className="ticket-comment-visibility-toggle">
-                  <label htmlFor="comment-is-internal">
-                    <input
-                      type="checkbox"
-                      id="comment-is-internal"
-                      checked={isInternalComment}
-                      onChange={(event) =>
-                        setIsInternalComment(event.target.checked)
-                      }
-                      disabled={isSendingComment}
-                    />
-                    <span>
-                      🔒 Internal staff note (visible to staff only)
+                <div className="horizon-context-row">
+                  <span className="horizon-context-row-label">Assigned Engineer</span>
+                  <span className="horizon-context-row-value">
+                    {user?.email || 'Assigned to Me'}
+                  </span>
+                </div>
+
+                <div className="horizon-context-row">
+                  <span className="horizon-context-row-label">Assigned At</span>
+                  <span className="horizon-context-row-value">{formatOptionalDate(ticket.assignedAt)}</span>
+                </div>
+
+                <div className="horizon-context-row">
+                  <span className="horizon-context-row-label">Last Updated</span>
+                  <span className="horizon-context-row-value">{formatDate(ticket.updatedAt)}</span>
+                </div>
+
+                {/* SLA Tracking Details */}
+                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-divider)' }}>
+                  <div className="horizon-context-row">
+                    <span className="horizon-context-row-label">Response SLA</span>
+                    <span className="horizon-context-row-value">
+                      <Badge variant={ticket.responseSlaStatus === 'BREACHED' ? 'danger' : 'success'} size="sm" dot>
+                        {formatSlaStatus(ticket.responseSlaStatus)}
+                      </Badge>
                     </span>
-                  </label>
-                </div>
-
-                <div className="ticket-comment-form-footer">
-                  <span>
-                    AI can prepare an editable draft.
-                    It is never sent automatically.
-                  </span>
-
-                  <button
-                    type="button"
-                    disabled={
-                      isGeneratingReplyDraft ||
-                      isSendingComment ||
-                      hasDraftableMessage
-                    }
-                    onClick={() =>
-                      void handleGenerateAiReplyDraft()
-                    }
-                  >
-                    {isGeneratingReplyDraft
-                      ? 'Drafting...'
-                      : 'Draft reply with AI'}
-                  </button>
-                </div>
-
-                {aiReplyDraftNotice && (
-                  <p aria-live="polite">
-                    {aiReplyDraftNotice}
-                  </p>
-                )}
-
-                {aiReplyDraftError && (
-                  <div className="ai-error-box" role="alert">
-                    <p
-                      className="form-error"
-                      role="alert"
-                    >
-                      {aiReplyDraftError}
-                    </p>
-                    {!hasDraftableMessage && (
-                      <button
-                        type="button"
-                        className="ai-retry-btn"
-                        disabled={isGeneratingReplyDraft}
-                        onClick={() =>
-                          void handleGenerateAiReplyDraft()
-                        }
-                      >
-                        ↻ Retry AI draft
-                      </button>
-                    )}
                   </div>
-                )}
 
-                <textarea
-                  id="support-comment-body"
-                  value={commentBody}
-                  maxLength={4000}
-                  rows={4}
-                  placeholder="Ask a question or send an update..."
-                  disabled={
-                    isSendingComment ||
-                    isGeneratingReplyDraft
-                  }
-                  onChange={(event) => {
-                    setCommentBody(
-                      event.target.value,
-                    )
+                  <div className="horizon-context-row">
+                    <span className="horizon-context-row-label">Response Deadline</span>
+                    <span className="horizon-context-row-value">{formatOptionalDate(ticket.responseDueAt)}</span>
+                  </div>
 
-                    if (commentError) {
-                      setCommentError(
-                        null,
-                      )
-                    }
+                  <div className="horizon-context-row">
+                    <span className="horizon-context-row-label">Resolution SLA</span>
+                    <span className="horizon-context-row-value">
+                      <Badge variant={ticket.resolutionSlaStatus === 'BREACHED' ? 'danger' : 'success'} size="sm" dot>
+                        {formatSlaStatus(ticket.resolutionSlaStatus)}
+                      </Badge>
+                    </span>
+                  </div>
 
-                    if (aiReplyDraftError) {
-                      setAiReplyDraftError(
-                        null,
-                      )
-                    }
-                  }}
-                />
-
-                <div className="ticket-comment-form-footer">
-                  <span>
-                    {commentBody.length}
-                    /4000
-                  </span>
-
-                  <button
-                    type="submit"
-                    className="primary-button"
-                    disabled={
-                      isSendingComment ||
-                      isGeneratingReplyDraft ||
-                      !commentBody.trim()
-                    }
-                  >
-                    {isSendingComment
-                      ? 'Sending...'
-                      : isInternalComment
-                        ? 'Add internal note'
-                        : 'Send message'}
-                  </button>
+                  <div className="horizon-context-row">
+                    <span className="horizon-context-row-label">Resolution Deadline</span>
+                    <span className="horizon-context-row-value">{formatOptionalDate(ticket.resolutionDueAt)}</span>
+                  </div>
                 </div>
+              </div>
 
-                {commentError && (
-                  <p
-                    className="form-error"
-                    role="alert"
-                  >
-                    {commentError}
-                  </p>
-                )}
-              </form>
-            )}
-          </section>
-        </>
+              {/* Integrated AI Assistant Workbench */}
+              <AiWorkbench
+                accessToken={accessToken}
+                ticketNumber={ticket.ticketNumber}
+                currentPriority={ticket.priority}
+                ticketStatus={ticket.status}
+                onTriageApplied={handleAiTriageApplied}
+                onGenerateReplyDraft={handleGenerateAiReplyDraft}
+                isGeneratingReplyDraft={isGeneratingReplyDraft}
+                aiReplyDraftNotice={aiReplyDraftNotice}
+                aiReplyDraftError={aiReplyDraftError}
+                onGenerateResolutionSummary={handleGenerateAiResolutionSummary}
+                isGeneratingResolutionSummary={isGeneratingResolutionSummary}
+                aiResolutionSummaryNotice={aiResolutionSummaryNotice}
+                aiResolutionSummaryError={aiResolutionSummaryError}
+              />
+            </div>
+          </div>
+        </div>
       )}
-    </main>
+
+      {/* Resolution Modal Dialog */}
+      <Modal
+        isOpen={isResolveModalOpen}
+        onClose={() => setIsResolveModalOpen(false)}
+        title="Resolve Ticket"
+        subtitle="Provide a concise technical resolution summary explaining how the issue was fixed. The customer will receive this explanation."
+        footer={
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" size="sm" onClick={() => setIsResolveModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => void handleResolveTicket()}
+              isLoading={isResolving}
+              disabled={!resolutionSummary.trim()}
+            >
+              Confirm and Resolve Ticket
+            </Button>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0.5rem 0' }}>
+          {resolutionError && (
+            <div className="horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ margin: 0, padding: '0.5rem' }}>
+              <AlertCircle size={16} className="horizon-auth-alert-icon" />
+              <span style={{ fontSize: 'var(--font-size-xs)' }}>{resolutionError}</span>
+            </div>
+          )}
+
+          {aiResolutionSummaryNotice && (
+            <div className="horizon-auth-alert horizon-auth-alert--success" style={{ margin: 0, padding: '0.5rem' }}>
+              <span style={{ fontSize: 'var(--font-size-xs)' }}>{aiResolutionSummaryNotice}</span>
+            </div>
+          )}
+
+          <div className="horizon-form-field" style={{ margin: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <label htmlFor="support-resolution-summary" className="horizon-label" style={{ margin: 0 }}>
+                Resolution Summary <span className="horizon-field-required">*</span>
+              </label>
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                onClick={handleGenerateAiResolutionSummary}
+                isLoading={isGeneratingResolutionSummary}
+                disabled={Boolean(resolutionSummary.trim())}
+                leadingIcon={<Sparkles size={12} />}
+              >
+                Auto-Draft with AI
+              </Button>
+            </div>
+            <div className="horizon-input-wrapper">
+              <textarea
+                id="support-resolution-summary"
+                className="horizon-textarea"
+                style={{ minHeight: '160px' }}
+                placeholder="Describe the root cause and remediation steps taken..."
+                value={resolutionSummary}
+                onChange={(e) => setResolutionSummary(e.target.value)}
+                disabled={isResolving}
+                maxLength={4000}
+                required
+              />
+            </div>
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px', textAlign: 'right' }}>
+              {resolutionSummary.length}/4000
+            </span>
+          </div>
+        </div>
+      </Modal>
+    </div>
   )
 }

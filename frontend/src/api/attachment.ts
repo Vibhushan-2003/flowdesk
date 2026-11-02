@@ -1,6 +1,6 @@
 import { notifySessionExpired } from '../auth/sessionEvents'
 import { API_BASE_URL } from './config'
-import type { TicketAttachmentResponse } from '../types/attachment'
+import type { AttachmentRescanReport, TicketAttachmentResponse } from '../types/attachment'
 
 export type AttachmentPersona = 'employee' | 'support'
 
@@ -163,4 +163,43 @@ export async function downloadAttachment(
       window.URL.revokeObjectURL(blobUrl)
     }, 1000)
   }
+}
+
+
+export async function rescanPendingAttachments(
+  accessToken: string,
+  batchSize = 50,
+): Promise<AttachmentRescanReport> {
+  const boundedBatch = Math.max(1, Math.min(batchSize, 100))
+  let response: Response
+
+  try {
+    response = await fetch(
+      `${API_BASE_URL}/api/admin/attachments/rescan-pending?batchSize=${boundedBatch}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    )
+  } catch {
+    throw new Error('Network error while requesting attachment rescan. Please check your connection.')
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null)
+    const backendMessage = errorBody?.message
+
+    if (response.status === 401) {
+      notifySessionExpired()
+      throw new Error('Your session is no longer valid. Please sign in again.')
+    }
+    if (response.status === 403) {
+      throw new Error('You do not have administrative permission to trigger attachment rescans.')
+    }
+    throw new Error(backendMessage || 'Failed to trigger attachment rescan.')
+  }
+
+  return response.json() as Promise<AttachmentRescanReport>
 }
