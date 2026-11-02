@@ -96,6 +96,20 @@ test.describe('Real-Stack Live: Internal Staff Notes Privacy & Visibility Enforc
     expect(savedInternalComment).toBeDefined()
     expect(savedInternalComment?.visibility).toBe('INTERNAL')
 
+    // 6b. Confirm ZERO notifications exist for requester immediately following internal note
+    const notifsAfterInternalRes = await fetch(
+      `${backendUrl}/api/notifications?page=0&size=50`,
+      {
+        headers: { Authorization: `Bearer ${tokenEmployee}` },
+      },
+    )
+    expect(notifsAfterInternalRes.status).toBe(200)
+    const notifsAfterInternal = (await notifsAfterInternalRes.json()) as {
+      content: Array<{ ticketNumber?: string; message?: string }>
+    }
+    const internalNotif = notifsAfterInternal.content.find((n) => n.ticketNumber === ticketNumber)
+    expect(internalNotif).toBeUndefined()
+
     // 7. Support Engineer posts a PUBLIC reply
     await expect(internalCheckbox).not.toBeChecked()
     const publicReplyText = `Public customer assistance reply - ${Date.now()}`
@@ -142,28 +156,23 @@ test.describe('Real-Stack Live: Internal Staff Notes Privacy & Visibility Enforc
     await expect(page.getByText(internalNoteText)).not.toBeVisible()
     await expect(page.getByTestId('internal-note-badge')).not.toBeVisible()
 
-    // 11. Confirms NO requester notification was generated for the internal note
-    const notifsRes = await fetch(`${backendUrl}/api/notifications?page=0&size=50`, {
-      headers: { Authorization: `Bearer ${tokenEmployee}` },
-    })
-    expect(notifsRes.status).toBe(200)
-    const notifsData = (await notifsRes.json()) as {
-      content: Array<{ ticketNumber?: string; message?: string }>
+    // 11. Confirms public message DOES generate a requester notification
+    const notifsAfterPublicRes = await fetch(
+      `${backendUrl}/api/notifications?page=0&size=50`,
+      {
+        headers: { Authorization: `Bearer ${tokenEmployee}` },
+      },
+    )
+    expect(notifsAfterPublicRes.status).toBe(200)
+    const notifsAfterPublic = (await notifsAfterPublicRes.json()) as {
+      content: Array<{ ticketNumber?: string; title?: string; message?: string }>
     }
 
-    const leakedInternalNotification = notifsData.content.find(
-      (n) => n.message && n.message.includes(internalNoteText),
-    )
-    expect(leakedInternalNotification).toBeUndefined()
-
-    // Confirms public message DOES generate a notification
-    const publicNotification = notifsData.content.find(
-      (n) =>
-        n.ticketNumber === ticketNumber &&
-        n.message &&
-        n.message.includes(publicReplyText),
+    const publicNotification = notifsAfterPublic.content.find(
+      (n) => n.ticketNumber === ticketNumber,
     )
     expect(publicNotification).toBeDefined()
+    expect(publicNotification?.title).toBe('New support reply')
+    expect(publicNotification?.message).toContain(ticketNumber)
   })
 })
-
