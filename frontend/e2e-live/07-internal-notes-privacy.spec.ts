@@ -105,7 +105,8 @@ test.describe('Real-Stack Live: Internal Staff Notes Privacy & Visibility Enforc
 
     await expect(page.getByText(publicReplyText)).toBeVisible()
 
-    // 8. Sign out Support Engineer cleanly
+    // 8. Navigate to dashboard and sign out Support Engineer cleanly
+    await page.goto('/dashboard')
     await page.getByRole('button', { name: /sign out/i }).click()
     await expect(page).toHaveURL(/.*login/)
 
