@@ -83,6 +83,9 @@ export function SupportTicketDetailsPage() {
   const [commentBody, setCommentBody] =
     useState('')
 
+  const [isInternalComment, setIsInternalComment] =
+    useState(false)
+
   const [
     resolutionSummary,
     setResolutionSummary,
@@ -557,6 +560,7 @@ export function SupportTicketDetailsPage() {
           ticketNumber,
           {
             body: normalizedBody,
+            visibility: isInternalComment ? 'INTERNAL' : 'PUBLIC',
           },
         )
 
@@ -566,6 +570,7 @@ export function SupportTicketDetailsPage() {
       ])
 
       setCommentBody('')
+      setIsInternalComment(false)
       setAiReplyDraftNotice(null)
       setAiReplyDraftError(null)
     } catch (caughtError) {
@@ -1240,12 +1245,26 @@ export function SupportTicketDetailsPage() {
               {comments.map((comment) => (
                 <article
                   key={comment.commentId}
-                  className="ticket-comment"
+                  className={`ticket-comment ${
+                    comment.visibility === 'INTERNAL'
+                      ? 'ticket-comment-internal'
+                      : ''
+                  }`}
                 >
                   <header className="ticket-comment-header">
-                    <strong>
-                      {comment.authorName}
-                    </strong>
+                    <div>
+                      <strong>
+                        {comment.authorName}
+                      </strong>
+                      {comment.visibility === 'INTERNAL' && (
+                        <span
+                          className="ticket-comment-badge-internal"
+                          data-testid="internal-note-badge"
+                        >
+                          🔒 Internal Staff Note
+                        </span>
+                      )}
+                    </div>
 
                     <time
                       dateTime={
@@ -1285,8 +1304,25 @@ export function SupportTicketDetailsPage() {
                 }
               >
                 <label htmlFor="support-comment-body">
-                  Message requester
+                  {isInternalComment ? 'Internal staff note' : 'Message requester'}
                 </label>
+
+                <div className="ticket-comment-visibility-toggle">
+                  <label htmlFor="comment-is-internal">
+                    <input
+                      type="checkbox"
+                      id="comment-is-internal"
+                      checked={isInternalComment}
+                      onChange={(event) =>
+                        setIsInternalComment(event.target.checked)
+                      }
+                      disabled={isSendingComment}
+                    />
+                    <span>
+                      🔒 Internal staff note (visible to staff only)
+                    </span>
+                  </label>
+                </div>
 
                 <div className="ticket-comment-form-footer">
                   <span>
@@ -1386,7 +1422,9 @@ export function SupportTicketDetailsPage() {
                   >
                     {isSendingComment
                       ? 'Sending...'
-                      : 'Send message'}
+                      : isInternalComment
+                        ? 'Add internal note'
+                        : 'Send message'}
                   </button>
                 </div>
 

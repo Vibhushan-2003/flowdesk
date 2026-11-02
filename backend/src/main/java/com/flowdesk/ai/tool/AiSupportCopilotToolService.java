@@ -4,6 +4,7 @@ import com.flowdesk.sla.domain.SlaStatus;
 
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.CommentVisibility;
 import com.flowdesk.ticket.domain.TicketComment;
 
 import com.flowdesk.ticket.repository.TicketAssignmentRepository;
@@ -146,8 +147,9 @@ public class AiSupportCopilotToolService {
                 requester.getId();
 
         return ticketCommentRepository
-                .findByTicket_IdOrderByCreatedAtAsc(
-                        ticket.getId()
+                .findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                        ticket.getId(),
+                        CommentVisibility.PUBLIC
                 )
                 .stream()
                 .map(

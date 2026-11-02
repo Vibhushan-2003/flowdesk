@@ -239,7 +239,11 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/support/**"
                         )
-                        .hasRole("SUPPORT_ENGINEER")
+                        .hasAnyRole(
+                                "SUPPORT_ENGINEER",
+                                "TEAM_LEAD",
+                                "ADMIN"
+                        )
 
                         // Approval workflow
                         .requestMatchers(

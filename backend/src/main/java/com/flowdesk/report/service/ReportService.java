@@ -87,14 +87,14 @@ public class ReportService {
         Map<LocalDate, Long> createdByDay = new HashMap<>();
         for (ReportQueryRepository.DateCount dc : reportQueryRepository.countDailyCreated(startUtc, endUtc)) {
             if (dc.getDate() != null) {
-                createdByDay.put(dc.getDate().toLocalDate(), dc.getCount());
+                createdByDay.put(dc.getDate(), dc.getCount());
             }
         }
 
         Map<LocalDate, Long> resolvedByDay = new HashMap<>();
         for (ReportQueryRepository.DateCount dc : reportQueryRepository.countDailyResolved(startUtc, endUtc)) {
             if (dc.getDate() != null) {
-                resolvedByDay.put(dc.getDate().toLocalDate(), dc.getCount());
+                resolvedByDay.put(dc.getDate(), dc.getCount());
             }
         }
 

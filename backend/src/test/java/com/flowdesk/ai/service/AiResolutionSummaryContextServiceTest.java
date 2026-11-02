@@ -4,6 +4,7 @@ import com.flowdesk.ai.client.AiResolutionSummaryMessageRole;
 
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.CommentVisibility;
 import com.flowdesk.ticket.domain.TicketComment;
 import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketStatus;
@@ -210,8 +211,9 @@ class AiResolutionSummaryContextServiceTest {
 
         when(
                 ticketCommentRepository
-                        .findByTicket_IdOrderByCreatedAtAsc(
-                                ticketId
+                        .findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                                ticketId,
+                                CommentVisibility.PUBLIC
                         )
         ).thenReturn(
                 List.of(
@@ -365,8 +367,9 @@ class AiResolutionSummaryContextServiceTest {
 
         when(
                 ticketCommentRepository
-                        .findByTicket_IdOrderByCreatedAtAsc(
-                                ticketId
+                        .findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                                ticketId,
+                                CommentVisibility.PUBLIC
                         )
         ).thenReturn(
                 List.of()

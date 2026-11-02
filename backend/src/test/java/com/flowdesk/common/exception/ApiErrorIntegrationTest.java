@@ -158,4 +158,21 @@ void invalidBearerTokenReturns401()
     .andExpect(jsonPath("$.requestId").isString());
 }
 
+    @Test
+    @WithMockUser(roles = "EMPLOYEE")
+    void malformedJsonOrInvalidEnumReturns400BadRequest()
+            throws Exception {
+
+        mockMvc.perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/tickets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Valid Title\",\"description\":\"Valid Desc\",\"type\":\"INVALID_ENUM\"}")
+                        .accept(MediaType.APPLICATION_JSON)
+        )
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message").value("Malformed JSON request or invalid field format"))
+        .andExpect(jsonPath("$.requestId").isString());
+    }
+
 }

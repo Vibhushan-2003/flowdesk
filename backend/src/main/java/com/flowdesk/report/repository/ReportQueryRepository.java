@@ -25,7 +25,7 @@ public interface ReportQueryRepository extends JpaRepository<Ticket, UUID> {
     }
 
     interface DateCount {
-        java.sql.Date getDate();
+        java.time.LocalDate getDate();
         Long getCount();
     }
 

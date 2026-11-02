@@ -132,8 +132,11 @@ export interface ResolveTicketRequest {
   resolutionSummary: string
 }
 
+export type CommentVisibility = 'PUBLIC' | 'INTERNAL'
+
 export interface CreateTicketCommentRequest {
   body: string
+  visibility?: CommentVisibility
 }
 
 export interface TicketCommentResponse {
@@ -141,5 +144,6 @@ export interface TicketCommentResponse {
   authorUserId: string
   authorName: string
   body: string
+  visibility?: CommentVisibility
   createdAt: string
 }

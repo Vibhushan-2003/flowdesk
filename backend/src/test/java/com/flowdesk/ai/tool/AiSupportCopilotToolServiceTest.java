@@ -4,6 +4,7 @@ import com.flowdesk.sla.domain.SlaStatus;
 
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.CommentVisibility;
 import com.flowdesk.ticket.domain.TicketComment;
 import com.flowdesk.ticket.domain.TicketPriority;
 import com.flowdesk.ticket.domain.TicketStatus;
@@ -292,8 +293,9 @@ class AiSupportCopilotToolServiceTest {
 
         when(
                 ticketCommentRepository
-                        .findByTicket_IdOrderByCreatedAtAsc(
-                                ticketId
+                        .findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                                ticketId,
+                                CommentVisibility.PUBLIC
                         )
         ).thenReturn(
                 List.of(

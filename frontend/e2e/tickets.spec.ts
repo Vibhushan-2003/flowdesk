@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import {
   MOCK_EMPLOYEE,
+  MOCK_ENGINEER,
   createMockToken,
   setupApiMocks,
 } from './fixtures/mockApi'
@@ -139,5 +140,160 @@ test.describe('Ticket Creation & Reliability Journeys', () => {
     const storedDraft = await page.evaluate(() => sessionStorage.getItem('flowdesk_ticket_draft'))
     expect(storedDraft).toBeNull()
   })
-})
 
+  test('Support staff internal notes: toggle creates internal note with badge, invisible to employee', async ({
+    page,
+  }) => {
+    // 1. Support engineer view
+    await setupApiMocks(page, MOCK_ENGINEER)
+    const engToken = createMockToken(MOCK_ENGINEER)
+    await page.addInitScript((t) => {
+      sessionStorage.setItem('flowdesk_access_token', t)
+    }, engToken)
+
+    const mockTicket = {
+      ticketId: '11111111-1111-1111-1111-111111111111',
+      ticketNumber: 'FD-100200',
+      type: 'INCIDENT',
+      title: 'Database connection spike',
+      description: 'Spike observed during peak hours',
+      priority: 'HIGH',
+      status: 'IN_PROGRESS',
+      createdByUserId: MOCK_EMPLOYEE.id,
+      createdByEmail: MOCK_EMPLOYEE.email,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      assignedAt: new Date().toISOString(),
+      responseDueAt: new Date().toISOString(),
+      resolutionDueAt: new Date().toISOString(),
+      firstRespondedAt: null,
+      resolvedAt: null,
+      resolutionSummary: null,
+      responseSlaStatus: 'MET',
+      resolutionSlaStatus: 'PENDING',
+    }
+
+    const commentsList = [
+      {
+        commentId: 'c1111111-0000-0000-0000-000000000001',
+        authorUserId: MOCK_EMPLOYEE.id,
+        authorName: 'Employee User',
+        body: 'Experiencing slow queries since this morning.',
+        visibility: 'PUBLIC',
+        createdAt: new Date(Date.now() - 3600000).toISOString(),
+      },
+    ]
+
+    await page.route('**/api/support/tickets/FD-100200', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockTicket),
+      })
+    })
+
+    await page.route('**/api/support/tickets/FD-100200/comments', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(commentsList),
+        })
+      } else if (route.request().method() === 'POST') {
+        const body = route.request().postDataJSON() as { body: string; visibility?: string }
+        const createdComment = {
+          commentId: 'c2222222-0000-0000-0000-000000000002',
+          authorUserId: MOCK_ENGINEER.id,
+          authorName: 'Support Engineer',
+          body: body.body,
+          visibility: body.visibility || 'PUBLIC',
+          createdAt: new Date().toISOString(),
+        }
+        commentsList.push(createdComment)
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify(createdComment),
+        })
+      }
+    })
+
+    await page.route('**/api/tickets/FD-100200/attachments**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      })
+    })
+
+    await page.goto('/support/tickets/FD-100200')
+    await expect(page.getByText('Database connection spike')).toBeVisible()
+
+    // Verify existing public comment is visible
+    await expect(page.getByText('Experiencing slow queries since this morning.')).toBeVisible()
+
+    // Check internal note toggle
+    const internalCheckbox = page.locator('#comment-is-internal')
+    await expect(internalCheckbox).toBeVisible()
+    await internalCheckbox.check()
+
+    // Button label should now indicate internal note
+    const submitBtn = page.getByRole('button', { name: /add internal note/i })
+    await expect(submitBtn).toBeVisible()
+
+    // Type private staff note
+    await page.locator('#support-comment-body').fill('Confidential staff investigation: checked DB replicas.')
+    await submitBtn.click()
+
+    // Internal note should appear with badge
+    await expect(page.getByText('Confidential staff investigation: checked DB replicas.')).toBeVisible()
+    await expect(page.getByTestId('internal-note-badge')).toBeVisible()
+
+    // 2. Employee view verification: only public comments must be returned
+    const empPage = await page.context().newPage()
+    await setupApiMocks(empPage, MOCK_EMPLOYEE)
+    const empToken = createMockToken(MOCK_EMPLOYEE)
+    await empPage.addInitScript((t) => {
+      sessionStorage.setItem('flowdesk_access_token', t)
+    }, empToken)
+
+    await empPage.route('**/api/tickets/FD-100200', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...mockTicket,
+          id: mockTicket.ticketId,
+        }),
+      })
+    })
+
+    // Employee API strictly returns only PUBLIC comments
+    await empPage.route('**/api/tickets/FD-100200/comments', async (route) => {
+      const publicOnly = commentsList.filter((c) => c.visibility === 'PUBLIC')
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(publicOnly),
+      })
+    })
+
+    await empPage.route('**/api/tickets/FD-100200/attachments**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      })
+    })
+
+    await empPage.goto('/tickets/FD-100200')
+    await expect(empPage.getByText('Database connection spike')).toBeVisible()
+    await expect(empPage.getByText('Experiencing slow queries since this morning.')).toBeVisible()
+
+    // Verify internal note is completely absent from employee view
+    await expect(empPage.getByText('Confidential staff investigation: checked DB replicas.')).not.toBeVisible()
+    await expect(empPage.getByTestId('internal-note-badge')).not.toBeVisible()
+
+    await empPage.close()
+  })
+});

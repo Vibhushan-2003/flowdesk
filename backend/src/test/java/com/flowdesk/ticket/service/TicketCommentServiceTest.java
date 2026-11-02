@@ -5,6 +5,7 @@ import com.flowdesk.notification.service.NotificationService;
 
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.CommentVisibility;
 import com.flowdesk.ticket.domain.TicketComment;
 import com.flowdesk.ticket.domain.TicketStatus;
 
@@ -104,8 +105,9 @@ class TicketCommentServiceTest {
                 .thenReturn(Optional.of(ticket));
 
         when(ticketCommentRepository
-                .findByTicket_IdOrderByCreatedAtAsc(
-                        ticketId
+                .findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                        ticketId,
+                        CommentVisibility.PUBLIC
                 ))
                 .thenReturn(List.of(comment));
 

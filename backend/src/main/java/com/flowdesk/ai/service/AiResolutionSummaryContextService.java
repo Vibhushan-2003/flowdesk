@@ -5,6 +5,7 @@ import com.flowdesk.ai.client.AiResolutionSummaryMessageRole;
 
 import com.flowdesk.ticket.domain.Ticket;
 import com.flowdesk.ticket.domain.TicketAssignment;
+import com.flowdesk.ticket.domain.CommentVisibility;
 import com.flowdesk.ticket.domain.TicketComment;
 import com.flowdesk.ticket.domain.TicketStatus;
 
@@ -114,8 +115,9 @@ public class AiResolutionSummaryContextService {
         List<AiResolutionSummaryConversationMessage>
                 conversation =
                 ticketCommentRepository
-                        .findByTicket_IdOrderByCreatedAtAsc(
-                                ticket.getId()
+                        .findByTicket_IdAndVisibilityOrderByCreatedAtAsc(
+                                ticket.getId(),
+                                CommentVisibility.PUBLIC
                         )
                         .stream()
                         .map(

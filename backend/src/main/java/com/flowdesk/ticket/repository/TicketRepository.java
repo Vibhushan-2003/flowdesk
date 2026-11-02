@@ -90,6 +90,8 @@ public interface TicketRepository
             UUID createdByUserId
     );
 
+    Optional<Ticket> findByTicketNumber(String ticketNumber);
+
     Page<Ticket> findByStatus(
             TicketStatus status,
             Pageable pageable
