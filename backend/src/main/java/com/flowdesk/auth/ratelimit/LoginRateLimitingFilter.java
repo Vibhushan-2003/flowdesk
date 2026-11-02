@@ -135,7 +135,7 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
             return;
         }
 
-        String clientIp = ClientIpResolver.resolveClientIp(wrappedRequest);
+        String clientIp = ClientIpResolver.resolveClientIp(wrappedRequest, properties.isTrustProxyHeaders());
         String normalizedEmail = extractNormalizedEmail(wrappedRequest);
 
         String ipKey = clientIp;
