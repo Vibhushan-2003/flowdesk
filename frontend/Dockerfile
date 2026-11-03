@@ -7,7 +7,8 @@
 # ------------------------------------------------------------------------------
 # Stage 1: Build production React / Vite static bundle
 # ------------------------------------------------------------------------------
-FROM node:22-alpine AS builder
+ARG BUILDPLATFORM
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 
 WORKDIR /app
 

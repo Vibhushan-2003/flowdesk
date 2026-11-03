@@ -108,7 +108,8 @@ public class SecurityConfig {
 
                         // Public health endpoint
                         .requestMatchers(
-                                "/api/health"
+                                "/api/health",
+                                "/api/health/**"
                         )
                         .permitAll()
 

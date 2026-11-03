@@ -1,0 +1,82 @@
+# ==============================================================================
+# FlowDesk Production Caddyfile - Edge Ingress & TLS Reverse Proxy
+# ==============================================================================
+# In production, Caddy serves as the public ingress boundary, terminating TLS
+# on host ports 80/443 and securely forwarding traffic to containerized backend
+# and frontend services across private Docker bridge networks.
+#
+# Environment Variables:
+#   CADDY_DOMAIN : Target domain name (default: localhost)
+#   CADDY_TLS    : TLS policy ('internal' for self-signed CA, or operator email for ACME)
+# ==============================================================================
+{
+	# Global options
+	admin off
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+{$CADDY_DOMAIN:localhost} {
+	# TLS Configuration:
+	# Use 'internal' for local testing (no external ACME/DNS validation required)
+	# Use operator email or omit for automated public Let's Encrypt / ZeroSSL certificates
+	tls {$CADDY_TLS:internal}
+
+	# Global security response headers
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# Gzip and zstd response compression
+	encode gzip zstd
+
+	# Health check probe endpoint for Caddy itself
+	handle /healthz {
+		respond "OK" 200
+	}
+
+	# REST API Endpoints -> Spring Boot Backend
+	# Caddy sanitizes client headers: X-Forwarded-For is explicitly set to {remote_host},
+	# completely stripping any client-forged prefix before forwarding to Tomcat.
+	handle /api/* {
+		reverse_proxy backend:8080 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+
+			# Response buffer configuration
+			flush_interval -1
+		}
+	}
+
+	# WebSocket / STOMP Connection Endpoints -> Spring Boot Backend
+	# Matches both /ws (standard STOMP endpoint) and /ws/* (SockJS fallback paths)
+	@websocket path /ws /ws/*
+	handle @websocket {
+		reverse_proxy backend:8080 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	# Static Assets & SPA Routing Fallback -> React / Nginx Frontend
+	handle {
+		reverse_proxy frontend:80 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+}
