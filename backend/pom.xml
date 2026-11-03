@@ -88,6 +88,16 @@
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
+        <!-- Day 67 - SRE Observability: Spring Boot Actuator & Micrometer Prometheus -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
         <!-- Day 60 - Multi-Instance Distributed Scheduler Locking (ShedLock) -->
         <dependency>
             <groupId>net.javacrumbs.shedlock</groupId>

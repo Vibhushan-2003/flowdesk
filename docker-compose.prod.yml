@@ -242,12 +242,157 @@ services:
       proxy_net:
         ipv4_address: 172.28.0.2
     healthcheck:
-      # Caddy edge process healthcheck
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/healthz || exit 1"]
+      # Caddy edge process healthcheck (supports TLS and plain HTTP probe)
+      test: ["CMD-SHELL", "wget -qO- --spider --no-check-certificate https://localhost/healthz || wget -qO- http://127.0.0.1:80/healthz || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ----------------------------------------------------------------------------
+  # Service 6: Prometheus Metrics Scraper (Optional Monitoring Profile)
+  # Activated via: docker compose --profile monitoring up -d
+  # Scrapes Spring Boot backend /actuator/prometheus over private internal network.
+  # Published host ports: NONE (strictly private to Docker network).
+  # ----------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: flowdesk-prod-prometheus
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    depends_on:
+      - alertmanager
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--storage.tsdb.retention.size=5GB'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - flowdesk_prod_prometheus_data:/prometheus
+    networks:
+      proxy_net:
+        ipv4_address: 172.28.0.30
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ----------------------------------------------------------------------------
+  # Service 7: Grafana Metrics Visualization (Optional Monitoring Profile)
+  # Activated via: docker compose --profile monitoring up -d
+  # Pre-provisioned with Prometheus datasource and FlowDesk SRE dashboard.
+  # Published host ports: NONE (strictly private, accessible via SSH tunnel or local binding).
+  # ----------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:11.5.0
+    container_name: flowdesk-prod-grafana
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ -z "$$GF_SECURITY_ADMIN_PASSWORD" ] || [ $${#GF_SECURITY_ADMIN_PASSWORD} -lt 12 ]; then
+          echo "FATAL: GRAFANA_ADMIN_PASSWORD must be configured with at least 12 characters when the monitoring profile is active." >&2
+          exit 1
+        fi
+        exec /run.sh
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-flowdesk_admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - flowdesk_prod_grafana_data:/var/lib/grafana
+    networks:
+      proxy_net:
+        ipv4_address: 172.28.0.31
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ----------------------------------------------------------------------------
+  # Service 8: Alertmanager Alert Dispatcher (Optional Monitoring Profile)
+  # Activated via: docker compose --profile monitoring up -d
+  # Receives alerts from Prometheus and handles routing/deduplication.
+  # Published host ports: NONE (strictly private to Docker network).
+  # ----------------------------------------------------------------------------
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: flowdesk-prod-alertmanager
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.listen-address=0.0.0.0:9093'
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - flowdesk_prod_alertmanager_data:/alertmanager
+    networks:
+      proxy_net:
+        ipv4_address: 172.28.0.32
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9093/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     logging:
       driver: "json-file"
       options:
@@ -268,6 +413,12 @@ volumes:
     name: flowdesk_prod_caddy_data
   flowdesk_prod_caddy_config:
     name: flowdesk_prod_caddy_config
+  flowdesk_prod_prometheus_data:
+    name: flowdesk_prod_prometheus_data
+  flowdesk_prod_grafana_data:
+    name: flowdesk_prod_grafana_data
+  flowdesk_prod_alertmanager_data:
+    name: flowdesk_prod_alertmanager_data
 
 # ------------------------------------------------------------------------------
 # Isolated Bridge Networks

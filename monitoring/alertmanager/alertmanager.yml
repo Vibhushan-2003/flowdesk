@@ -1,0 +1,22 @@
+# ==============================================================================
+# FlowDesk Alertmanager Configuration
+# ==============================================================================
+# Evaluates and dispatches alerts forwarded from Prometheus.
+# Runs privately on proxy_net with NO published host ports.
+# ==============================================================================
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ["alertname", "service", "severity"]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+  receiver: "default-receiver"
+
+receivers:
+  # Internal default receiver: active firing alerts are logged and recorded
+  # in Alertmanager's state machine. When external dispatch is desired, operators
+  # configure webhook_configs or email_configs with production credentials.
+  - name: "default-receiver"
+
