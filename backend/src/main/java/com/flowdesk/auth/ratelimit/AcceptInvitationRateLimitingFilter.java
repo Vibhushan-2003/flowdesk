@@ -91,7 +91,7 @@ public class AcceptInvitationRateLimitingFilter extends OncePerRequestFilter {
             return;
         }
 
-        String clientIp = ClientIpResolver.resolveClientIp(request, properties.isTrustProxyHeaders());
+        String clientIp = ClientIpResolver.resolveClientIp(request, properties.isTrustProxyHeaders(), properties.getTrustedProxies());
 
         CachedBodyHttpServletRequest cachedRequest;
         try {
