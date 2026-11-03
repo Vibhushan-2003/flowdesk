@@ -1,0 +1,258 @@
+# ==============================================================================
+# FlowDesk Production Deployment Architecture - Oracle Cloud Always Free
+# ==============================================================================
+# Services:
+#   1. postgres : PostgreSQL 16 (internal_net only, private)
+#   2. clamav   : ClamAV Daemon + Freshclam (internal_net only, private)
+#   3. backend  : Spring Boot Application (internal_net + proxy_net, private)
+#   4. frontend : React / Nginx Static SPA (proxy_net only, private)
+#   5. caddy    : Caddy HTTPS Reverse Proxy (public ports 80/443, proxy_net fixed IP 172.28.0.2)
+#
+# Persistence:
+#   - flowdesk_prod_db_data     : PostgreSQL storage
+#   - flowdesk_prod_attachments : Private ticket attachments
+#   - flowdesk_prod_clamav_db   : ClamAV virus definitions (avoids redownload on restart)
+#   - flowdesk_prod_caddy_data  : TLS certificates and ACME account keys
+#   - flowdesk_prod_caddy_config: Caddy runtime configuration
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # Service 1: PostgreSQL 16 Relational Database
+  # Kept strictly private on internal_net. No host ports published.
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: flowdesk-prod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-flowdesk}
+      POSTGRES_USER: ${DB_USER:-flowdesk_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Database password must be provided in environment file}
+    volumes:
+      - flowdesk_prod_db_data:/var/lib/postgresql/data
+    networks:
+      - internal_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-flowdesk_app} -d $${POSTGRES_DB:-flowdesk}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ----------------------------------------------------------------------------
+  # Service 2: ClamAV Malware Scanner
+  # Official Debian multiarch image (linux/arm64 + linux/amd64).
+  # Persistent signature volume prevents redundant daily signature downloads.
+  # Kept strictly private on internal_net. No host ports published.
+  # ----------------------------------------------------------------------------
+  clamav:
+    image: clamav/clamav:stable-debian
+    container_name: flowdesk-prod-clamav
+    restart: unless-stopped
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "false"
+      FRESHCLAMD_CHECKS: "12"
+    volumes:
+      - flowdesk_prod_clamav_db:/var/lib/clamav
+    networks:
+      - internal_net
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "5"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 90s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ----------------------------------------------------------------------------
+  # Service 3: Spring Boot Backend Application
+  # Runs as non-root user (UID 10001). Connects to internal PostgreSQL and ClamAV.
+  # Kept strictly private on internal_net and proxy_net. No host ports published.
+  # Only accepts trusted proxy headers from Caddy's fixed IP (172.28.0.2).
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: flowdesk-backend:prod
+    container_name: flowdesk-prod-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+    environment:
+      # Profile & Lifecycle
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_SHUTDOWN: graceful
+      SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 30s
+
+      # Database
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-flowdesk}
+      DB_USERNAME: ${DB_USER:-flowdesk_app}
+      DB_PASSWORD: ${DB_PASSWORD:?Database password must be provided in environment file}
+
+      # Authentication & Cryptography
+      JWT_SECRET: ${JWT_SECRET:?JWT secret must be provided in environment file}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-https://localhost}
+      FLOWDESK_FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-https://localhost}
+
+      # Attachment Storage & Malware Scanner
+      ATTACHMENT_STORAGE_DIR: /app/data/attachments
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      APP_ATTACHMENT_MALWARE_SCANNER_TYPE: clamav
+
+      # Network & Trusted Proxy Model
+      # Caddy is pinned to 172.28.0.2 on proxy_net.
+      # Tomcat and Spring filters trust ONLY 172.28.0.2 and loopback.
+      RATE_LIMIT_LOGIN_TRUST_PROXY: "true"
+      RATE_LIMIT_TRUSTED_PROXIES: ${RATE_LIMIT_TRUSTED_PROXIES:-172.28.0.2}
+      TOMCAT_INTERNAL_PROXIES: ${TOMCAT_INTERNAL_PROXIES:-172\.28\.0\.2}
+      SERVER_FORWARD_HEADERS_STRATEGY: native
+
+      # Optional Integrations (Dormant by default)
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_OAUTH_ENABLED: ${GOOGLE_OAUTH_ENABLED:-false}
+
+      # Outbound Email (TLS enforced if enabled)
+      FLOWDESK_MAIL_ENABLED: ${FLOWDESK_MAIL_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      SMTP_SSL: ${SMTP_SSL:-false}
+      FLOWDESK_MAIL_FROM_ADDRESS: ${FLOWDESK_MAIL_FROM_ADDRESS:-noreply@flowdesk.internal}
+      FLOWDESK_MAIL_FROM_NAME: ${FLOWDESK_MAIL_FROM_NAME:-FlowDesk}
+
+      # Dormant bootstrap for long-running web instance
+      FLOWDESK_BOOTSTRAP_ADMIN_ENABLED: ${FLOWDESK_BOOTSTRAP_ADMIN_ENABLED:-false}
+    volumes:
+      - flowdesk_prod_attachments:/app/data/attachments
+    networks:
+      internal_net:
+      proxy_net:
+        ipv4_address: 172.28.0.10
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ----------------------------------------------------------------------------
+  # Service 4: React / Vite Static Bundle via Nginx
+  # Serves compiled static SPA assets and SPA fallback routes.
+  # Kept strictly private on proxy_net. No host ports published.
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${FRONTEND_ORIGIN:-https://localhost}
+    image: flowdesk-frontend:prod
+    container_name: flowdesk-prod-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      proxy_net:
+        ipv4_address: 172.28.0.20
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ----------------------------------------------------------------------------
+  # Service 5: Caddy Edge HTTPS Reverse Proxy
+  # The ONLY service publishing host ports (80 and 443).
+  # Pinned to static IPv4 172.28.0.2 on proxy_net.
+  # Automatic Let's Encrypt / ZeroSSL TLS certificates with persistent storage.
+  # ----------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: flowdesk-prod-caddy
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    ports:
+      - "${CADDY_HTTP_PORT:-80}:80"
+      - "${CADDY_HTTPS_PORT:-443}:443"
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN:-localhost}
+      CADDY_TLS: ${CADDY_TLS:-internal}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - flowdesk_prod_caddy_data:/data
+      - flowdesk_prod_caddy_config:/config
+    networks:
+      proxy_net:
+        ipv4_address: 172.28.0.2
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ------------------------------------------------------------------------------
+# Persistent Volumes (Isolated with flowdesk_prod_ prefix)
+# ------------------------------------------------------------------------------
+volumes:
+  flowdesk_prod_db_data:
+    name: flowdesk_prod_db_data
+  flowdesk_prod_attachments:
+    name: flowdesk_prod_attachments
+  flowdesk_prod_clamav_db:
+    name: flowdesk_prod_clamav_db
+  flowdesk_prod_caddy_data:
+    name: flowdesk_prod_caddy_data
+  flowdesk_prod_caddy_config:
+    name: flowdesk_prod_caddy_config
+
+# ------------------------------------------------------------------------------
+# Isolated Bridge Networks
+# ------------------------------------------------------------------------------
+networks:
+  # Private network connecting backend, database and virus scanner only
+  internal_net:
+    name: flowdesk_prod_internal_net
+    driver: bridge
+
+  # Ingress network connecting Caddy, frontend and backend
+  # Explicitly configured subnet allows pinning Caddy to 172.28.0.2
+  proxy_net:
+    name: flowdesk_prod_proxy_net
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/24

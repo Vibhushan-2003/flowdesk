@@ -7,7 +7,8 @@
 # ------------------------------------------------------------------------------
 # Stage 1: Build executable Spring Boot application archive
 # ------------------------------------------------------------------------------
-FROM maven:3.9-eclipse-temurin-21-alpine AS builder
+ARG BUILDPLATFORM
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /workspace
 
