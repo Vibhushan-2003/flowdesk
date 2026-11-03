@@ -6,7 +6,7 @@ Validates live FlowDesk stack health across 13 security & operational criteria:
   1. Edge HTTPS Connectivity & TLS Handshake
   2. HTTP -> HTTPS Automated Redirection (Port 80 -> 443)
   3. Frontend SPA Root Asset Delivery (index.html, JS/CSS bundles)
-  4. Backend Readiness Probe (/api/health/ready)
+  4. Backend Readiness Probe (/api/health/ready -> {"status":"READY"})
   5. Edge Actuator Lockdown (/actuator* blocked with 404 at Caddy boundary)
   6. Authentication Security (Valid login / safe rejection of invalid credentials)
   7. Authenticated User Profile Probe (/api/users/me)
@@ -19,6 +19,7 @@ Validates live FlowDesk stack health across 13 security & operational criteria:
 """
 
 import argparse
+import getpass
 import json
 import os
 import ssl
@@ -40,13 +41,13 @@ def create_ssl_context(insecure: bool) -> ssl.SSLContext:
 def http_get(url: str, ssl_ctx: ssl.SSLContext, headers=None, follow_redirects=True):
     req = urllib.request.Request(url, headers=headers or {})
     try:
-        # urllib by default follows redirects
-        opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_ctx))
         if not follow_redirects:
             class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
                 def redirect_request(self, req, fp, code, msg, headers, newurl):
                     return None
             opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_ctx), NoRedirectHandler)
+        else:
+            opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_ctx))
 
         with opener.open(req, timeout=10) as resp:
             return resp.status, resp.read().decode("utf-8", errors="replace"), resp.headers
@@ -72,6 +73,59 @@ def http_post_json(url: str, payload: dict, ssl_ctx: ssl.SSLContext, headers=Non
         return 0, str(e), {}
 
 
+def evaluate_readiness_response(http_status: int, response_body: str) -> tuple:
+    """
+    Validates backend readiness contract from HealthController.java:
+    Returns (True, message) if HTTP 200 and JSON contains {"status":"READY"}.
+    Returns (False, message) otherwise.
+    """
+    if http_status == 0:
+        return False, f"Network connection failed / unreachable: {response_body}"
+
+    if http_status != 200:
+        if http_status == 503:
+            try:
+                data = json.loads(response_body)
+                status_val = data.get("status")
+                return False, f"Backend reports service unavailable (HTTP 503, status: '{status_val}')"
+            except Exception:
+                return False, f"Backend returned HTTP 503 Service Unavailable"
+        return False, f"Expected HTTP 200, got HTTP {http_status}"
+
+    try:
+        data = json.loads(response_body)
+    except Exception as e:
+        return False, f"Readiness response is not valid JSON: {e}"
+
+    if not isinstance(data, dict):
+        return False, "Readiness response JSON root is not an object"
+
+    status_val = data.get("status")
+    if status_val == "READY":
+        return True, "Backend /api/health/ready returned HTTP 200 with status: READY"
+
+    return False, f"Expected readiness status 'READY', but received '{status_val}'"
+
+
+def load_env_file(filepath: str) -> dict:
+    env_vars = {}
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Environment file not found: {filepath}")
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, val = line.split("=", 1)
+                key = key.strip()
+                val = val.strip().strip("'\"")
+                if key.startswith("export "):
+                    key = key[7:].strip()
+                env_vars[key] = val
+    return env_vars
+
+
 def main():
     parser = argparse.ArgumentParser(description="FlowDesk Production Deployment Smoke Test Suite")
     parser.add_argument("--domain", default=os.getenv("CADDY_DOMAIN", "localhost"), help="Target domain or host")
@@ -79,12 +133,31 @@ def main():
     parser.add_argument("--http-port", type=int, default=int(os.getenv("CADDY_HTTP_PORT", "80")), help="HTTP port")
     parser.add_argument("--insecure", "-k", action="store_true", help="Allow insecure TLS (internal CA)")
     parser.add_argument("--local", action="store_true", help="Convenience flag: sets --domain localhost -k")
+    parser.add_argument("--env-file", help="Path to protected env file containing SMOKE_TEST_USER / SMOKE_TEST_PASSWORD")
     parser.add_argument("--user", default=os.getenv("SMOKE_TEST_USER", ""), help="Smoke test user email")
     parser.add_argument("--password", default=os.getenv("SMOKE_TEST_PASSWORD", ""), help="Smoke test user password")
+    parser.add_argument("--strict", action="store_true", help="Enforce production release gate: skipped mandatory tests result in failure")
     parser.add_argument("--skip-monitoring", action="store_true", help="Skip monitoring container checks")
     parser.add_argument("--skip-backup-timer", action="store_true", help="Skip systemd backup timer check")
 
     args = parser.parse_args()
+
+    # Load from env-file if specified
+    if args.env_file:
+        loaded = load_env_file(args.env_file)
+        if not args.user and "SMOKE_TEST_USER" in loaded:
+            args.user = loaded["SMOKE_TEST_USER"]
+        if not args.password and "SMOKE_TEST_PASSWORD" in loaded:
+            args.password = loaded["SMOKE_TEST_PASSWORD"]
+
+    # Secure prompt if user provided without password in interactive session
+    if args.user and not args.password:
+        if sys.stdin.isatty():
+            try:
+                args.password = getpass.getpass(f"Enter password for {args.user}: ")
+            except Exception:
+                pass
+
     if args.local:
         args.domain = "localhost"
         args.insecure = True
@@ -99,11 +172,13 @@ def main():
     print(f"Target Base URL:    {base_url}")
     print(f"HTTP Ingress URL:   {http_url}")
     print(f"TLS Verification:   {'Insecure / Internal CA (-k)' if args.insecure else 'Strict Public TLS'}")
-    print(f"Authenticated Auth: {'Enabled (' + args.user + ')' if args.user else 'Disabled'}")
+    print(f"Release Gate Mode:  {'STRICT (skips fail)' if args.strict else 'Standard'}")
+    print(f"Authenticated Auth: {'Enabled (' + args.user + ')' if args.user else 'Disabled (unauthenticated check)'}")
 
     passed = 0
     failed = 0
     skipped = 0
+    strict_violations = 0
 
     def report_pass(msg):
         nonlocal passed
@@ -115,10 +190,14 @@ def main():
         print(f"  [FAIL] {msg}", file=sys.stderr)
         failed += 1
 
-    def report_skip(msg):
-        nonlocal skipped
-        print(f"  [SKIP] {msg}")
-        skipped += 1
+    def report_skip(msg, mandatory=False):
+        nonlocal skipped, strict_violations
+        if args.strict and mandatory:
+            print(f"  [FAIL-STRICT] Mandatory check skipped in strict release mode: {msg}", file=sys.stderr)
+            strict_violations += 1
+        else:
+            print(f"  [SKIP] {msg}")
+            skipped += 1
 
     # 1. Edge HTTPS Connectivity
     print("\n--- Step 1: Edge HTTPS Connectivity & TLS Handshake ---")
@@ -148,10 +227,11 @@ def main():
     # 4. Backend Readiness Probe
     print("\n--- Step 4: Backend Readiness Probe ---")
     status, body, _ = http_get(f"{base_url}/api/health/ready", ssl_ctx)
-    if status == 200 and '"status":"UP"' in body.replace(" ", ""):
-        report_pass("Backend /api/health/ready returned HTTP 200 with status: UP")
+    is_ready, ready_msg = evaluate_readiness_response(status, body)
+    if is_ready:
+        report_pass(ready_msg)
     else:
-        report_fail(f"Backend readiness check failed (status: {status}, body: {body})")
+        report_fail(f"Backend readiness check failed: {ready_msg} (raw body: {body})")
 
     # 5. Edge Actuator Lockdown
     print("\n--- Step 5: Edge Actuator Lockdown ---")
@@ -176,7 +256,7 @@ def main():
             except Exception as e:
                 report_fail(f"Failed to parse login response: {e}")
         else:
-            report_fail(f"Authentication failed for {args.user} (status: {status}, body: {body})")
+            report_fail(f"Authentication failed for {args.user} (status: {status})")
     else:
         status, body, _ = http_post_json(
             f"{base_url}/api/auth/login",
@@ -197,7 +277,7 @@ def main():
         else:
             report_fail(f"User profile query failed (status: {status})")
     else:
-        report_skip("User profile probe skipped (no authenticated session)")
+        report_skip("User profile probe skipped (no authenticated session)", mandatory=True)
 
     # 8. Ticket Resource Query
     print("\n--- Step 8: Ticket Resource Query ---")
@@ -208,7 +288,7 @@ def main():
         else:
             report_fail(f"Ticket listing query failed (status: {status})")
     else:
-        report_skip("Ticket resource query skipped (no authenticated session)")
+        report_skip("Ticket resource query skipped (no authenticated session)", mandatory=True)
 
     # 9. ClamAV Malware Scanner Check
     print("\n--- Step 9: Malware Scanner Availability ---")
@@ -220,9 +300,9 @@ def main():
         if res.returncode == 0 and res.stdout.strip() == "healthy":
             report_pass("ClamAV daemon container is healthy (verified via docker inspect)")
         else:
-            report_skip(f"ClamAV daemon container status: {res.stdout.strip() or 'not running'}")
+            report_skip(f"ClamAV daemon container status: {res.stdout.strip() or 'not running'}", mandatory=True)
     except Exception:
-        report_skip("Docker inspection for ClamAV unavailable")
+        report_skip("Docker inspection for ClamAV unavailable", mandatory=True)
 
     # 10. WebSocket / STOMP Endpoint Availability
     print("\n--- Step 10: WebSocket Endpoint Availability ---")
@@ -247,12 +327,12 @@ def main():
         if leaks == 0:
             report_pass("Zero port leaks: PostgreSQL, Backend, ClamAV, and Frontend publish NO host ports")
     except Exception:
-        report_skip("Docker inspection for host ports unavailable")
+        report_skip("Docker CLI not available to inspect internal port bindings", mandatory=True)
 
     # 12. SRE Monitoring Profile Verification
     print("\n--- Step 12: SRE Monitoring Profile Verification ---")
     if args.skip_monitoring:
-        report_skip("Monitoring stack verification skipped (--skip-monitoring)")
+        report_skip("Monitoring stack verification skipped (--skip-monitoring)", mandatory=False)
     else:
         try:
             res = subprocess.run(
@@ -290,14 +370,14 @@ def main():
                     else:
                         report_fail(f"Grafana health probe failed: {g_res.stdout}")
             else:
-                report_skip("Monitoring profile is not active (run docker compose --profile monitoring up -d to enable)")
+                report_skip("Monitoring profile is not active (run docker compose --profile monitoring up -d to enable)", mandatory=False)
         except Exception:
-            report_skip("Docker inspection for monitoring stack unavailable")
+            report_skip("Docker inspection for monitoring stack unavailable", mandatory=False)
 
     # 13. Systemd Backup Timer Check
     print("\n--- Step 13: Systemd Backup Timer Status ---")
     if args.skip_backup_timer:
-        report_skip("Backup timer check skipped (--skip-backup-timer)")
+        report_skip("Backup timer check skipped (--skip-backup-timer)", mandatory=False)
     else:
         try:
             res = subprocess.run(
@@ -307,26 +387,29 @@ def main():
             if res.returncode == 0:
                 report_pass("flowdesk-backup.timer is active on host")
             else:
-                report_skip("flowdesk-backup.timer is not active (install via scripts/sre/systemd/)")
+                report_skip("flowdesk-backup.timer is not active (install via scripts/sre/systemd/)", mandatory=False)
         except Exception:
-            report_skip("systemctl not available on this host")
+            report_skip("systemctl not available on this host", mandatory=False)
 
     # Summary
     print("\n======================================================================")
     print("Smoke Test Summary")
     print("======================================================================")
-    print(f"  Passed:  {passed}")
-    print(f"  Failed:  {failed}")
-    print(f"  Skipped: {skipped}")
+    print(f"  Passed:             {passed}")
+    print(f"  Failed:             {failed}")
+    print(f"  Skipped:            {skipped}")
+    if args.strict:
+        print(f"  Strict Violations:  {strict_violations}")
 
-    if failed == 0:
+    total_failures = failed + (strict_violations if args.strict else 0)
+
+    if total_failures == 0:
         print("\n>>> SMOKE TEST RESULT: ALL CHECKS PASSED - STACK IS READY <<<\n")
         sys.exit(0)
     else:
-        print(f"\n>>> SMOKE TEST RESULT: {failed} CHECK(S) FAILED <<<\n", file=sys.stderr)
+        print(f"\n>>> SMOKE TEST RESULT: {total_failures} CHECK(S) FAILED <<<\n", file=sys.stderr)
         sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
-

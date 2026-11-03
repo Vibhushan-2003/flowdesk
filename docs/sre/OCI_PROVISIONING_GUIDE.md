@@ -1,38 +1,47 @@
 # FlowDesk — Oracle Cloud Always Free ARM64 Provisioning & Deployment Guide
 
-This guide provides end-to-end operational instructions for deploying FlowDesk to Oracle Cloud Infrastructure (OCI) Always Free tier using Ampere ARM64 compute, isolated Docker containers, Caddy automated TLS, and automated backups with SRE observability.
+This guide provides operational instructions for deploying FlowDesk to the Oracle Cloud Infrastructure (OCI) Always Free tier using Ampere ARM64 compute, isolated Docker containers, Caddy automated TLS, and automated backups with SRE observability.
 
 ---
 
-## 1. Oracle Cloud Always Free Resource Sizing
+## 1. Oracle Cloud Always Free Resource Sizing & Tenancy Constraints
 
-### 1.1 Tenancy Limits & Allocation
-Oracle Cloud Always Free provides the following tenancy-wide limits for Ampere A1 Compute:
-- **Compute:** 4 OCPUs and 24 GB RAM (can be allocated to 1 to 4 VMs).
-- **Block Volume Storage:** 200 GB pooled across boot volumes and block volumes.
-- **Networking:** 1 Free Public IPv4 address per compute instance; 10 TB/month outbound bandwidth.
+### 1.1 Official Tenancy Quotas & Monthly Ceilings
+Oracle Cloud Always Free provides compute and storage resources subject to strict monthly allowance metrics:
+- **Ampere A1 Compute Grant:** Conservative billing documentation allocates **1,500 A1 OCPU-hours** and **9,000 GB-hours** of memory per tenancy per calendar month.
+- **Continuous 24x7 VM Allocation:** 1,500 OCPU-hours allows approximately **2 OCPUs** and **12 GB RAM** running continuously for a full month (30 days &times; 24 hours &times; 2 OCPUs = 1,440 OCPU-hours; 30 days &times; 24 hours &times; 12 GB = 8,640 GB-hours).
+- **Block Volume Storage Pool:** **200 GB total eligible storage pool** shared across boot volumes and block volumes across the entire tenancy.
+- **Networking:** 1 Free Public IPv4 address per compute instance; 10 TB/month outbound data transfer.
+
+> [!CAUTION]
+> **Important Capacity Note on Multi-VM Headroom:**
+> Some Oracle marketing materials state "up to 4 OCPUs and 24 GB RAM", corresponding to 3,000 OCPU-hours/month. However, conservative billing enforcement across standard Always Free accounts tracks against **1,500 OCPU-hours / 9,000 GB-hours**. Allocating 2 OCPUs and 12 GB RAM for FlowDesk utilizes ~96–99% of that monthly allowance. **Do not assume another 2 OCPU / 12 GB instance can be run concurrently without incurring charges or encountering capacity rejection.**
+>
+> During VM provisioning in the OCI Console, the operator **MUST verify** that:
+> 1. The instance shape displays the **"Always Free-eligible"** tag.
+> 2. The **"Cost Estimation"** panel in the creation drawer displays strictly **$0.00 / month**.
+> 3. Never select "High Performance" volume VPUs (use "Balanced" 30 VPU/GB included in Always Free).
 
 ### 1.2 FlowDesk Production VM Specification
-To leave generous capacity for staging or disaster recovery while maximizing single-node performance:
 
-| Component | Specification | Tenancy Headroom Remaining |
+| Component | Target Specification | Tenancy Consumption & Safety Rule |
 | :--- | :--- | :--- |
-| **Compute Shape** | `VM.Standard.A1.Flex` (Ampere Altra ARM64) | — |
-| **OCPUs** | **2 OCPUs** | 2 OCPUs free |
-| **RAM** | **12 GB RAM** | 12 GB free |
-| **Boot Volume** | **60 GB** (Balanced Performance, 30 VPU/GB) | 140 GB free |
-| **Operating System** | **Ubuntu 24.04 LTS Minimal ARM64** (`aarch64`) | — |
-| **Public IPv4** | 1 Ephemeral or Reserved Public IPv4 | Free tier |
+| **Compute Shape** | `VM.Standard.A1.Flex` (Ampere Altra ARM64) | Must display **Always Free-eligible** |
+| **OCPUs** | **2 OCPUs** | Consumes ~1,440 of 1,500 monthly OCPU-hours |
+| **RAM** | **12 GB RAM** | Consumes ~8,640 of 9,000 monthly GB-hours |
+| **Boot Volume** | **60 GB** (Balanced Performance, 30 VPU/GB) | Leaves 140 GB in 200 GB eligible block volume pool |
+| **Operating System** | **Ubuntu 24.04 LTS Minimal ARM64** (`aarch64`) | Official Canonical minimal cloud image |
+| **Public IPv4** | 1 Ephemeral or Reserved Public IPv4 | Included in Always Free allocation |
 
 ### 1.3 Memory Allocation Budget (12 GB RAM)
 - **PostgreSQL 16:** ~512 MB – 1 GB (shared buffers, work mem)
 - **Spring Boot Backend (JVM):** 1.5 GB heap (`-Xms512m -Xmx2048m`), ~500 MB native/metaspace
-- **ClamAV Daemon:** ~1.2 GB (virus definition database in memory)
-- **React / Nginx Frontend:** ~50 MB
+- **ClamAV Daemon:** ~1.2 GB (virus signature database resident in RAM)
+- **React / Nginx Static Frontend:** ~50 MB
 - **Caddy Reverse Proxy:** ~80 MB
 - **Prometheus + Node Exporter:** ~300 MB
 - **Grafana + Alertmanager:** ~200 MB
-- **Host OS & Buffer Cache:** ~5 GB (available for Linux filesystem cache and dirty page buffers)
+- **Host OS & Linux Filesystem Cache:** ~5+ GB (available for OS disk caching and page buffers)
 
 ---
 
@@ -48,81 +57,98 @@ To leave generous capacity for staging or disaster recovery while maximizing sin
    - **Public Subnet CIDR:** `10.0.0.0/24`
    - **Private Subnet CIDR:** `10.0.1.0/24`
 4. Click **Next** &rarr; **Create**.
-5. Once created, click on `flowdesk-prod-vcn` &rarr; click on **Security Lists** &rarr; select **Default Security List for flowdesk-prod-vcn**.
-6. **Ingress Rules Configuration:**
-   Configure exactly the following ingress rules:
+5. Click on `flowdesk-prod-vcn` &rarr; click on **Security Lists** &rarr; select **Default Security List for flowdesk-prod-vcn**.
+6. **Configure Ingress Rules:**
 
-   | Source CIDR | IP Protocol | Source Port Range | Destination Port Range | Description |
-   | :--- | :--- | :--- | :--- | :--- |
-   | `0.0.0.0/0` | TCP | All | **22** | SSH Administration (optionally restrict to operator IP) |
-   | `0.0.0.0/0` | TCP | All | **80** | HTTP Ingress (ACME HTTP-01 challenge & HTTPS redirection) |
-   | `0.0.0.0/0` | TCP | All | **443** | HTTPS Public Edge Ingress (Caddy TLS) |
+   | Source CIDR | IP Protocol | Destination Port Range | Description & Hardening |
+   | :--- | :--- | :--- | :--- |
+   | `<OPERATOR_IP>/32` *(or `0.0.0.0/0`)* | TCP | **22** | SSH Administration (**strongly recommended to restrict to operator's static IP/CIDR**) |
+   | `0.0.0.0/0` | TCP | **80** | HTTP Ingress (Automated ACME HTTP-01 challenge & HTTPS redirection) |
+   | `0.0.0.0/0` | TCP | **443** | HTTPS Edge Ingress (Caddy TLS termination) |
 
    > [!IMPORTANT]
    > Do **NOT** add ingress rules for ports `5432` (PostgreSQL), `8080` (Backend), `3310` (ClamAV), `9090` (Prometheus), `3000` (Grafana), `9093` (Alertmanager), or `9100` (Node Exporter). These services are private to Docker bridge networks.
 
-7. **Egress Rules:**
-   - Verify Default Egress Rule exists: Destination `0.0.0.0/0`, All Protocols (allows outbound OS updates, ClamAV virus signatures, and SMTP relays).
+7. **Verify Egress Rule:**
+   - Default Egress Rule must allow `0.0.0.0/0` for all protocols (required for OS security patches, ClamAV freshclam virus definitions, and outbound SMTP relays).
 
 ---
 
 ### Step 2: Launch Compute Instance
 1. Navigate to **Compute** &rarr; **Instances** &rarr; click **Create Instance**.
 2. **Name:** `flowdesk-prod-vm1`
-3. **Compartment:** Select your compartment.
-4. **Placement:** Select an Availability Domain (e.g. `AD-1`). If capacity is temporarily constrained, try `AD-2` or `AD-3`.
+3. **Compartment:** Select production compartment.
+4. **Placement:** Select an Availability Domain (e.g. `AD-1`, `AD-2`, or `AD-3` where A1 capacity is available).
 5. **Image and Shape:**
    - Click **Change Image** &rarr; select **Canonical Ubuntu** &rarr; choose **Ubuntu 24.04 Minimal aarch64**.
    - Click **Change Shape** &rarr; select **Ampere (ARM)** &rarr; choose `VM.Standard.A1.Flex`.
    - Set **OCPUs:** `2`
    - Set **Memory (GB):** `12`
+   - **Verify:** Confirm the **"Always Free-eligible"** badge is present.
 6. **Networking:**
    - **Primary Network:** Select `flowdesk-prod-vcn`.
    - **Subnet:** Select `Public Subnet-flowdesk-prod-vcn`.
    - **Assign Public IPv4 Address:** Select **Automatically assign public IPv4 address** (or attach a Reserved Public IP).
 7. **SSH Keys:**
-   - Select **Upload public key files (.pub)** and upload your secure SSH public key (e.g. `~/.ssh/id_ed25519.pub`).
+   - Upload your secure public key (`~/.ssh/id_ed25519.pub`).
 8. **Boot Volume:**
    - Check **Specify a custom boot volume size**.
    - Set **Size (GB):** `60`.
-   - Volume Performance: **Balanced** (Default).
-9. Click **Create**. Instance provisioning typically completes in 60–90 seconds.
-10. Note the assigned **Public IPv4 Address** (e.g. `129.150.x.x`).
+   - Volume Performance: **Balanced (30 VPU/GB)** (Default, eligible for Always Free).
+9. **Cost Estimation Check:**
+   - Check the bottom estimation bar: Ensure estimated cost reads **$0.00 / month**.
+10. Click **Create** and record the assigned **Public IPv4 Address** once provisioning transitions to *Running*.
 
 ---
 
-### Step 3: Configure Host OS Firewall (iptables / netfilter)
+### Step 3: Configure Host OS Firewall (SSH Preservation & Non-Brittle Rules)
 > [!CAUTION]
-> Canonical Ubuntu images on Oracle Cloud include a default `/etc/iptables/rules.v4` firewall configuration that rejects incoming TCP traffic on ports 80 and 443, even when the OCI VCN Security List permits it! You must open these ports on the host OS.
+> Canonical Ubuntu images on Oracle Cloud ship with a default `/etc/iptables/rules.v4` firewall configuration that rejects incoming TCP traffic on ports 80 and 443. Never use brittle fixed rule index insertions (e.g. `iptables -I INPUT 6 ...`), which can fail or disrupt SSH access across different image releases.
 
-Connect to your instance via SSH:
+Connect via SSH:
 ```bash
 ssh -i ~/.ssh/id_ed25519 ubuntu@<YOUR_OCI_PUBLIC_IP>
 ```
 
-Open ports 80 and 443 in `iptables` and make the rules persistent across reboots:
+#### Option A: UFW (Recommended for Ubuntu 24.04)
+UFW automatically handles safe rule ordering while explicitly preserving active SSH sessions:
 ```bash
-# Insert rules before the final REJECT rule in the INPUT chain
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+# 1. Set safe defaults
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
 
-# Persist iptables rules across reboots
-sudo apt update && sudo apt install -y iptables-persistent netfilter-persistent
-sudo netfilter-persistent save
+# 2. Explicitly allow SSH, HTTP, and HTTPS
+sudo ufw allow 22/tcp comment 'SSH Administration'
+sudo ufw allow 80/tcp comment 'HTTP Ingress & ACME'
+sudo ufw allow 443/tcp comment 'HTTPS Edge Ingress'
+
+# 3. Enable UFW
+sudo ufw --force enable
+sudo ufw status verbose
 ```
 
-*(Alternative using UFW if preferred):*
+#### Option B: Robust iptables (Without fragile rule numbers)
+If using raw netfilter/iptables, insert rules at the top of the `INPUT` chain in a controlled sequence that guarantees SSH is never blocked:
 ```bash
-sudo ufw allow 22/tcp
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw --force enable
+# 1. Preserve established connections and loopback traffic
+sudo iptables -I INPUT 1 -m state --state RELATED,ESTABLISHED -j ACCEPT
+sudo iptables -I INPUT 2 -i lo -j ACCEPT
+
+# 2. Prioritize SSH to prevent lockout
+sudo iptables -I INPUT 3 -p tcp --dport 22 -j ACCEPT
+
+# 3. Allow HTTP (80) and HTTPS (443) for Caddy edge ingress
+sudo iptables -I INPUT 4 -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT 5 -p tcp --dport 443 -j ACCEPT
+
+# 4. Persist rules across host reboots
+sudo apt update && sudo apt install -y iptables-persistent netfilter-persistent
+sudo netfilter-persistent save
 ```
 
 ---
 
 ### Step 4: Install Docker Engine & Compose Plugin on Ubuntu ARM64
-Install the official Docker CE repository and runtime:
 
 ```bash
 # 1. Install prerequisites
@@ -159,7 +185,7 @@ sudo chown ubuntu:ubuntu /opt/flowdesk
 git clone https://github.com/Vibhushan-2003/flowdesk.git /opt/flowdesk
 cd /opt/flowdesk
 
-# 2. Create backup and observability directories
+# 2. Create backup and observability directories with restrictive permissions
 sudo mkdir -p /var/backups/flowdesk
 sudo chmod 700 /var/backups/flowdesk
 sudo mkdir -p /var/lib/node_exporter/textfile_collector
@@ -177,16 +203,16 @@ chmod 600 .env.prod
 ### Step 6: Public DNS & TLS Domain Configuration
 1. In your DNS provider (Cloudflare, Namecheap, Route 53, etc.), create an `A` record:
    - **Type:** `A`
-   - **Name:** `tickets` (or `@` for apex domain)
+   - **Name:** `tickets` (e.g. `tickets.yourdomain.com`)
    - **Value:** `<YOUR_OCI_PUBLIC_IP>`
    - **TTL:** `300` (5 minutes)
-   - **Proxy Status:** DNS Only (disable Cloudflare orange cloud proxy during initial ACME certificate issuance).
+   - **Proxy Status:** DNS Only (disable Cloudflare orange-cloud proxy during initial ACME certificate issuance).
 
 2. Edit `/opt/flowdesk/.env.prod`:
    ```bash
    nano /opt/flowdesk/.env.prod
    ```
-   Set your public domain and ACME email:
+   Set your public domain, ACME email, generated database password, and JWT secret:
    ```properties
    # Production Domain & Automated ACME TLS
    CADDY_DOMAIN=tickets.yourdomain.com
@@ -194,12 +220,10 @@ chmod 600 .env.prod
    FRONTEND_ORIGIN=https://tickets.yourdomain.com
    FLOWDESK_FRONTEND_ORIGIN=https://tickets.yourdomain.com
 
-   # Generate strong random database password
-   # (e.g. openssl rand -base64 32)
+   # Strong Database Password (generated e.g. via: openssl rand -base64 32)
    DB_PASSWORD=YourStrongDatabasePassword123456789!
 
-   # Generate strong JWT secret
-   # (e.g. openssl rand -base64 32)
+   # Strong 256-bit JWT Secret (generated e.g. via: openssl rand -base64 32)
    JWT_SECRET=YourStrongBase64EncodedJwtSecretMin32Bytes==
 
    # Outbound SMTP Configuration (Brevo, Resend, or SendGrid)
@@ -219,9 +243,12 @@ chmod 600 .env.prod
    NODE_EXPORTER_TEXTFILE_DIR=/var/lib/node_exporter/textfile_collector
    ```
 
+   > [!IMPORTANT]
+   > Do **NOT** store `FLOWDESK_BOOTSTRAP_ADMIN_PASSWORD` in `.env.prod`. First administrator initialization must use the secret-safe transient environment procedure in Step 7.
+
 ---
 
-### Step 7: Launch Core Stack & Provision First Administrator
+### Step 7: Launch Stack & Provision First Administrator (Secret-Safe)
 
 1. Build and start the production stack:
    ```bash
@@ -232,23 +259,48 @@ chmod 600 .env.prod
 2. Wait for backend and database health:
    ```bash
    docker compose -f docker-compose.prod.yml ps
-   # Backend and Postgres will transition to healthy
+   # Backend and Postgres will report (healthy)
    ```
 
-3. **Provision the First Administrator (Non-Web CLI Bootstrap):**
-   Execute the idempotent bootstrap CLI command:
+3. **Provision the First Administrator (Secret-Safe Non-Web CLI):**
+   To prevent credentials from leaking into bash history, process lists (`ps aux`), or `.env.prod`:
+
    ```bash
-   docker compose -f docker-compose.prod.yml run --rm \
+   # Method A: Transient restricted environment file (Recommended)
+   install -m 0600 /dev/null /tmp/admin_bootstrap.env
+   cat << 'EOF' > /tmp/admin_bootstrap.env
+   FLOWDESK_BOOTSTRAP_ADMIN_ENABLED=true
+   FLOWDESK_BOOTSTRAP_ADMIN_EMAIL=admin@yourdomain.com
+   FLOWDESK_BOOTSTRAP_ADMIN_PASSWORD=YourStrongInitialAdminPassword123!
+   EOF
+
+   # Execute one-time bootstrap
+   docker compose -f docker-compose.prod.yml run --rm --env-file /tmp/admin_bootstrap.env backend --flowdesk.bootstrap.admin
+
+   # Securely destroy the transient file immediately
+   shred -u /tmp/admin_bootstrap.env 2>/dev/null || rm -f /tmp/admin_bootstrap.env
+   ```
+
+   *(Alternative Method B via interactive hidden input):*
+   ```bash
+   read -s -p "Enter initial admin password: " ADMIN_PASS
+   echo
+   FLOWDESK_BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PASS" docker compose -f docker-compose.prod.yml run --rm \
      -e FLOWDESK_BOOTSTRAP_ADMIN_ENABLED=true \
      -e FLOWDESK_BOOTSTRAP_ADMIN_EMAIL=admin@yourdomain.com \
-     -e FLOWDESK_BOOTSTRAP_ADMIN_PASSWORD='YourStrongInitialAdminPassword123!' \
+     -e FLOWDESK_BOOTSTRAP_ADMIN_PASSWORD \
      backend --flowdesk.bootstrap.admin
+   unset ADMIN_PASS
    ```
-   *Expected output:*
+
+   *Expected Output:*
    ```text
-   FlowDesk initial administrator [admin@yourdomain.com] provisioned successfully.
+   Starting FlowDesk in non-web bootstrap mode (WebApplicationType.NONE).
+   Acquiring lock on ADMIN role row for initial bootstrap check...
+   Successfully provisioned initial administrator with email: admin@yourdomain.com
+   Terminating application process after successful bootstrap (exit code 0).
    ```
-   *Note: This command runs in non-web mode, provisions the admin user in PostgreSQL, and immediately terminates. Future runs on a non-empty database are rejected automatically.*
+   *Note: This command runs in non-web mode, applies changes, and exits 0 immediately. Future runs against a non-empty database are rejected automatically.*
 
 ---
 
@@ -259,7 +311,7 @@ chmod 600 .env.prod
    sudo cp /opt/flowdesk/scripts/sre/flowdesk-backup.env.example /etc/flowdesk/backup.env
    sudo chmod 600 /etc/flowdesk/backup.env
    ```
-   Edit `/etc/flowdesk/backup.env` to configure off-host replication (OCI Object Storage or S3) and passphrases.
+   Edit `/etc/flowdesk/backup.env` to configure off-host replication (`DEST_TYPE=oci_cli`, `OCI_BUCKET=...`, `BACKUP_ENCRYPTION_KEY=...`).
 
 2. Install systemd service and timer units:
    ```bash
@@ -278,7 +330,7 @@ chmod 600 .env.prod
    ```bash
    sudo /opt/flowdesk/scripts/sre/flowdesk-backup.sh
    ```
-   Confirm that Prometheus metrics were generated:
+   Confirm that Prometheus metrics were generated in the textfile directory:
    ```bash
    cat /var/lib/node_exporter/textfile_collector/flowdesk_backup.prom
    ```
@@ -300,15 +352,31 @@ ssh -L 3000:172.28.0.31:3000 ubuntu@<YOUR_OCI_PUBLIC_IP>
 
 ---
 
-### Step 10: Run the Deployment Smoke Test Suite
+### Step 10: Run the Production Deployment Smoke Test Suite
 Validate the complete production deployment across all 13 criteria:
 
 ```bash
 cd /opt/flowdesk
+
+# Option A: Interactive prompt for admin password (prevents CLI password exposure)
 ./scripts/sre/deployment_smoke_test.sh \
   --domain tickets.yourdomain.com \
   --user admin@yourdomain.com \
-  --password 'YourStrongInitialAdminPassword123!'
+  --strict
+
+# Option B: Using a protected env file
+install -m 0600 /dev/null /tmp/smoke.env
+cat << 'EOF' > /tmp/smoke.env
+SMOKE_TEST_USER=admin@yourdomain.com
+SMOKE_TEST_PASSWORD=YourStrongInitialAdminPassword123!
+EOF
+
+./scripts/sre/deployment_smoke_test.sh \
+  --domain tickets.yourdomain.com \
+  --env-file /tmp/smoke.env \
+  --strict
+
+shred -u /tmp/smoke.env 2>/dev/null || rm -f /tmp/smoke.env
 ```
 
 *Expected Result:*
@@ -316,10 +384,10 @@ cd /opt/flowdesk
 ======================================================================
 Smoke Test Summary
 ======================================================================
-  Passed:  13
-  Failed:  0
-  Skipped: 0
+  Passed:             13
+  Failed:             0
+  Skipped:            0
+  Strict Violations:  0
 
 >>> SMOKE TEST RESULT: ALL CHECKS PASSED - STACK IS READY <<<
 ```
-
