@@ -1,0 +1,78 @@
+# ==============================================================================
+# FlowDesk — Render Blueprint Specification (Infrastructure-as-Code)
+# Deploys a temporary demo stack on the Render Free tier:
+#   1. Render PostgreSQL Database (1GB storage, free tier)
+#   2. FlowDesk Spring Boot Backend (Docker Web Service, 512MB RAM)
+#   3. FlowDesk React Frontend (Static Site with SPA rewrites)
+# ==============================================================================
+
+version: "1"
+
+services:
+  # ----------------------------------------------------------------------------
+  # Backend Web Service (Spring Boot 4 / OpenJDK 21)
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: flowdesk-api-demo
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: render
+      - key: JAVA_TOOL_OPTIONS
+        value: -XX:+UseSerialGC -Xmx224m -Xms96m -XX:MaxMetaspaceSize=128m -Xss512k -XX:+UseStringDeduplication
+      - key: DB_URL
+        # Set to: jdbc:postgresql://<internal-db-host>:5432/flowdesk?sslmode=require
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_ORIGIN
+        # Set to: https://flowdesk-demo.onrender.com (matching static site URL)
+        sync: false
+      - key: FLOWDESK_BOOTSTRAP_ADMIN_ENABLED
+        value: "true"
+      - key: FLOWDESK_BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: FLOWDESK_BOOTSTRAP_ADMIN_PASSWORD
+        generateValue: true
+      - key: FLOWDESK_MAIL_ENABLED
+        value: "false"
+      - key: GOOGLE_OAUTH_ENABLED
+        value: "false"
+
+  # ----------------------------------------------------------------------------
+  # Frontend Static Site (React 19 / Vite SPA)
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: flowdesk-demo
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    autoDeploy: true
+    routes:
+      # SPA rewrite rule: routes all browser navigation to index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        # Set to: https://flowdesk-api-demo.onrender.com
+        sync: false
+
+# ------------------------------------------------------------------------------
+# Managed PostgreSQL Database
+# ------------------------------------------------------------------------------
+databases:
+  - name: flowdesk-db-demo
+    databaseName: flowdesk
+    user: flowdesk_user
+    plan: free
