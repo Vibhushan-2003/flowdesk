@@ -17,12 +17,14 @@ The system integrates **Spring Boot Actuator** and **Micrometer Prometheus** to 
 
 ### Key Milestones Achieved:
 1. **Spring Boot Actuator & Micrometer Prometheus:** Integrated compatible Actuator and Micrometer Prometheus registry managed by Spring Boot 4.1.1. Exposes `/actuator/prometheus` and `/actuator/health` while keeping all sensitive administrative endpoints (`env`, `heapdump`, `beans`) disabled and protected.
-2. **Strict Edge Ingress & Network Isolation:** Enforced multi-layered defense-in-depth: Caddy edge proxy unconditionally blocks all `/actuator*` traffic at the edge (HTTP 404), Spring Security enforces strict authentication on operational endpoints, and Prometheus/Grafana publish **zero host ports** by default.
-3. **ClamAV Observability:** Implemented `ClamAvHealthIndicator` (contributing to `/actuator/health`) and `ClamAvMetrics` (exporting `flowdesk_clamav_available` gauge to Prometheus), enabling proactive alerting before file uploads fail.
-4. **Reproducible Prometheus & Alerting Engine:** Configured Prometheus with 15-day / 5 GB retention limits, 15-second scraping intervals, and 7 actionable SRE alerting rules with persistence windows to prevent transient alarm flapping.
-5. **Pre-Provisioned Grafana SRE Dashboard:** Engineered `flowdesk-observability.json` with 11 core panels organized across System Availability, HTTP Throughput & Latency, JVM Runtime, and Database Connection Pool saturation.
-6. **Decoupled Architecture:** FlowDesk operates 100% independently from the monitoring stack. A stoppage or crash of Prometheus or Grafana produces zero impact on core ticketing workflows.
-7. **Comprehensive Acceptance:** Verified with 993 backend tests passing (including `ActuatorObservabilityIntegrationTest` and `ClamAvObservabilityTest`), clean frontend lint/build, and 41/41 Playwright mocked E2E journeys passing.
+2. **Strict Edge Ingress & Network Isolation:** Enforced multi-layered defense-in-depth: Caddy edge proxy unconditionally blocks all `/actuator*` traffic at the edge (HTTP 404), Spring Security enforces strict authentication on operational endpoints, and Prometheus, Alertmanager, and Grafana publish **zero host ports** by default.
+3. **Grafana Credential Hardening:** Eliminated all hardcoded fallback administrator passwords from `docker-compose.prod.yml` and `.env.prod.example`. Implemented a container entrypoint fail-fast guard verifying that `GRAFANA_ADMIN_PASSWORD` is injected at runtime with a minimum length of 12 characters.
+4. **Verified Persistent Storage Instrumentation:** Implemented `DiskStorageMetrics` binding real persistent filesystem metrics (`flowdesk_disk_free_bytes`, `flowdesk_disk_total_bytes`, and `flowdesk_disk_free_percent`) directly from `/app/data/attachments`. Resolves the missing disk metric problem in Prometheus.
+5. **ClamAV Observability:** Implemented `ClamAvHealthIndicator` (contributing to `/actuator/health`) and `ClamAvMetrics` (exporting `flowdesk_clamav_available` gauge to Prometheus), enabling proactive alerting before file uploads fail.
+6. **Alertmanager & SRE Alerting Engine:** Configured Prometheus with 15-day / 5 GB retention limits, 15-second scraping intervals, 7 actionable SRE alerting rules, and integrated Alertmanager v0.27.0 with an internal dormant receiver routing architecture. Clearly separates internal Prometheus alert evaluation from external notification dispatch.
+7. **Pre-Provisioned Grafana SRE Dashboard:** Engineered `flowdesk-observability.json` with 13 panels (including Storage Headroom stat and Firing SRE Alerts stat) organized across System Availability, Storage & Alerts, HTTP Throughput & Latency, JVM Runtime, and Database Connection Pool saturation.
+8. **Decoupled Architecture:** FlowDesk operates 100% independently from the monitoring stack. A stoppage or crash of Prometheus, Alertmanager, or Grafana produces zero impact on core ticketing workflows.
+9. **Comprehensive Acceptance:** Verified with 995 backend tests passing (including `DiskStorageMetricsTest`, `ActuatorObservabilityIntegrationTest`, and `ClamAvObservabilityTest`), clean frontend lint/build, and 41/41 Playwright mocked E2E journeys passing.
 
 ---
 
@@ -90,6 +92,7 @@ The system integrates **Spring Boot Actuator** and **Micrometer Prometheus** to 
 | **PostgreSQL**| `flowdesk-prod-postgres` | default | 5432 | *None* | Private (`internal_net`) |
 | **ClamAV** | `flowdesk-prod-clamav` | default | 3310 | *None* | Private (`internal_net`) |
 | **Prometheus**| `flowdesk-prod-prometheus`| `monitoring` | 9090 | *None* (Private) | Private (`proxy_net`) |
+| **Alertmanager**| `flowdesk-prod-alertmanager`| `monitoring` | 9093 | *None* (Private) | Private (`proxy_net`) |
 | **Grafana** | `flowdesk-prod-grafana` | `monitoring` | 3000 | *None* (Private) | Private (`proxy_net`) |
 
 ---
@@ -134,6 +137,9 @@ To satisfy enterprise SRE standards and prevent metric leakage or reconnaissance
 | **HikariCP Idle** | `hikaricp_connections_idle` | Gauge | Available idle connections ready for lease. |
 | **HikariCP Pending** | `hikaricp_connections_pending` | Gauge | Number of caller threads awaiting a database connection from the pool. |
 | **ClamAV Health** | `flowdesk_clamav_available` | Gauge | Binary reachability status of ClamAV daemon (`1.0` = healthy, `0.0` = unreachable). |
+| **Disk Storage** | `flowdesk_disk_free_bytes` | Gauge | Usable storage capacity in bytes on `/app/data/attachments`. |
+| **Disk Storage** | `flowdesk_disk_total_bytes` | Gauge | Total storage capacity in bytes on `/app/data/attachments`. |
+| **Disk Headroom** | `flowdesk_disk_free_percent` | Gauge | Storage headroom percentage (`usable / total * 100`) on `/app/data/attachments`. |
 
 ---
 
@@ -170,7 +176,7 @@ Initial practical objectives for the FlowDesk single-VM deployment:
 | **API Latency** | 95% of requests < 500ms | `FlowDeskHighLatencyP95` | Warning | `p95 > 1.0s` for **3m** |
 | **Database Pool** | 0 connection starvation timeouts | `FlowDeskHikariPoolExhaustionRisk`| Critical | `pending > 0 and active == max` for **1m** |
 | **Malware Scanner** | 99.0% daemon reachability | `FlowDeskClamAvScannerUnavailable`| Warning | `flowdesk_clamav_available == 0` for **2m** |
-| **Disk Headroom** | > 15% free volume capacity | `FlowDeskDiskSpaceLow` | Warning | `free / total * 100 < 15` for **5m** |
+| **Disk Headroom** | > 15% free volume capacity | `FlowDeskDiskSpaceLow` | Warning | `flowdesk_disk_free_percent < 15` for **5m** |
 | **JVM Heap Memory**| < 85% steady-state utilization | `FlowDeskHighJvmHeapUsage` | Warning | `heap_used / heap_max * 100 > 85` for **3m** |
 
 ### Alert Verification & Test Mechanism:
@@ -232,14 +238,15 @@ The entire stack with full Prometheus scraping and Grafana visualization utilize
 | Gate | Scope | Status | Result / Metric |
 | :--- | :--- | :--- | :--- |
 | **Local Development DB Safety** | PostgreSQL `flowdesk` | **PASSED** | Untouched at Flyway V25 (`V25__add_ticket_comment_visibility.sql`). |
-| **Backend Test Suite** | Maven Surefire | **PASSED** | **993 tests run, 0 failures, 0 errors, 1 skipped** (1m 45s). |
-| **Actuator & Observability Suite** | `ActuatorObservabilityIntegrationTest` | **PASSED** | 6/6 passed (Health, Prometheus scrape, unauthenticated 401, cardinality). |
+| **Backend Test Suite** | Maven Surefire | **PASSED** | **995 tests run, 0 failures, 0 errors, 1 skipped** (1m 29s). |
+| **Storage Observability Suite** | `DiskStorageMetricsTest` | **PASSED** | 2/2 passed (metric binding, usable/total space calculation). |
+| **Actuator & Observability Suite** | `ActuatorObservabilityIntegrationTest` | **PASSED** | 6/6 passed (Health, Prometheus scrape, disk metrics, unauthenticated 401, cardinality). |
 | **ClamAV Health & Metrics Suite** | `ClamAvObservabilityTest` | **PASSED** | 4/4 passed (UP on pong, DOWN on timeout, gauge reflects state). |
 | **Frontend Lint** | ESLint | **PASSED** | 0 errors, 0 warnings. |
-| **Frontend Build** | TypeScript / Vite | **PASSED** | Clean production bundle generated in 831ms. |
-| **Playwright Mocked Journeys** | 4 Application Roles | **PASSED** | **41/41 passed** in 17.4s. |
-| **Prometheus & Rules Syntax** | YAML Validation | **PASSED** | `prometheus.yml` and `alert_rules.yml` syntax verified via YAML parser. |
-| **Grafana Dashboard Schema** | JSON Validation | **PASSED** | `flowdesk-observability.json` validated (15 panels, schema 39). |
+| **Frontend Build** | TypeScript / Vite | **PASSED** | Clean production bundle generated in 702ms. |
+| **Playwright Mocked Journeys** | 4 Application Roles | **PASSED** | **41/41 passed** in 14.0s. |
+| **Prometheus & Alertmanager Syntax** | YAML Validation | **PASSED** | `prometheus.yml`, `alertmanager.yml`, and `alert_rules.yml` syntax verified via YAML parser. |
+| **Grafana Dashboard Schema** | JSON Validation | **PASSED** | `flowdesk-observability.json` validated (13 panels, schema 39). |
 | **Caddy Ingress Security** | Edge Reverse Proxy | **PASSED** | Direct `/actuator` access blocked with HTTP 404 at edge. |
 
 ---

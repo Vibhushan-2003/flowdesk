@@ -36,7 +36,7 @@ class ActuatorObservabilityIntegrationTest {
     }
 
     @Test
-    @DisplayName("Actuator prometheus endpoint /actuator/prometheus exposes JVM, process, and ClamAV metrics")
+    @DisplayName("Actuator prometheus endpoint /actuator/prometheus exposes JVM, process, ClamAV, and disk metrics")
     void actuatorPrometheusExposesRequiredMetrics() throws Exception {
         // Trigger a GC to populate GC metrics
         System.gc();
@@ -66,7 +66,12 @@ class ActuatorObservabilityIntegrationTest {
         // 4. ClamAV Reachability Metric
         assertThat(responseBody).contains("flowdesk_clamav_available");
 
-        // 5. HTTP Server Request Metrics
+        // 5. Disk Storage Metrics
+        assertThat(responseBody).contains("flowdesk_disk_free_bytes");
+        assertThat(responseBody).contains("flowdesk_disk_total_bytes");
+        assertThat(responseBody).contains("flowdesk_disk_free_percent");
+
+        // 6. HTTP Server Request Metrics
         assertThat(responseBody).contains("http_server_requests_seconds_count");
     }
 

@@ -71,17 +71,17 @@ groups:
           description: "FlowDesk cannot reach the ClamAV daemon. Ticket attachment uploads will fail closed."
           action: "Check ClamAV daemon container logs and signature update memory consumption."
 
-      # 6. Disk Storage Pressure: Minimum 15% Free Space
+      # 6. Persistent Storage Headroom: Minimum 15% Free Space
       - alert: FlowDeskDiskSpaceLow
-        expr: (disk_free_bytes / disk_total_bytes) * 100 < 15
+        expr: flowdesk_disk_free_percent < 15
         for: 5m
         labels:
           severity: warning
           service: flowdesk-storage
         annotations:
-          summary: "Available disk space is below 15%"
-          description: "Disk storage for attachments or database volumes has less than 15% free headroom."
-          action: "Prune unused Docker images/volumes and inspect /app/data/attachments volume growth."
+          summary: "Available persistent storage headroom is below 15%"
+          description: "Disk storage for attachments volume (/app/data/attachments) has less than 15% free headroom."
+          action: "Prune old attachments or expand persistent volume capacity."
 
       # 7. JVM Heap Memory Saturation
       - alert: FlowDeskHighJvmHeapUsage
@@ -94,4 +94,3 @@ groups:
           summary: "JVM heap memory utilization exceeds 85%"
           description: "Backend JVM heap memory usage has remained above 85% for 3 minutes."
           action: "Inspect garbage collection frequency and review JVM heap limit (-Xmx) allocation."
-
