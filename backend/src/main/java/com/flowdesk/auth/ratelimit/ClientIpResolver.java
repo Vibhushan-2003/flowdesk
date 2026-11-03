@@ -183,14 +183,14 @@ public final class ClientIpResolver {
     }
 
     /**
-     * Checks if an IP address belongs to the trusted internal proxy set:
-     * - Loopback (127.0.0.1, ::1, 0:0:0:0:0:0:0:1, localhost)
-     * - Docker bridge networks & RFC 1918 private subnets:
-     *   - 10.0.0.0/8
-     *   - 172.16.0.0/12 (172.16.* to 172.31.*)
-     *   - 192.168.0.0/16
-     *   - 169.254.0.0/16 (link-local)
-     * - IPv6 Unique Local Addresses (fc00::/7) and link-local (fe80::/10)
+     * Checks if an IP address belongs to the trusted internal proxy set.
+     * By default, ONLY loopback addresses are considered trusted proxies:
+     * - Loopback (127.0.0.1, ::1, 0:0:0:0:0:0:0:1, localhost, 127.0.0.0/8)
+     *
+     * Private subnets (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) are strictly NOT trusted by default
+     * to prevent malicious containers on internal Docker networks or direct LAN connections from forging
+     * client identities. Additional proxies (e.g. specific reverse proxy container IPs or CIDRs)
+     * must be explicitly declared via additionalTrustedProxies.
      */
     public static boolean isTrustedProxy(String ip) {
         return isTrustedProxy(ip, Collections.emptySet());
@@ -202,8 +202,15 @@ public final class ClientIpResolver {
         }
         String clean = stripPortAndBrackets(ip.trim());
 
-        if (additionalTrustedProxies != null && additionalTrustedProxies.contains(clean)) {
-            return true;
+        if (additionalTrustedProxies != null && !additionalTrustedProxies.isEmpty()) {
+            for (String trusted : additionalTrustedProxies) {
+                if (trusted != null && !trusted.isBlank()) {
+                    String cleanTrusted = stripPortAndBrackets(trusted.trim());
+                    if (matchesProxy(clean, cleanTrusted)) {
+                        return true;
+                    }
+                }
+            }
         }
 
         if ("127.0.0.1".equals(clean) || "::1".equals(clean) || "0:0:0:0:0:0:0:1".equals(clean) || "localhost".equalsIgnoreCase(clean)) {
@@ -213,34 +220,55 @@ public final class ClientIpResolver {
         if (isValidIpv4(clean)) {
             String[] octets = clean.split("\\.");
             int first = Integer.parseInt(octets[0]);
-            int second = Integer.parseInt(octets[1]);
-
             if (first == 127) {
-                return true; // Loopback
-            }
-            if (first == 10) {
-                return true; // 10.0.0.0/8
-            }
-            if (first == 172 && (second >= 16 && second <= 31)) {
-                return true; // 172.16.0.0/12 (Docker bridge)
-            }
-            if (first == 192 && second == 168) {
-                return true; // 192.168.0.0/16
-            }
-            if (first == 169 && second == 254) {
-                return true; // 169.254.0.0/16
-            }
-        } else if (isValidIpv6(clean)) {
-            String lower = clean.toLowerCase();
-            if (lower.startsWith("fc") || lower.startsWith("fd")) {
-                return true; // Unique Local Address fc00::/7
-            }
-            if (lower.startsWith("fe8") || lower.startsWith("fe9") || lower.startsWith("fea") || lower.startsWith("feb")) {
-                return true; // Link-local fe80::/10
+                return true; // Loopback 127.0.0.0/8
             }
         }
 
         return false;
+    }
+
+    private static boolean matchesProxy(String ip, String rule) {
+        if (ip.equalsIgnoreCase(rule)) {
+            return true;
+        }
+        if (rule.contains("/")) {
+            return matchesCidr(ip, rule);
+        }
+        return false;
+    }
+
+    private static boolean matchesCidr(String ip, String cidr) {
+        try {
+            String[] parts = cidr.split("/");
+            if (parts.length != 2) {
+                return false;
+            }
+            String network = parts[0].trim();
+            int prefixLen = Integer.parseInt(parts[1].trim());
+
+            if (isValidIpv4(ip) && isValidIpv4(network)) {
+                if (prefixLen < 0 || prefixLen > 32) {
+                    return false;
+                }
+                long ipLong = ipv4ToLong(ip);
+                long netLong = ipv4ToLong(network);
+                long mask = prefixLen == 0 ? 0 : (0xFFFFFFFFL << (32 - prefixLen)) & 0xFFFFFFFFL;
+                return (ipLong & mask) == (netLong & mask);
+            }
+        } catch (Exception ignored) {
+            // Malformed CIDR safely returns false
+        }
+        return false;
+    }
+
+    private static long ipv4ToLong(String ip) {
+        String[] octets = ip.split("\\.");
+        long result = 0;
+        for (int i = 0; i < 4; i++) {
+            result = (result << 8) | (Integer.parseInt(octets[i]) & 0xFF);
+        }
+        return result;
     }
 
     /**

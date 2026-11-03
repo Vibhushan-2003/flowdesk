@@ -39,14 +39,54 @@ class ClientIpResolverTest {
     }
 
     @Test
-    @DisplayName("Trusted proxy correctly extracts external client IP from X-Forwarded-For")
-    void trustedProxyExtractsClientIp() {
+    @DisplayName("Default trusted proxy (loopback) correctly extracts external client IP from X-Forwarded-For")
+    void defaultTrustedProxyExtractsClientIp() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setRemoteAddr("172.18.0.2"); // Docker container network (trusted proxy)
+        request.setRemoteAddr("127.0.0.1"); // Default trusted local reverse proxy (Caddy on host)
         request.addHeader("X-Forwarded-For", "203.0.113.195");
 
         String resolved = ClientIpResolver.resolveClientIp(request, true);
         assertEquals("203.0.113.195", resolved, "Trusted proxy must resolve true external client IP");
+    }
+
+    @Test
+    @DisplayName("Malicious container on internal Docker network cannot forge arbitrary client identities by default")
+    void unconfiguredInternalContainerCannotForgeClientIdentity() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("172.18.0.5"); // Another container on the internal Docker network
+        request.addHeader("X-Forwarded-For", "8.8.8.8"); // Forged client IP
+
+        // By default, 172.18.0.5 is NOT trusted; only explicitly configured proxies or loopback are trusted
+        String resolved = ClientIpResolver.resolveClientIp(request, true);
+        assertEquals("172.18.0.5", resolved, "Internal containers cannot forge external client identities by default");
+    }
+
+    @Test
+    @DisplayName("Explicitly configured proxy container IP or CIDR is trusted")
+    void explicitlyConfiguredProxyIsTrusted() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("172.18.0.2"); // Ingress proxy container
+        request.addHeader("X-Forwarded-For", "203.0.113.195");
+
+        // When 172.18.0.2 is declared as a trusted proxy:
+        String resolved = ClientIpResolver.resolveClientIp(request, true, Set.of("172.18.0.2"));
+        assertEquals("203.0.113.195", resolved);
+
+        // When CIDR 172.18.0.0/16 is declared:
+        String resolvedCidr = ClientIpResolver.resolveClientIp(request, true, Set.of("172.18.0.0/16"));
+        assertEquals("203.0.113.195", resolvedCidr);
+    }
+
+    @Test
+    @DisplayName("Corporate VPN client with private IP behind trusted proxy is recognized as authentic client")
+    void corporateVpnClientBehindTrustedProxyIsNotTreatedAsProxy() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("127.0.0.1"); // Caddy reverse proxy
+        request.addHeader("X-Forwarded-For", "10.0.1.50"); // Corporate employee VPN IP
+
+        // 10.0.1.50 is NOT an internal proxy; it is the genuine client IP
+        String resolved = ClientIpResolver.resolveClientIp(request, true);
+        assertEquals("10.0.1.50", resolved, "Private IP clients behind trusted proxy must be preserved, not skipped");
     }
 
     @Test
@@ -65,12 +105,13 @@ class ClientIpResolverTest {
     @DisplayName("Proxy chaining correctly traverses intermediate trusted proxies")
     void proxyChainingTraversesIntermediateProxies() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setRemoteAddr("172.18.0.2"); // Ingress proxy
-        // Chain: Client (203.0.113.10) -> Edge Proxy (172.18.0.5) -> Ingress (172.18.0.2)
-        request.addHeader("X-Forwarded-For", "203.0.113.10, 172.18.0.5");
+        request.setRemoteAddr("127.0.0.1"); // Ingress proxy
+        // Chain: Client (203.0.113.10) -> Intermediate Proxy (10.0.0.5) -> Ingress (127.0.0.1)
+        request.addHeader("X-Forwarded-For", "203.0.113.10, 10.0.0.5");
 
-        String resolved = ClientIpResolver.resolveClientIp(request, true);
-        assertEquals("203.0.113.10", resolved, "Must skip intermediate internal proxies");
+        // When 10.0.0.5 is an explicitly configured intermediate proxy:
+        String resolved = ClientIpResolver.resolveClientIp(request, true, Set.of("10.0.0.5"));
+        assertEquals("203.0.113.10", resolved, "Must skip intermediate trusted proxies");
     }
 
     @Test
@@ -88,18 +129,18 @@ class ClientIpResolverTest {
     @DisplayName("Malformed or injection forwarded headers fall back safely to socket address")
     void malformedForwardedHeadersFallbackSafely() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setRemoteAddr("172.18.0.2");
+        request.setRemoteAddr("127.0.0.1");
         request.addHeader("X-Forwarded-For", "malformed_ip, <script>, ; rm -rf /");
 
         String resolved = ClientIpResolver.resolveClientIp(request, true);
-        assertEquals("172.18.0.2", resolved, "Malformed headers must safely fall back to remoteAddr");
+        assertEquals("127.0.0.1", resolved, "Malformed headers must safely fall back to remoteAddr");
     }
 
     @Test
     @DisplayName("X-Real-IP is used as fallback when X-Forwarded-For is absent")
     void xRealIpFallback() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setRemoteAddr("172.18.0.2");
+        request.setRemoteAddr("127.0.0.1");
         request.addHeader("X-Real-IP", "203.0.113.88");
 
         String resolved = ClientIpResolver.resolveClientIp(request, true);
@@ -132,14 +173,24 @@ class ClientIpResolverTest {
     }
 
     @Test
-    @DisplayName("isTrustedProxy correctly classifies loopback, Docker bridge, and public IPs")
+    @DisplayName("isTrustedProxy correctly classifies loopback vs unconfigured private/public IPs")
     void isTrustedProxyClassification() {
+        // Loopback is always trusted
         assertTrue(ClientIpResolver.isTrustedProxy("127.0.0.1"));
         assertTrue(ClientIpResolver.isTrustedProxy("::1"));
-        assertTrue(ClientIpResolver.isTrustedProxy("172.18.0.2")); // Docker
-        assertTrue(ClientIpResolver.isTrustedProxy("10.0.5.1"));
-        assertTrue(ClientIpResolver.isTrustedProxy("192.168.1.1"));
+        assertTrue(ClientIpResolver.isTrustedProxy("127.0.0.2"));
 
+        // Private IPs are NOT trusted by default (defense against internal container spoofing)
+        assertFalse(ClientIpResolver.isTrustedProxy("172.18.0.2"));
+        assertFalse(ClientIpResolver.isTrustedProxy("10.0.5.1"));
+        assertFalse(ClientIpResolver.isTrustedProxy("192.168.1.1"));
+
+        // Explicitly configured private IPs or CIDRs ARE trusted
+        assertTrue(ClientIpResolver.isTrustedProxy("172.18.0.2", Set.of("172.18.0.2")));
+        assertTrue(ClientIpResolver.isTrustedProxy("172.18.0.2", Set.of("172.18.0.0/16")));
+        assertTrue(ClientIpResolver.isTrustedProxy("10.0.5.1", Set.of("10.0.0.0/8")));
+
+        // Public IPs and invalid inputs
         assertFalse(ClientIpResolver.isTrustedProxy("203.0.113.195"));
         assertFalse(ClientIpResolver.isTrustedProxy("8.8.8.8"));
         assertFalse(ClientIpResolver.isTrustedProxy("unknown"));

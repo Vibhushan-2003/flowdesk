@@ -32,7 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {
         "app.security.rate-limit.login.enabled=true",
-        "app.security.rate-limit.login.trust-proxy-headers=true"
+        "app.security.rate-limit.login.trust-proxy-headers=true",
+        "app.security.rate-limit.login.trusted-proxies=172.18.0.2"
 })
 class ProxyAwareLoginRateLimitingIntegrationTest {
 

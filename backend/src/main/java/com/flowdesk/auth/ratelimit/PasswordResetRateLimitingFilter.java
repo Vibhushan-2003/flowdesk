@@ -123,7 +123,7 @@ public class PasswordResetRateLimitingFilter extends OncePerRequestFilter {
         }
 
         String path = request.getRequestURI();
-        String clientIp = ClientIpResolver.resolveClientIp(request, properties.isTrustProxyHeaders());
+        String clientIp = ClientIpResolver.resolveClientIp(request, properties.isTrustProxyHeaders(), properties.getTrustedProxies());
 
         if (FORGOT_PASSWORD_PATH.equals(path)) {
             handleForgotPasswordRateLimiting(request, response, filterChain, clientIp);

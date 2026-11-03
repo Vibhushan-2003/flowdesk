@@ -3,6 +3,9 @@ package com.flowdesk.auth.ratelimit;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
+import java.util.Set;
+
 @Component
 @ConfigurationProperties(prefix = "app.security.rate-limit.invitation")
 public class InvitationRateLimiterProperties {
@@ -13,6 +16,7 @@ public class InvitationRateLimiterProperties {
     private int maxTrackedKeys = 10000;
     private int maxBodyBytes = 4096;
     private boolean trustProxyHeaders = false;
+    private Set<String> trustedProxies = new HashSet<>();
 
     public boolean isEnabled() {
         return enabled;
@@ -60,6 +64,14 @@ public class InvitationRateLimiterProperties {
 
     public void setTrustProxyHeaders(boolean trustProxyHeaders) {
         this.trustProxyHeaders = trustProxyHeaders;
+    }
+
+    public Set<String> getTrustedProxies() {
+        return trustedProxies;
+    }
+
+    public void setTrustedProxies(Set<String> trustedProxies) {
+        this.trustedProxies = trustedProxies != null ? trustedProxies : new HashSet<>();
     }
 
     public void validate() {

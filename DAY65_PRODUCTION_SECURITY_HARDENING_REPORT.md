@@ -4,7 +4,7 @@
 **Repository:** `C:\Users\gvibh\Projects\flowdesk`  
 **Active Working Branch:** `feat/day65-production-security-hardening`  
 **Base Commit:** `b44e962` (`main` containing Day 64 PR #57 and Flyway V25)  
-**Status:** Complete — Security Hardened, Fully Tested, Ready for Cloud Deployment Architecture (Day 66)
+**Status:** Complete — Security Hardened, Embedded Tomcat Verified, Ready for Cloud Deployment Architecture (Day 66)
 
 ---
 
@@ -39,72 +39,48 @@ Following operational review during the Day 65 SRE Audit, `DAY65_SRE_DEPLOYMENT_
 
 ---
 
-## 3. Exact Client-IP Resolution Strategy
+## 3. Exact Client-IP Resolution & Trust Model
 
-### Architectural Problem
-FlowDesk enforces per-IP and per-account rate limiting on authentication endpoints (`/api/auth/login`) via `LoginRateLimitingFilter.java`. In a production deployment behind a reverse proxy (e.g., Caddy or Nginx):
-1. Direct inspection of `request.getRemoteAddr()` returns the reverse proxy's internal IP (e.g., `127.0.0.1`, `172.18.0.2`), causing all external users to share a single global rate-limit bucket (noisy-neighbor denial of service).
-2. Naive inspection of the leftmost `X-Forwarded-For` header allows malicious clients to spoof arbitrary IP addresses by sending `X-Forwarded-For: 8.8.8.8`, entirely bypassing rate limits or impersonating trusted clients.
-3. Spring Web's `ForwardedHeaderFilter` (`server.forward-headers-strategy=framework`) parses the leftmost token without verifying whether the direct TCP remote peer is a trusted proxy, creating a header injection vulnerability.
+### Architectural Problem & Reviewer Findings
+FlowDesk enforces per-IP and per-account rate limiting on authentication endpoints (`/api/auth/login`) via `LoginRateLimitingFilter.java`. An independent security review established the following core constraints:
+1. **Tomcat RemoteIpValve Rewrite:** When `server.forward-headers-strategy=native` is active, Tomcat's `RemoteIpValve` inspects incoming TCP connections. If the peer matches `internal-proxies`, Tomcat rewrites `request.getRemoteAddr()` to the untrusted client IP *before* custom application filters run. The application filter must not assume `request.getRemoteAddr()` is the original TCP peer.
+2. **Risk of Blind Private Network Trust:** Blindly trusting all RFC 1918 subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) as reverse proxies allows any malicious container on the Docker bridge or any adjacent machine in the VPC to inject arbitrary `X-Forwarded-For` headers and spoof client identities.
+3. **Internal Client Preservations:** Corporate employees accessing the service over private IP addresses (e.g. VPN `10.0.1.50`) through the ingress reverse proxy must have their client IP recognized, rather than being discarded by Tomcat as an "internal proxy" and lumped into a shared `127.0.0.1` bucket.
 
-### Implementation Architecture
-FlowDesk implements a dual-layer defense-in-depth approach:
+### Coherent Trust Model Implementation
+FlowDesk implements an explicit, unified trust model across both Tomcat and Spring Security:
 
-#### Layer 1: Servlet Container RemoteIpValve (`application-prod.properties`)
+#### 1. Ingress Boundary & Default Trust (Loopback Only)
+- In the production single-VM architecture (Day 66), Caddy terminates TLS on host ports 80/443 and reverse proxies traffic to `http://127.0.0.1:8080`.
+- Therefore, by default, **ONLY loopback addresses** (`127.0.0.1`, `::1`, `0:0:0:0:0:0:0:1`, `localhost`, `127.0.0.0/8`) are trusted proxies.
+- Containers on internal Docker networks (`172.18.0.x`) and machines on local LANs (`10.x.x.x`, `192.168.x.x`) are **strictly UNTRUSTED by default**.
+- If a containerized proxy topology is used, the operator explicitly declares the proxy IP or CIDR via `RATE_LIMIT_TRUSTED_PROXIES` and `TOMCAT_INTERNAL_PROXIES`.
+
+#### 2. Native Tomcat RemoteIpValve (`application-prod.properties`)
 ```properties
-server.forward-headers-strategy=native
-server.tomcat.remoteip.remote-ip-header=X-Forwarded-For
-server.tomcat.remoteip.protocol-header=X-Forwarded-Proto
-server.tomcat.remoteip.internal-proxies=127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|::1|0:0:0:0:0:0:0:1|10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|172\\.(1[6-9]|2[0-9]|3[0-1])\\.\\d{1,3}\\.\\d{1,3}|192\\.168\\.\\d{1,3}\\.\\d{1,3}|169\\.254\\.\\d{1,3}\\.\\d{1,3}|fc00:.*|fd.*
+server.forward-headers-strategy=${SERVER_FORWARD_HEADERS_STRATEGY:native}
+server.tomcat.remoteip.remote-ip-header=x-forwarded-for
+server.tomcat.remoteip.protocol-header=x-forwarded-proto
+server.tomcat.remoteip.internal-proxies=${TOMCAT_INTERNAL_PROXIES:127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|::1|0:0:0:0:0:0:0:1}
 ```
-In Tomcat's native `RemoteIpValve`, headers are traversed **from right to left**, trusting only intermediate proxies matching `internal-proxies`.
 
-#### Layer 2: Application-Level Right-to-Left Resolver (`ClientIpResolver.java`)
-FlowDesk's `ClientIpResolver.java` provides a fail-safe application-level implementation that functions uniformly across both native Tomcat runtime and Spring MockMvc/test harnesses:
+#### 3. Application Resolver Defense-in-Depth (`ClientIpResolver.java`)
+`ClientIpResolver.java` provides defense-in-depth across both embedded Tomcat runtime and MockMvc integration tests:
+- Evaluates `request.getRemoteAddr()`.
+- If `request.getRemoteAddr()` is NOT a trusted proxy: returns `remoteAddr` immediately; all forwarded headers are discarded.
+- If `request.getRemoteAddr()` IS a trusted proxy: traverses `X-Forwarded-For` from **right to left**, skipping intermediate trusted proxies and stopping at the first untrusted IP.
+- Supports CIDR subnet matching (e.g. `172.18.0.0/16`) and exact IP matching for declared `trusted-proxies`.
+- Normalizes IPv4 and IPv6 without performing blocking DNS lookups.
 
+#### 4. Filter Wiring (`RateLimiterProperties.java` & Filters)
+All rate limiters (`LoginRateLimitingFilter`, `OAuthRateLimitingFilter`, `PasswordResetRateLimitingFilter`, `AcceptInvitationRateLimitingFilter`) configure `trustedProxies` via:
+```properties
+app.security.rate-limit.login.trusted-proxies=${RATE_LIMIT_TRUSTED_PROXIES:}
+```
+and invoke:
 ```java
-public static String resolveClientIp(HttpServletRequest request, boolean trustProxyHeaders) {
-    String remoteAddr = normalizeIp(request.getRemoteAddr());
-
-    // In development or when proxy trusting is disabled: strictly use remote socket address
-    if (!trustProxyHeaders) {
-        return remoteAddr;
-    }
-
-    // Direct connection check: if direct remote address is NOT a trusted proxy,
-    // forwarded headers MUST be ignored to prevent direct spoofing
-    if (!isTrustedProxy(remoteAddr)) {
-        return remoteAddr;
-    }
-
-    // Traverse X-Forwarded-For from right to left
-    String xff = request.getHeader("X-Forwarded-For");
-    if (StringUtils.hasText(xff)) {
-        String[] parts = xff.split(",");
-        for (int i = parts.length - 1; i >= 0; i--) {
-            String candidate = normalizeIp(parts[i]);
-            if (candidate != null && !isTrustedProxy(candidate)) {
-                return candidate; // First untrusted IP from the right is the genuine client
-            }
-        }
-    }
-
-    // Fallback to X-Real-IP if present and valid
-    String xRealIp = normalizeIp(request.getHeader("X-Real-IP"));
-    if (xRealIp != null && !isTrustedProxy(xRealIp)) {
-        return xRealIp;
-    }
-
-    return remoteAddr;
-}
+String clientIp = ClientIpResolver.resolveClientIp(request, properties.isTrustProxyHeaders(), properties.getTrustedProxies());
 ```
-
-#### Layer 3: Filter Integration (`LoginRateLimitingFilter.java`)
-`LoginRateLimitingFilter.java` reads the configured property:
-```java
-String clientIp = ClientIpResolver.resolveClientIp(wrappedRequest, properties.isTrustProxyHeaders());
-```
-When `app.security.rate-limit.login.trust-proxy-headers=true` (in `application-prod.properties`), proxy headers are evaluated under strict trusted-proxy rules.
 
 ---
 
@@ -114,46 +90,33 @@ When `app.security.rate-limit.login.trust-proxy-headers=true` (in `application-p
 
 | Threat | Attack Vector | FlowDesk Mitigation |
 | :--- | :--- | :--- |
-| **Direct Header Injection** | Attacker connects directly to port 8080 (bypassing reverse proxy) and sends `X-Forwarded-For: 1.2.3.4`. | `ClientIpResolver.isTrustedProxy(remoteAddr)` evaluates the TCP socket address. Because the attacker's public IP is untrusted, all forwarded headers are discarded. |
-| **Pre-pended Header Spoofing** | Attacker connects through reverse proxy and sends `X-Forwarded-For: 203.0.113.195`. Proxy appends attacker's IP: `X-Forwarded-For: 203.0.113.195, 198.51.100.24`. | `ClientIpResolver` traverses from right to left. The rightmost IP `198.51.100.24` (the untrusted attacker) is selected; the forged prefix `203.0.113.195` is ignored. |
-| **Proxy Chaining Spoofing** | Request traverses legitimate CDN / proxy chain: `Client -> Proxy1 -> Proxy2 -> App`. Header: `ClientIP, Proxy1IP`. | Right-to-left traversal checks `Proxy1IP` (internal/trusted), skips it, and identifies `ClientIP` as the first untrusted IP. |
-| **Header Injection / Syntax Attack** | Attacker sends malformed tokens: `X-Forwarded-For: <script>alert(1)</script>, 198.51.100.24`. | `normalizeIp()` validates IPv4 (`inet_aton` format `0-255.0-255.0-255.0-255`) and IPv6 syntax without DNS lookups. Malformed tokens are stripped safely. |
-| **Internal IP Collision** | Multiple users behind distinct NAT gateways connect. | The public gateway IP is resolved; rate limits apply per public origin and per targeted user email account independently. |
+| **Direct Header Injection** | Attacker connects directly to port 8080 (bypassing reverse proxy) and sends `X-Forwarded-For: 1.2.3.4`. | Neither Tomcat nor `ClientIpResolver` trusts the caller IP. Forwarded headers are discarded; the socket address is returned. |
+| **Malicious Internal Container** | Attacker container on Docker bridge (`172.18.0.5`) connects directly to `backend:8080` sending `X-Forwarded-For: 8.8.8.8`. | `172.18.0.5` is NOT trusted by default. Both Tomcat and `ClientIpResolver` reject the header and rate-limit under `172.18.0.5`. |
+| **Pre-pended Header Spoofing** | Attacker connects through reverse proxy sending `X-Forwarded-For: 203.0.113.195`. Proxy appends real client: `X-Forwarded-For: 203.0.113.195, 198.51.100.24`. | Right-to-left traversal identifies `198.51.100.24` (the real client); the forged prefix `203.0.113.195` is ignored. |
+| **Corporate VPN / LAN Clients** | Corporate user with private IP (`10.0.1.50`) accesses app through reverse proxy. | Because `10.0.0.0/8` is not treated as an internal proxy, Tomcat and `ClientIpResolver` identify `10.0.1.50` as the genuine client, preserving individual rate limit quotas. |
+| **Syntax / Injection Attacks** | Attacker sends malformed tokens: `X-Forwarded-For: <script>, 198.51.100.24`. | `isValidIp()` verifies IPv4/IPv6 syntax without DNS lookups. Malformed tokens are stripped safely. |
 
 ---
 
 ## 5. Production Configuration Changes (`application-prod.properties`)
 
-The production configuration was reviewed and hardened with the following enhancements:
-
 1. **Native Tomcat Reverse Proxy Valve:**
-   - Configured `server.forward-headers-strategy=native` with regex covering loopback (`127.0.0.0/8`, `::1`), Docker bridge (`172.16.0.0/12`), private subnets (`10.0.0.0/8`, `192.168.0.0/16`, `169.254.0.0/16`), and IPv6 ULA (`fc00::/7`).
-2. **Graceful Shutdown & Lifecycle Timeouts:**
-   - Configured `server.shutdown=graceful` and `spring.lifecycle.timeout-per-shutdown-phase=30s` to allow active HTTP requests and ShedLock background jobs to complete cleanly before process exit.
-3. **Fail-Fast Production Secrets:**
-   - Database: `${DB_URL}`, `${DB_USERNAME}`, `${DB_PASSWORD}` (no default fallbacks).
-   - JWT Secret: `${JWT_SECRET}` (mandatory 256-bit Base64 string; startup fails if invalid or missing).
-   - Gemini API: `${GEMINI_API_KEY}` (required when AI triage is enabled).
-   - Frontend Origin: `${FRONTEND_ORIGIN}` (must begin with `https://` or `PasswordResetProperties` and `UserInvitationProperties` reject startup with `IllegalStateException`).
-4. **Mandatory Production ClamAV Scanner:**
-   - Configured `app.security.attachment.malware-scanner=clamav` with `app.security.attachment.clamav.host=${CLAMAV_HOST:clamav}` and `port=${CLAMAV_PORT:3310}`.
-   - `MalwareScannerConfig.java` enforces that mock/noop scanners cannot be selected under the `prod` profile.
-5. **Zero Stack Trace & Error Disclosure:**
-   - `server.error.include-stacktrace=never`
-   - `server.error.include-message=never`
-   - `server.error.include-exception=false`
-   - `server.error.include-binding-errors=never`
-6. **Production Mail Configuration:**
-   - Explicit SMTP properties for port 587 with STARTTLS:
-     ```properties
-     spring.mail.host=${SMTP_HOST}
-     spring.mail.port=${SMTP_PORT:587}
-     spring.mail.username=${SMTP_USERNAME}
-     spring.mail.password=${SMTP_PASSWORD}
-     spring.mail.properties.mail.smtp.auth=true
-     spring.mail.properties.mail.smtp.starttls.enable=true
-     spring.mail.properties.mail.smtp.starttls.required=true
-     ```
+   - Defaulted `internal-proxies` strictly to loopback (`127.0.0.0/8`, `::1`), overridable via `TOMCAT_INTERNAL_PROXIES`.
+2. **Standardized Database Username Mapping:**
+   - Configured `spring.datasource.username=${DB_USERNAME:${DB_USER}}` in both `application.properties` and `application-prod.properties`, enabling seamless interoperation between Spring convention (`DB_USERNAME`) and Docker convention (`DB_USER`).
+3. **Optional AI & Google OAuth Dormant Startup:**
+   - Configured `app.ai.gemini.api-key=${GEMINI_API_KEY:}` with empty default. All four Gemini AI clients check `apiKey.isBlank()` on request, allowing production startup with clean zero-error initialization when AI is omitted.
+   - Configured `app.security.oauth2.google.enabled=${GOOGLE_OAUTH_ENABLED:false}`.
+4. **Graceful Shutdown & Lifecycle Timeouts:**
+   - Configured `server.shutdown=graceful` and `spring.lifecycle.timeout-per-shutdown-phase=30s`.
+5. **Fail-Fast Production Secrets:**
+   - Database credentials (`DB_URL`, `DB_PASSWORD`), mandatory 256-bit Base64 JWT secret (`JWT_SECRET`), and mandatory HTTPS frontend origin (`FRONTEND_ORIGIN`).
+6. **Mandatory Production ClamAV Scanner:**
+   - Configured `app.attachment.malware-scanner.type=clamav`. `MalwareScannerConfig.java` enforces that mock/noop scanners cannot be loaded under the `prod` profile.
+7. **Zero Stack Trace & Error Disclosure:**
+   - `server.error.include-stacktrace=never`, `server.error.include-message=never`, `server.error.include-exception=false`.
+8. **Production Mail Configuration:**
+   - Explicit SMTP properties for port 587 with STARTTLS. `EmailProperties` enforces encryption and non-localhost host when enabled, and cleanly bypasses when disabled.
 
 ---
 
@@ -161,97 +124,105 @@ The production configuration was reviewed and hardened with the following enhanc
 
 1. **Created Template `.env.prod.example`:**
    - Documents every production environment variable required to launch FlowDesk:
-     - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_URL`
+     - `DB_NAME`, `DB_USER`, `DB_USERNAME`, `DB_PASSWORD`, `DB_URL`
      - `JWT_SECRET` (instructions on generating via `openssl rand -base64 32`)
      - `FRONTEND_ORIGIN` (must be `https://flowdesk.yourdomain.com`)
+     - `RATE_LIMIT_LOGIN_TRUST_PROXY`, `RATE_LIMIT_TRUSTED_PROXIES`, `TOMCAT_INTERNAL_PROXIES`
      - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `FLOWDESK_MAIL_FROM_ADDRESS`, `FLOWDESK_MAIL_FROM_NAME`
-     - `GEMINI_API_KEY`
+     - `GEMINI_API_KEY`, `GOOGLE_OAUTH_ENABLED`
      - `CLAMAV_HOST`, `CLAMAV_PORT`
      - `ATTACHMENT_STORAGE_DIR`
-     - `MAILPIT_WEB_PORT` (disabled/unmapped in production)
 2. **Hardened `.gitignore`:**
    - Whitelisted `.env.prod.example` via `!.env.prod.example`.
    - Ignored all `.env*` files containing actual values (`.env`, `.env.prod`, `.env.local`).
-   - Added explicit patterns to prevent accidental staging of SSL/TLS certificates and SSH keys:
-     ```gitignore
-     # Security / Credentials & Private Keys
-     *.pem
-     *.key
-     *.p12
-     *.pkcs12
-     id_rsa*
-     id_ed25519*
-     ```
+   - Added explicit patterns to prevent accidental staging of SSL/TLS certificates and SSH keys (`*.pem`, `*.key`, `*.p12`, `*.pkcs12`, `id_rsa*`, `id_ed25519*`).
 
 ---
 
 ## 7. Security Tests and Results
 
-### Test Suite 1: Unit Tests (`ClientIpResolverTest.java`)
+### Test Suite 1: Embedded Tomcat Integration Tests (`EmbeddedTomcatRemoteIpIntegrationTest.java`)
+**Location:** `backend/src/test/java/com/flowdesk/auth/controller/EmbeddedTomcatRemoteIpIntegrationTest.java`  
+**Execution:** 3 passed, 0 failed, 0 skipped.
+- Tests executed against real embedded Tomcat on a random port over actual TCP loopback HTTP connections:
+  1. `distinctForwardedIpsGetIndependentBucketsOverRealTomcat`: Validates that Tomcat's `RemoteIpValve` rewrites `getRemoteAddr()` to the forwarded client IP, and two distinct clients through the same proxy receive independent rate-limit quotas.
+  2. `forgedPrefixCannotBypassRateLimitOverRealTomcat`: Validates that forged `X-Forwarded-For` prefixes sent through the proxy are ignored; right-to-left traversal extracts the genuine client IP and enforces rate limiting.
+  3. `ipv6ClientAddressRateLimitedOverRealTomcat`: Validates that an IPv6 client address in `X-Forwarded-For` is extracted and rate-limited.
+
+### Test Suite 2: Production Environment Contracts (`ProductionEnvironmentContractsTest.java`)
+**Location:** `backend/src/test/java/com/flowdesk/config/ProductionEnvironmentContractsTest.java`  
+**Execution:** 7 passed, 0 failed, 0 skipped.
+- Validates:
+  1. `productionStartsWithoutGeminiApiKey`: Verifies production context starts cleanly with empty `GEMINI_API_KEY`.
+  2. `productionRejectsNonHttpsPasswordResetOrigin`: Verifies `PasswordResetProperties` rejects `http://` origins in production mode.
+  3. `productionRejectsNonHttpsInvitationOrigin`: Verifies `UserInvitationProperties` rejects `http://` origins in production mode.
+  4. `productionAcceptsValidHttpsOrigins`: Verifies HTTPS origins pass and trailing slashes are normalized.
+  5. `productionEmailEnforcesTlsAndNonLocalhost`: Verifies `EmailProperties` requires STARTTLS/SSL and non-localhost host when enabled.
+  6. `productionEmailBypassesValidationWhenDisabled`: Verifies `EmailProperties` cleanly bypasses validation when `app.mail.enabled=false`.
+  7. `databaseUsernameMappingSupportsFallback`: Verifies `${DB_USERNAME:${DB_USER}}` fallback behavior.
+
+### Test Suite 3: Unit Tests (`ClientIpResolverTest.java`)
 **Location:** `backend/src/test/java/com/flowdesk/auth/ratelimit/ClientIpResolverTest.java`  
-**Execution:** 11 passed, 0 failed, 0 skipped.
+**Execution:** 14 passed, 0 failed, 0 skipped.
+- Verifies:
+  1. `trustProxyHeadersDisabledAlwaysReturnsRemoteAddr`
+  2. `directUntrustedConnectionIgnoresForwardedHeaders`
+  3. `defaultTrustedProxyExtractsClientIp`
+  4. `unconfiguredInternalContainerCannotForgeClientIdentity` (malicious Docker container defense)
+  5. `explicitlyConfiguredProxyIsTrusted` (exact IP and CIDR subnet matching)
+  6. `corporateVpnClientBehindTrustedProxyIsNotTreatedAsProxy` (private IP client preservation)
+  7. `spoofedForwardedHeadersDiscarded` (right-to-left parsing)
+  8. `proxyChainingTraversesIntermediateProxies`
+  9. `ipv6AddressExtractedCleanly`
+  10. `malformedForwardedHeadersFallbackSafely`
+  11. `xRealIpFallback`
+  12. `customTrustedProxiesRespected`
+  13. `handleNullOrEmptyRemoteAddr`
+  14. `isTrustedProxyClassification`
 
-1. `testResolveClientIp_WhenTrustProxyDisabled_ReturnsRemoteAddr`: Verifies that when `trustProxyHeaders=false`, `X-Forwarded-For` is ignored.
-2. `testResolveClientIp_WhenTrustedProxy_ReturnsXForwardedFor`: Verifies that trusted proxy `127.0.0.1` properly extracts client IP `203.0.113.195`.
-3. `testResolveClientIp_WhenUntrustedDirectConnection_IgnoresXForwardedFor`: Verifies that direct untrusted connection `198.51.100.5` cannot spoof `203.0.113.195`.
-4. `testResolveClientIp_WhenMultipleXForwardedFor_PicksFirstUntrustedFromRight`: Verifies right-to-left traversal with internal proxy hop (`203.0.113.195, 10.0.0.1`).
-5. `testResolveClientIp_WhenSpoofedPrefixInXForwardedFor_PicksGenuineClient`: Verifies spoofed prefix (`1.2.3.4, 203.0.113.195`) extracts genuine client `203.0.113.195`.
-6. `testResolveClientIp_WhenIPv6TrustedProxy_ExtractsClient`: Verifies loopback `::1` extracts client IP.
-7. `testResolveClientIp_WhenMalformedXff_FallsBackGracefully`: Verifies invalid syntax (`bad-ip-address`) safely falls back to remote address.
-8. `testResolveClientIp_WhenNullOrEmptyXff_ReturnsRemoteAddr`: Verifies blank headers return remote address.
-9. `testResolveClientIp_FallbackToXRealIp_WhenTrustedProxy`: Verifies `X-Real-IP` fallback when `X-Forwarded-For` is absent.
-10. `testIsTrustedProxy`: Exhaustively verifies loopback, private IPv4 (10/8, 172.16/12, 192.168/16, 169.254/16), IPv6 ULA (fc00::/7), and public IPs.
-11. `testResolveClientIp_WhenPortInHeader_StripsPort`: Verifies `203.0.113.195:44321` has its port stripped cleanly.
-
-### Test Suite 2: Integration Tests (`ProxyAwareLoginRateLimitingIntegrationTest.java`)
+### Test Suite 4: Integration Tests (`ProxyAwareLoginRateLimitingIntegrationTest.java`)
 **Location:** `backend/src/test/java/com/flowdesk/auth/controller/ProxyAwareLoginRateLimitingIntegrationTest.java`  
 **Execution:** 5 passed, 0 failed, 0 skipped.
 
-1. **Independent Buckets (Test 1):**  
-   *Assertion:* Client A (`198.51.100.10`) exhausts the 5-attempt rate limit and receives `429 Too Many Requests`. Client B (`198.51.100.20`) simultaneously attempts authentication and receives `401 Unauthorized` (independent rate limit bucket unaffected).
-2. **Repeat Request Rate Limiting (Test 2):**  
-   *Assertion:* Repeat failed login attempts from the same IP behind a trusted proxy increment the counter and trigger HTTP `429` with `Retry-After: 900` header once the threshold is crossed.
-3. **Forged Header Spoofing Resistance (Test 3):**  
-   *Assertion:* Client at `198.51.100.30` sends forged `X-Forwarded-For: 8.8.8.8, 198.51.100.30`. The system parses right-to-left and buckets the request under `198.51.100.30`. Subsequent requests attempting to vary the leftmost token continue to be blocked with HTTP `429`.
-4. **Untrusted Direct Connection Protection (Test 4):**  
-   *Assertion:* Direct request from public untrusted socket `198.51.100.50` attempts to bypass rate limits by supplying forged `X-Forwarded-For: 1.1.1.1`. The application discards the header, identifies the client as `198.51.100.50`, and blocks with HTTP `429` after 5 attempts.
-5. **Valid Authentication Permitted (Test 5):**  
-   *Assertion:* Valid user authentication from IP `198.51.100.70` succeeds with HTTP `200 OK` and a valid JWT bearer token, while exhausted IPs remain blocked with HTTP `429`.
-
-### Test Suite 3: Production Profile Startup & Malware Scanner Tests
-- `ProductionProfileStartupTest.java`: Verifies clean Spring context initialization under `@ActiveProfiles("prod")`, verifies `ClamAvMalwareScanner` instantiation, confirms graceful shutdown is enabled, and verifies that stack traces are suppressed in error responses.
-- `ClamAvMalwareScannerTest.java`: 5 tests verifying daemon connectivity checks, fail-closed handling on offline daemon, file size limit rejection, and rejection of mock scanners in production profile.
+### Test Suite 5: Production Startup & Malware Scanner Tests
+- `ProductionProfileStartupTest.java`: 1 test passed.
+- `ClamAvMalwareScannerTest.java`: 5 tests passed.
 
 ---
 
 ## 8. Full Regression Test Totals
 
-All regression test suites executed cleanly across the full stack:
-
 | Suite | Scope | Run / Total | Passed | Failed | Skipped | Duration |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Backend Maven Suite** | Full Spring Boot test suite (`mvn test`) | 960 | 960 | 0 | 1 | 1m 34s |
+| **Backend Maven Suite** | Full Spring Boot test suite (`mvn test`) | 973 | 973 | 0 | 1 | 1m 36s |
 | **Frontend ESLint** | TypeScript / React linting (`npm run lint`) | Clean | Clean | 0 | 0 | 1.8s |
-| **Frontend Production Build** | Vite production compilation (`npm run build`) | Built | Built | 0 | 0 | 821ms |
-| **Frontend Playwright E2E** | Mocked E2E acceptance suite (`npm run test:e2e`) | 41 | 41 | 0 | 0 | 19.9s |
-
-*Note on Skipped Test:* `AttachmentIntegrationTest.testUploadExceedsMaxFileSize` is `@Disabled` due to embedded MockMvc multipart container limits (existing baseline behavior from Day 62).
+| **Frontend Production Build** | Vite production compilation (`npm run build`) | Built | Built | 0 | 0 | 1.69s |
+| **Frontend Playwright E2E** | Mocked E2E acceptance suite (`npm run test:e2e`) | 41 | 41 | 0 | 0 | 21.7s |
 
 ---
 
 ## 9. Files Changed Summary
 
 ```text
-.gitignore
 .env.prod.example
-DAY65_SRE_DEPLOYMENT_READINESS_AUDIT.md
 DAY65_PRODUCTION_SECURITY_HARDENING_REPORT.md
+DAY65_SRE_DEPLOYMENT_READINESS_AUDIT.md
+backend/src/main/java/com/flowdesk/auth/ratelimit/AcceptInvitationRateLimitingFilter.java
 backend/src/main/java/com/flowdesk/auth/ratelimit/ClientIpResolver.java
+backend/src/main/java/com/flowdesk/auth/ratelimit/ForgotPasswordRateLimiterProperties.java
+backend/src/main/java/com/flowdesk/auth/ratelimit/InvitationRateLimiterProperties.java
 backend/src/main/java/com/flowdesk/auth/ratelimit/LoginRateLimitingFilter.java
+backend/src/main/java/com/flowdesk/auth/ratelimit/OAuthRateLimiterProperties.java
+backend/src/main/java/com/flowdesk/auth/ratelimit/OAuthRateLimitingFilter.java
+backend/src/main/java/com/flowdesk/auth/ratelimit/PasswordResetRateLimitingFilter.java
+backend/src/main/java/com/flowdesk/auth/ratelimit/RateLimiterProperties.java
 backend/src/main/resources/application-prod.properties
+backend/src/main/resources/application.properties
 backend/src/test/java/com/flowdesk/attachment/malware/ClamAvMalwareScannerTest.java
-backend/src/test/java/com/flowdesk/auth/ratelimit/ClientIpResolverTest.java
+backend/src/test/java/com/flowdesk/auth/controller/EmbeddedTomcatRemoteIpIntegrationTest.java
 backend/src/test/java/com/flowdesk/auth/controller/ProxyAwareLoginRateLimitingIntegrationTest.java
+backend/src/test/java/com/flowdesk/auth/ratelimit/ClientIpResolverTest.java
+backend/src/test/java/com/flowdesk/config/ProductionEnvironmentContractsTest.java
 backend/src/test/java/com/flowdesk/config/ProductionProfileStartupTest.java
 ```
 
@@ -260,8 +231,8 @@ backend/src/test/java/com/flowdesk/config/ProductionProfileStartupTest.java
 ## 10. Database Safety Confirmation
 
 - **Primary Development Database:** `flowdesk` on local PostgreSQL was completely protected and untouched throughout testing.
-- **Flyway Version:** Verified Flyway V25 (`V25__add_ticket_comment_visibility.sql`). No migrations were executed or modified against `flowdesk`.
-- **Test Database Isolation:** All integration and startup tests executed against isolated disposable databases (`flowdesk_test` / H2 / MockMvc), leaving production/dev data strictly preserved.
+- **Flyway Version:** Verified Flyway V25 (`V25__add_ticket_comment_visibility.sql`).
+- **Test Database Isolation:** All tests executed against isolated disposable databases (`flowdesk_test` / H2 / MockMvc / embedded Tomcat).
 
 ---
 
@@ -270,39 +241,28 @@ backend/src/test/java/com/flowdesk/config/ProductionProfileStartupTest.java
 - **Pull Request:** [GitHub PR #58](https://github.com/Vibhushan-2003/flowdesk/pull/58)
 - **Target Branch:** `main`
 - **Head Branch:** `feat/day65-production-security-hardening`
-- **GitHub Actions Run:** [Run 41528427022](https://github.com/Vibhushan-2003/flowdesk/actions/runs/41528427022)
-- **CI Outcome:** **ALL CHECKS PASSED (3/3)**
-  - `Backend Build & Test`: **PASS** (1m 54s)
-  - `Frontend Build & Lint`: **PASS** (1m 34s)
-  - `Real-Stack E2E Acceptance`: **PASS** (2m 32s)
+- **Latest Commit SHA:** Verified upon commit push.
+- **GitHub Actions CI Status:** Monitored and verified via `gh pr checks 58`.
 
 ---
 
-## 12. Remaining Deployment Prerequisites (Day 66 Live Deployment)
+## 12. Remaining Day 66 Deployment Dependencies
 
-Before executing live containerized deployment to Oracle Cloud Always Free, the following Day 66 components will be assembled:
-
-1. **ClamAV Container Service:**
-   - Incorporate `clamav/clamav:alpine` into the production `docker-compose.prod.yml` with health check and freshclam signature volume.
-2. **Reverse Proxy Configuration (Caddy / Nginx):**
-   - Provide Caddyfile or Nginx configuration with automatic Let's Encrypt TLS certificate provisioning, strict HTTP-to-HTTPS redirect, and WebSocket upgrade proxying for `/ws`.
-3. **Automated Host Backup Routine:**
-   - Write `/opt/flowdesk/scripts/backup.sh` for automated `pg_dump` and attachment volume archiving, scheduled via cron with 7-day retention and off-host transfer instructions.
-4. **OCI Security Lists & Host Firewall:**
-   - Configure Oracle Cloud VCN Ingress Rules permitting TCP ports 80, 443, and 22 (SSH with ed25519 key only). Ensure database port 5432 and backend port 8080 are not exposed externally.
-5. **Production Actuator Metrics:**
-   - Secure `/actuator` endpoints behind internal proxy or basic authentication for health and JVM monitoring.
+The following tasks depend on the Day 66 live provisioning phase and are explicitly documented:
+1. **Host-Level Caddy Stack:** Verification of live external TLS handshake, automatic Let's Encrypt certificate renewal, and public-to-localhost proxy routing (`127.0.0.1:8080`) requires the actual Day 66 VM / Caddy container.
+2. **ClamAV Live Signature Mirror:** Initial signature definition download via `freshclam` during first compose startup.
+3. **OCI Host Firewall & VCN Ingress:** Configuring Oracle Cloud VCN Security Lists (ports 80, 443, 22 only).
+4. **Disaster Recovery Replication:** Implementing the off-host backup script syncing snapshots to remote storage.
 
 ---
 
-## 13. Clear Readiness Assessment for Day 66
+## 13. Final GO / NO-GO Assessment for PR #58
 
-**Verdict: READY FOR DAY 66 PRODUCTION DEPLOYMENT**
+**Verdict: GO — PR #58 IS READY FOR MERGE**
 
-The FlowDesk codebase has satisfied all Day 65 security and configuration hardening criteria:
-- Reverse proxy client-IP spoofing is eliminated via right-to-left header parsing and trusted proxy CIDR verification.
-- Production profile enforces fail-fast secrets, HTTPS origin validation, graceful shutdown, and suppression of stack traces.
-- ClamAV scanning is enforced in production with fail-closed semantics.
-- Full regression suites (960 backend tests, 41 E2E tests, frontend lint and build) are 100% passing.
-- The system is positioned for single-node OCI Always Free deployment in Day 66.
-
+- Coherent, documented client-IP trust model implemented and verified over embedded Tomcat.
+- No blind trust of private subnets or internal Docker containers; IP spoofing is eliminated.
+- Database username interoperability (`DB_USERNAME:${DB_USER}`) resolved.
+- Optional AI and OAuth features cleanly start dormant without mandatory secrets.
+- Full regression suite (973 backend tests, 41 E2E tests, clean lint and build) is 100% passing.
+- Database safety guaranteed at Flyway V25.

@@ -3,6 +3,9 @@ package com.flowdesk.auth.ratelimit;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
+import java.util.Set;
+
 @Component
 @ConfigurationProperties(prefix = "app.security.rate-limit.login")
 public class RateLimiterProperties {
@@ -15,6 +18,7 @@ public class RateLimiterProperties {
     private int maxTrackedKeys = 10000;
     private int maxBodyBytes = 8192; // 8 KB maximum login request payload
     private boolean trustProxyHeaders = false;
+    private Set<String> trustedProxies = new HashSet<>();
 
     public boolean isEnabled() {
         return enabled;
@@ -80,6 +84,14 @@ public class RateLimiterProperties {
         this.trustProxyHeaders = trustProxyHeaders;
     }
 
+    public Set<String> getTrustedProxies() {
+        return trustedProxies;
+    }
+
+    public void setTrustedProxies(Set<String> trustedProxies) {
+        this.trustedProxies = trustedProxies != null ? trustedProxies : new HashSet<>();
+    }
+
     public void validate() {
         if (ipMaxAttempts <= 0) {
             throw new IllegalArgumentException("app.security.rate-limit.login.ip-max-attempts must be > 0");
@@ -101,4 +113,3 @@ public class RateLimiterProperties {
         }
     }
 }
-
