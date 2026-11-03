@@ -15,9 +15,9 @@ public class BackendApplication {
     public static void main(String[] args) {
         SpringApplication app = new SpringApplication(BackendApplication.class);
 
-        // Issue 2 Fix: If bootstrap is explicitly requested (via CLI or environment),
+        // If bootstrap is explicitly requested via CLI arguments (e.g. OCI one-shot container),
         // configure WebApplicationType.NONE so no embedded HTTP or WebSocket server is started.
-        if (AdminBootstrapActivation.isBootstrapRequested(args, null)) {
+        if (AdminBootstrapActivation.isBootstrapRequested(args)) {
             log.info("Starting FlowDesk in non-web bootstrap mode (WebApplicationType.NONE).");
             app.setWebApplicationType(WebApplicationType.NONE);
         }

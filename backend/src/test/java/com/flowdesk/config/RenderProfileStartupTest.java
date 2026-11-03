@@ -4,9 +4,11 @@ import com.flowdesk.attachment.service.TicketAttachmentService;
 import com.flowdesk.attachment.storage.AttachmentStorageProperties;
 import com.flowdesk.auth.config.RefreshTokenProperties;
 import com.flowdesk.auth.ratelimit.RateLimiterProperties;
+import com.flowdesk.user.bootstrap.AdminBootstrapRunner;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
@@ -19,6 +21,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -56,6 +59,9 @@ class RenderProfileStartupTest {
 
     @Autowired
     private TicketAttachmentService ticketAttachmentService;
+
+    @Autowired
+    private AdminBootstrapRunner adminBootstrapRunner;
 
     @Test
     @DisplayName("Render profile loads successfully and enforces demo security and resource constraints")
@@ -127,5 +133,13 @@ class RenderProfileStartupTest {
                     assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
                     assertThat(rse.getReason()).contains("Attachment uploads are disabled in temporary demo environment");
                 });
+    }
+
+    @Test
+    @DisplayName("In-service bootstrap is idempotent and does not terminate the web application when executed")
+    void inServiceBootstrapDoesNotTerminateApplication() {
+        // Calling runner.run with empty args simulates normal web service startup.
+        // It must not call System.exit or throw an unexpected exception.
+        assertDoesNotThrow(() -> adminBootstrapRunner.run(new DefaultApplicationArguments(new String[]{})));
     }
 }

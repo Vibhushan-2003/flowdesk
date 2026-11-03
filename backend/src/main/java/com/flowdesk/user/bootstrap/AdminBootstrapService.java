@@ -114,4 +114,9 @@ public class AdminBootstrapService {
                 savedAdmin.getCreatedAt()
         );
     }
+
+    @Transactional(readOnly = true)
+    public boolean hasExistingUsers() {
+        return userRepository.count() > 0;
+    }
 }

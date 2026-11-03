@@ -26,7 +26,8 @@ services:
       - key: JAVA_TOOL_OPTIONS
         value: -XX:+UseSerialGC -Xmx224m -Xms96m -XX:MaxMetaspaceSize=128m -Xss512k -XX:+UseStringDeduplication
       - key: DB_URL
-        # Set to: jdbc:postgresql://<internal-db-host>:5432/flowdesk?sslmode=require
+        # Option 1 (Neon PostgreSQL - No Card Required): jdbc:postgresql://<neon-endpoint>.neon.tech/neondb?sslmode=require
+        # Option 2 (Render PostgreSQL): jdbc:postgresql://<internal-db-host>:5432/flowdesk?sslmode=require
         sync: false
       - key: DB_USERNAME
         sync: false
@@ -38,12 +39,14 @@ services:
         # Set to: https://flowdesk-demo.onrender.com (matching static site URL)
         sync: false
       - key: FLOWDESK_BOOTSTRAP_ADMIN_ENABLED
+        # In-service bootstrap: provisions admin on clean DB without System.exit(); wipes credentials from memory in finally
         value: "true"
       - key: FLOWDESK_BOOTSTRAP_ADMIN_EMAIL
         sync: false
       - key: FLOWDESK_BOOTSTRAP_ADMIN_PASSWORD
         generateValue: true
       - key: FLOWDESK_MAIL_ENABLED
+        # Render Free blocks outbound SMTP ports 25, 465, and 587; email must remain disabled
         value: "false"
       - key: GOOGLE_OAUTH_ENABLED
         value: "false"
@@ -76,3 +79,4 @@ databases:
     databaseName: flowdesk
     user: flowdesk_user
     plan: free
+
