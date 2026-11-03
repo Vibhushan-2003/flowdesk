@@ -140,11 +140,16 @@ In the event of catastrophic data loss where production must be restored:
 4. Start backend and verify health:
    ```bash
    docker start flowdesk-prod-backend
-   curl -fsS http://localhost:8080/api/health/ready
+   # Verify health probe inside container (port 8080 is internal to Docker and unpublished on host):
+   docker exec flowdesk-prod-backend wget -qO- http://127.0.0.1:8080/api/health/ready
+   # Or inspect container health status until healthy:
+   docker inspect --format='{{.State.Health.Status}}' flowdesk-prod-backend
    ```
 5. Resume edge ingress:
    ```bash
    docker start flowdesk-prod-caddy
+   # Verify through edge HTTPS ingress:
+   curl -k -fsS https://${CADDY_DOMAIN:-localhost}/api/health/ready
    ```
 
 ---

@@ -84,6 +84,9 @@ cleanup() {
 # HELP flowdesk_backup_status Binary indicator of last backup run (1 = success, 0 = failure)
 # TYPE flowdesk_backup_status gauge
 flowdesk_backup_status 0
+# HELP flowdesk_backup_success Binary indicator of last backup run (1 = success, 0 = failure)
+# TYPE flowdesk_backup_success gauge
+flowdesk_backup_success 0
 # HELP flowdesk_backup_collector_healthy Binary indicator of collector health
 # TYPE flowdesk_backup_collector_healthy gauge
 flowdesk_backup_collector_healthy 1
@@ -492,6 +495,9 @@ if [ -n "$METRICS_DIR" ] && [ -d "$METRICS_DIR" ]; then
 # HELP flowdesk_backup_last_success_timestamp Timestamp of last successful FlowDesk backup
 # TYPE flowdesk_backup_last_success_timestamp gauge
 flowdesk_backup_last_success_timestamp ${END_TIME}
+# HELP flowdesk_backup_last_timestamp_seconds Timestamp of last successful FlowDesk backup (alias)
+# TYPE flowdesk_backup_last_timestamp_seconds gauge
+flowdesk_backup_last_timestamp_seconds ${END_TIME}
 # HELP flowdesk_backup_duration_seconds Execution duration of the last FlowDesk backup
 # TYPE flowdesk_backup_duration_seconds gauge
 flowdesk_backup_duration_seconds ${DURATION}
@@ -501,6 +507,9 @@ flowdesk_backup_size_bytes ${TOTAL_BACKUP_BYTES}
 # HELP flowdesk_backup_status Binary indicator of last backup run (1 = success, 0 = failure)
 # TYPE flowdesk_backup_status gauge
 flowdesk_backup_status 1
+# HELP flowdesk_backup_success Binary indicator of last backup run (1 = success, 0 = failure)
+# TYPE flowdesk_backup_success gauge
+flowdesk_backup_success 1
 # HELP flowdesk_backup_collector_healthy Binary indicator of collector health
 # TYPE flowdesk_backup_collector_healthy gauge
 flowdesk_backup_collector_healthy 1
