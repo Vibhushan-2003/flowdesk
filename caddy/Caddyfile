@@ -59,7 +59,9 @@
 	}
 
 	# WebSocket / STOMP Connection Endpoints -> Spring Boot Backend
-	handle /ws/* {
+	# Matches both /ws (standard STOMP endpoint) and /ws/* (SockJS fallback paths)
+	@websocket path /ws /ws/*
+	handle @websocket {
 		reverse_proxy backend:8080 {
 			header_up Host {host}
 			header_up X-Real-IP {remote_host}
