@@ -2,20 +2,21 @@
 # ==============================================================================
 # FlowDesk Off-Host Disaster Recovery & Replication Adapter
 # ==============================================================================
-# Purpose: Encrypts completed FlowDesk backup sets client-side before replicating
-#          them to an off-host storage target (OCI Object Storage, S3, or remote mount).
+# Purpose: Encrypts completed FlowDesk backup sets client-side using authenticated
+#          encryption (GPG OpenPGP Symmetric AES-256 with Modification Detection
+#          Code / MDC) before replicating to an off-host storage target (OCI
+#          Object Storage, S3, or remote mount).
 #
-# Principles:
-#   - Zero Trust Storage: Encryption occurs locally before transfer using
-#     OpenSSL AES-256-CBC with PBKDF2 and 100,000 iterations.
-#   - Explicit Destination: Target adapter is configurable via DEST_TYPE:
-#       * 'local_dir' (local/NFS secondary mount for testing or on-prem)
-#       * 'oci_cli'   (Oracle Cloud Infrastructure Object Storage)
-#       * 's3'        (AWS S3 / S3-compatible object storage)
-#   - Integrity Verification: Verifies SHA-256 checksum of the replicated artifact
-#     at the destination to guarantee zero transmission corruption.
-#   - Fail-Closed: Never reports disaster recovery success if off-host upload fails.
-#   - Independent Retention: Dedicated retention management on off-host storage.
+# Security & Authenticity Guarantees:
+#   - Strong Confidentiality: Industry-standard OpenPGP AES-256 symmetric cipher.
+#   - Authenticated Encryption: GPG MDC (Modification Detection Code) detects any
+#     tampering, corruption, or bit-flipping prior to decryption.
+#   - Process Argument Protection: Key is injected via secure temporary file or
+#     file descriptor. Never exposed in process command line or `ps aux`.
+#   - Zero Trust Storage: Data is encrypted locally before touching any network.
+#   - Zero Credentials in Logs: Passphrases are suppressed from stdout/stderr.
+#   - Pluggable Adapters: 'oci_cli' (Primary), 'local_dir' (Testing/NFS), 's3'.
+#   - Post-Transfer Integrity Verification: Destination SHA-256 is validated.
 # ==============================================================================
 
 set -euo pipefail
@@ -33,6 +34,8 @@ OFFSITE_RETENTION_DAYS="${OFFSITE_RETENTION_DAYS:-30}"
 ENCRYPTION_KEY="${BACKUP_ENCRYPTION_KEY:-}"
 ENCRYPTION_KEY_FILE="${BACKUP_ENCRYPTION_KEY_FILE:-}"
 
+TEMP_KEY_FILE=""
+
 log_info() {
     echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] [OFFSITE-INFO] $*"
 }
@@ -41,11 +44,18 @@ log_error() {
     echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] [OFFSITE-ERROR] $*" >&2
 }
 
+cleanup() {
+    if [ -n "$TEMP_KEY_FILE" ] && [ -f "$TEMP_KEY_FILE" ]; then
+        rm -f "$TEMP_KEY_FILE"
+    fi
+}
+trap cleanup EXIT ERR INT TERM
+
 usage() {
     cat <<EOF
 Usage: $(basename "$0") --backup-dir DIR [OPTIONS]
 
-FlowDesk Off-Host Replication Adapter
+FlowDesk Off-Host Replication Adapter (Authenticated OpenPGP AES-256)
 
 Required:
   --backup-dir DIR            Path to completed FlowDesk backup directory
@@ -61,7 +71,7 @@ Options:
   -h, --help                  Show this help message
 
 Environment Variables:
-  BACKUP_ENCRYPTION_KEY       Strong passphrase for AES-256-CBC client-side encryption
+  BACKUP_ENCRYPTION_KEY       Strong passphrase for authenticated AES-256 encryption
   BACKUP_ENCRYPTION_KEY_FILE  Alternative path to key file
 EOF
     exit 0
@@ -96,9 +106,13 @@ if [ ! -f "$MANIFEST_FILE" ]; then
     exit 1
 fi
 
+command -v gpg >/dev/null 2>&1 || { log_error "'gpg' (GnuPG) is required for authenticated encryption but not installed."; exit 1; }
+
 # ------------------------------------------------------------------------------
-# Encryption Key Resolution & Security Verification
+# Passphrase Protection & Validation
 # ------------------------------------------------------------------------------
+SECURE_KEY_PATH=""
+
 if [ -n "$ENCRYPTION_KEY_FILE" ] && [ -f "$ENCRYPTION_KEY_FILE" ]; then
     # Verify secure key file permissions (must be 0600 or 0400 on POSIX systems)
     if command -v stat >/dev/null 2>&1; then
@@ -108,39 +122,47 @@ if [ -n "$ENCRYPTION_KEY_FILE" ] && [ -f "$ENCRYPTION_KEY_FILE" ]; then
             exit 1
         fi
     fi
-    ENCRYPTION_KEY=$(cat "$ENCRYPTION_KEY_FILE")
-fi
-
-if [ -z "$ENCRYPTION_KEY" ]; then
+    SECURE_KEY_PATH="$ENCRYPTION_KEY_FILE"
+elif [ -n "$ENCRYPTION_KEY" ]; then
+    # Write environment key to a private temporary file with 0600 permissions to avoid CLI argument exposure
+    TEMP_KEY_FILE="${BACKUP_DIR}/.key_$$.tmp"
+    touch "$TEMP_KEY_FILE"
+    chmod 600 "$TEMP_KEY_FILE"
+    printf "%s" "$ENCRYPTION_KEY" > "$TEMP_KEY_FILE"
+    SECURE_KEY_PATH="$TEMP_KEY_FILE"
+else
     log_error "CRITICAL: No encryption key provided! Set BACKUP_ENCRYPTION_KEY or supply --key-file."
     log_error "Unencrypted off-host transfers are strictly forbidden by FlowDesk SRE policy."
     exit 1
 fi
 
-if [ ${#ENCRYPTION_KEY} -lt 16 ]; then
-    log_error "CRITICAL: BACKUP_ENCRYPTION_KEY must be at least 16 characters for cryptographic safety."
+KEY_LEN=$(wc -c < "$SECURE_KEY_PATH" | tr -d ' ')
+if [ "$KEY_LEN" -lt 16 ]; then
+    log_error "CRITICAL: Encryption passphrase must contain at least 16 characters for cryptographic safety (found $KEY_LEN)."
     exit 1
 fi
 
 # ------------------------------------------------------------------------------
-# Client-Side AES-256-CBC Encryption
+# Authenticated OpenPGP AES-256 Symmetric Encryption
 # ------------------------------------------------------------------------------
 BACKUP_NAME=$(basename "$BACKUP_DIR")
-ENCRYPTED_ARCHIVE="${BACKUP_DIR}/${BACKUP_NAME}.tar.gz.enc"
-ENCRYPTED_SHA_FILE="${BACKUP_DIR}/${BACKUP_NAME}.tar.gz.enc.sha256"
+ENCRYPTED_ARCHIVE="${BACKUP_DIR}/${BACKUP_NAME}.tar.gz.gpg"
+ENCRYPTED_SHA_FILE="${BACKUP_DIR}/${BACKUP_NAME}.tar.gz.gpg.sha256"
 
-log_info "Encrypting backup set '${BACKUP_NAME}' with AES-256-CBC (PBKDF2, 100k iterations)..."
+log_info "Encrypting backup set '${BACKUP_NAME}' with GPG AES-256 (MDC Authenticated Encryption)..."
 
-# Create compressed tar stream and pipe directly into openssl enc
+# Stream compressed tar through GPG symmetric encryption
+# --pinentry-mode loopback and --passphrase-file prevent interactive prompts and process argument leakage
 tar -czf - -C "$(dirname "$BACKUP_DIR")" "$BACKUP_NAME" | \
-    openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt -out "$ENCRYPTED_ARCHIVE" -pass "pass:$ENCRYPTION_KEY"
+    gpg --batch --yes --symmetric --cipher-algo AES256 --pinentry-mode loopback \
+        --passphrase-file "$SECURE_KEY_PATH" -o "$ENCRYPTED_ARCHIVE"
 
 chmod 600 "$ENCRYPTED_ARCHIVE"
-LOCAL_ENC_SHA256=$(sha256sum "$ENCRYPTED_ARCHIVE" | cut -d' ' -f1)
+LOCAL_ENC_SHA256=$(sha256sum "$ENCRYPTED_ARCHIVE" | cut -d' ' -f1 | tr -d '\r\n')
 echo "$LOCAL_ENC_SHA256  $(basename "$ENCRYPTED_ARCHIVE")" > "$ENCRYPTED_SHA_FILE"
 chmod 600 "$ENCRYPTED_SHA_FILE"
 
-log_info "Client-side encryption complete: $(du -sh "$ENCRYPTED_ARCHIVE" | cut -f1)"
+log_info "Authenticated encryption complete: $(du -sh "$ENCRYPTED_ARCHIVE" | cut -f1)"
 log_info "Encrypted artifact SHA-256: ${LOCAL_ENC_SHA256}"
 
 # ------------------------------------------------------------------------------
@@ -156,7 +178,7 @@ case "$DEST_TYPE" in
         
         # Verify post-transfer integrity at destination
         DEST_FILE="${DEST_PATH}/$(basename "$ENCRYPTED_ARCHIVE")"
-        DEST_SHA=$(sha256sum "$DEST_FILE" | cut -d' ' -f1)
+        DEST_SHA=$(sha256sum "$DEST_FILE" | cut -d' ' -f1 | tr -d '\r\n')
         if [ "$DEST_SHA" != "$LOCAL_ENC_SHA256" ]; then
             log_error "POST-TRANSFER CORRUPTION: Destination SHA-256 does not match local artifact!"
             exit 1
@@ -172,7 +194,7 @@ case "$DEST_TYPE" in
         fi
         command -v oci >/dev/null 2>&1 || { log_error "'oci' CLI not found on PATH."; exit 1; }
         
-        # Upload encrypted archive
+        # Upload encrypted archive with pre-upload checksum verification
         oci os object put \
             --bucket-name "$OCI_BUCKET" \
             ${OCI_NAMESPACE:+--namespace-name "$OCI_NAMESPACE"} \
@@ -181,7 +203,7 @@ case "$DEST_TYPE" in
             --force \
             --verify-checksum
         
-        # Upload checksum file
+        # Upload checksum sidecar
         oci os object put \
             --bucket-name "$OCI_BUCKET" \
             ${OCI_NAMESPACE:+--namespace-name "$OCI_NAMESPACE"} \
@@ -215,7 +237,7 @@ esac
 # ------------------------------------------------------------------------------
 if [ "$DEST_TYPE" = "local_dir" ] && [ "$OFFSITE_RETENTION_DAYS" -gt 0 ]; then
     log_info "Enforcing off-host retention policy (${OFFSITE_RETENTION_DAYS} days) on ${DEST_PATH}..."
-    find "$DEST_PATH" -type f -name "*.enc*" -mtime +"$OFFSITE_RETENTION_DAYS" -delete 2>/dev/null || true
+    find "$DEST_PATH" -type f \( -name "*.gpg" -o -name "*.gpg.sha256" \) -mtime +"$OFFSITE_RETENTION_DAYS" -delete 2>/dev/null || true
 fi
 
 # Clean up local encrypted artifacts to save local storage (original plaintext backup remains)
@@ -224,9 +246,9 @@ rm -f "$ENCRYPTED_ARCHIVE" "$ENCRYPTED_SHA_FILE"
 log_info "======================================================================"
 log_info "FlowDesk Off-Host Disaster Recovery Replication SUCCESS"
 log_info "Destination Adapter: ${DEST_TYPE}"
-log_info "Artifact ID:         ${BACKUP_NAME}.tar.gz.enc"
+log_info "Artifact ID:         ${BACKUP_NAME}.tar.gz.gpg"
 log_info "Integrity Checksum:  ${LOCAL_ENC_SHA256}"
+log_info "Cipher / Auth Mode:  GPG OpenPGP AES-256 (MDC Integrity Protected)"
 log_info "======================================================================"
 
 exit 0
-

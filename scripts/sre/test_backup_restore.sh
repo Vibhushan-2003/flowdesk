@@ -202,7 +202,7 @@ export BACKUP_ENCRYPTION_KEY="$DRILL_KEY"
     --dest-type "local_dir" \
     --dest-path "$DRILL_ROOT/offsite_dest"
 
-OFFSITE_ENC_FILE=$(find "$DRILL_ROOT/offsite_dest" -type f -name "*.tar.gz.enc" | head -n 1)
+OFFSITE_ENC_FILE=$(find "$DRILL_ROOT/offsite_dest" -type f \( -name "*.tar.gz.gpg" -o -name "*.tar.gz.enc" \) | head -n 1)
 [ -n "$OFFSITE_ENC_FILE" ] || { echo "ERROR: Encrypted offsite artifact not found!"; exit 1; }
 echo "Offsite encrypted package: $OFFSITE_ENC_FILE"
 
@@ -364,6 +364,7 @@ assert_failure "F6: Decryption with incorrect passphrase must fail" \
 # Test F7: Concurrency Lock Collision
 TOUCH_LOCK="/tmp/flowdesk_backup.lock"
 touch "$TOUCH_LOCK"
+mkdir -p "${TOUCH_LOCK}.d"
 # Hold an exclusive lock using flock in subshell
 (
   exec 200>"$TOUCH_LOCK"
@@ -384,7 +385,7 @@ assert_failure "F7: Concurrent backup invocation must abort on lock collision" \
     --attachments-dir "$DRILL_ROOT/attachments_src" \
     --backup-root "$DRILL_ROOT/backups"
 wait $LOCK_PID 2>/dev/null || true
-rm -f "$TOUCH_LOCK"
+rm -rf "$TOUCH_LOCK" "${TOUCH_LOCK}.d"
 
 # Test F8: Unencrypted Offsite Transfer Refusal
 assert_failure "F8: Off-host transfer without encryption key must fail closed" \
@@ -393,8 +394,113 @@ assert_failure "F8: Off-host transfer without encryption key must fail closed" \
     --dest-type "local_dir" \
     --dest-path "$DRILL_ROOT/offsite_dest"
 
+# Test F9: Tampered Ciphertext Rejection (GPG MDC / Authenticated Encryption)
+TAMPERED_ENC_FILE="$DRILL_ROOT/offsite_dest/tampered.tar.gz.gpg"
+cp "$OFFSITE_ENC_FILE" "$TAMPERED_ENC_FILE"
+TAMPERED_WIN=$(cygpath -m "$TAMPERED_ENC_FILE" 2>/dev/null || echo "$TAMPERED_ENC_FILE")
+python -c "
+import sys
+with open(sys.argv[1], 'r+b') as f:
+    f.seek(100)
+    b = f.read(1)
+    f.seek(100)
+    f.write(bytes([b[0] ^ 0xFF]))
+" "$TAMPERED_WIN"
+assert_failure "F9: Decryption of tampered ciphertext must fail (MDC verification)" \
+    env BACKUP_ENCRYPTION_KEY="$DRILL_KEY" "$SCRIPT_DIR/decrypt-backup.sh" \
+    --enc-file "$TAMPERED_ENC_FILE" \
+    --output-dir "$DRILL_ROOT/tampered_decrypt_stage"
+
+# Test F10: Unsafe Archive Rejection (Zip Slip / Symlink / Traversal)
+UNSAFE_DIR="$DRILL_ROOT/test_unsafe_archive"
+cp -r "$PUBLISHED_BACKUP" "$UNSAFE_DIR"
+UNSAFE_ATT_WIN=$(cygpath -m "$UNSAFE_DIR/attachments.tar.gz" 2>/dev/null || echo "$UNSAFE_DIR/attachments.tar.gz")
+python -c "
+import sys, tarfile
+with tarfile.open(sys.argv[1], 'w:gz') as tar:
+    ti = tarfile.TarInfo(name='attachments/symlink_escape')
+    ti.type = tarfile.SYMTYPE
+    ti.linkname = '/etc/passwd'
+    tar.addfile(ti)
+" "$UNSAFE_ATT_WIN"
+NEW_ATT_SHA=$(sha256sum "$UNSAFE_DIR/attachments.tar.gz" | cut -d' ' -f1 | tr -d '\r\n')
+sed -i "s/^[a-f0-9]*  attachments.tar.gz/${NEW_ATT_SHA}  attachments.tar.gz/" "$UNSAFE_DIR/SHA256SUMS" 2>/dev/null || true
+sed -i "s/\"attachments.tar.gz\": \".*\"/\"attachments.tar.gz\": \"$NEW_ATT_SHA\"/" "$UNSAFE_DIR/manifest.json" 2>/dev/null || true
+assert_failure "F10: Restore must reject archive containing symlinks or path traversal" \
+    "$SCRIPT_DIR/flowdesk-restore.sh" \
+    --backup-dir "$UNSAFE_DIR" \
+    --target-db "$DB_NAME" \
+    --target-attachments-dir "$DRILL_ROOT/tmp_att" \
+    --confirm-destructive "CONFIRM-RESTORE-OVERWRITE" \
+    --use-docker false
+
 # ------------------------------------------------------------------------------
-# 10. Clean Up Disposable Test Database Schema
+# 10. Concurrent Write Race Condition Verification (Task 2 & C1)
+# ------------------------------------------------------------------------------
+log_drill "Phase 10: Testing Concurrent-Write Race Condition Scenarios (C1)..."
+
+C1_ROOT="$DRILL_ROOT/c1_race"
+mkdir -p "$C1_ROOT/attachments"
+mkdir -p "$C1_ROOT/backups"
+echo "Some valid content" > "$C1_ROOT/attachments/valid.dat"
+VALID_SHA=$(sha256sum "$C1_ROOT/attachments/valid.dat" | cut -d' ' -f1 | tr -d '\r\n')
+
+# Seed test schema with 2 attachments: 1 valid on disk, 1 missing on disk (simulating incomplete upload write)
+psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -v ON_ERROR_STOP=1 <<EOF
+CREATE SCHEMA flowdesk_drill_race;
+SET search_path TO flowdesk_drill_race;
+CREATE TABLE ticket_attachments (
+    id uuid PRIMARY KEY,
+    storage_key character varying(255) NOT NULL,
+    checksum_sha256 character varying(64) NOT NULL,
+    status character varying(30) NOT NULL
+);
+INSERT INTO ticket_attachments VALUES
+('d0000000-0000-0000-0000-000000000001', 'valid.dat', '$VALID_SHA', 'ACTIVE'),
+('d0000000-0000-0000-0000-000000000002', 'missing_due_to_race.dat', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'ACTIVE');
+EOF
+
+assert_failure "C1.1: Backup must fail closed when DB row exists but attachment file is missing on disk" \
+    "$SCRIPT_DIR/flowdesk-backup.sh" \
+    --use-docker false \
+    --db-host "$DB_HOST" \
+    --db-port "$DB_PORT" \
+    --db-name "$DB_NAME" \
+    --db-user "$DB_USER" \
+    --db-schema "flowdesk_drill_race" \
+    --attachments-dir "$C1_ROOT/attachments" \
+    --backup-root "$C1_ROOT/backups"
+
+# Subtest C1.2: Attachment File On Disk but NOT in DB Dump (simulating uncommitted or rolling-back upload)
+echo "Uncommitted payload" > "$C1_ROOT/attachments/orphan_during_upload.dat"
+# Remove the missing row from DB so DB only references valid.dat
+psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c \
+    "DELETE FROM flowdesk_drill_race.ticket_attachments WHERE storage_key = 'missing_due_to_race.dat';"
+
+assert_success "C1.2: Backup succeeds when disk has uncommitted file; only snapshot-referenced files are required" \
+    "$SCRIPT_DIR/flowdesk-backup.sh" \
+    --use-docker false \
+    --db-host "$DB_HOST" \
+    --db-port "$DB_PORT" \
+    --db-name "$DB_NAME" \
+    --db-user "$DB_USER" \
+    --db-schema "flowdesk_drill_race" \
+    --attachments-dir "$C1_ROOT/attachments" \
+    --backup-root "$C1_ROOT/backups"
+
+# Clean up race test schema
+psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -c "DROP SCHEMA IF EXISTS flowdesk_drill_race CASCADE;" >/dev/null
+
+# ------------------------------------------------------------------------------
+# 11. Prometheus Backup Alert Rule Evaluation (Task 5)
+# ------------------------------------------------------------------------------
+log_drill "Phase 11: Testing Prometheus Backup Alert Rule Evaluation..."
+ALERT_SCRIPT_WIN=$(cygpath -m "$SCRIPT_DIR/test_prometheus_backup_alerts.py" 2>/dev/null || echo "$SCRIPT_DIR/test_prometheus_backup_alerts.py")
+assert_success "Prometheus Backup Alerts Evaluation (5 simulated operational conditions)" \
+    python "$ALERT_SCRIPT_WIN"
+
+# ------------------------------------------------------------------------------
+# 12. Clean Up Disposable Test Database Schema & Workspace
 # ------------------------------------------------------------------------------
 psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -c "DROP SCHEMA IF EXISTS flowdesk_drill_src CASCADE;" >/dev/null
 rm -rf "$DRILL_ROOT"

@@ -20,7 +20,7 @@
             │
             ▼
  [ offsite-replication.sh ]
-   1. Client-Side AES-256-CBC Encryption (PBKDF2, 100k iter, Salted)
+   1. Client-Side GPG OpenPGP Symmetric AES-256 Encryption (MDC Authenticated, S2K)
    2. Cryptographic SHA-256 Sidecar Generation
             │
             ▼ (Encrypted HTTPS Payload)
@@ -94,7 +94,7 @@ Follow these exact steps to rebuild FlowDesk from scratch on a new VM:
 
 ### Step 1: Initialize New Host & Install Prerequisites
 ```bash
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 openssl tar gzip
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 gnupg tar gzip
 ```
 
 ### Step 2: Fetch Encrypted Archive from Offsite Object Store

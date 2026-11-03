@@ -96,12 +96,12 @@ groups:
           action: "Inspect garbage collection frequency and review JVM heap limit (-Xmx) allocation."
       # 8. Automated Backup & Disaster Recovery Freshness
       - alert: FlowDeskBackupMissingOrFailed
-        expr: (time() - flowdesk_backup_last_success_timestamp > 93600) or (flowdesk_backup_status == 0)
+        expr: (time() - flowdesk_backup_last_success_timestamp > 93600) or (flowdesk_backup_status == 0) or (absent(flowdesk_backup_collector_healthy) == 1)
         for: 15m
         labels:
           severity: critical
           service: flowdesk-backup
         annotations:
-          summary: "FlowDesk production backup is missing or failed"
-          description: "No successful FlowDesk backup has completed in the last 26 hours, or the last backup attempt failed."
+          summary: "FlowDesk production backup is missing, failed, or collector offline"
+          description: "No successful FlowDesk backup has completed in the last 26 hours, the last backup attempt failed, or the backup metric collector is offline."
           action: "Check systemd journal on host: journalctl -u flowdesk-backup.service -xe"

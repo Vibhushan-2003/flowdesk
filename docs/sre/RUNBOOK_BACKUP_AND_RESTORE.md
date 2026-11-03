@@ -19,17 +19,17 @@ A standard uncoordinated `pg_dump` and independent `tar` cannot guarantee transa
 
 ### Supported Consistency Strategies
 
-#### Strategy A: `verified_snapshot` (Default, Zero-Downtime)
-1. **Transactional Database Snapshot:** Dumps PostgreSQL using native `pg_dump --single-transaction --clean --if-exists`.
+#### Strategy A: `verified_snapshot` (Default, High Availability)
+1. **Transactional Database Snapshot:** Dumps PostgreSQL using native `pg_dump --clean --if-exists --no-owner --no-privileges` (PostgreSQL executes dumps in a single snapshot transaction).
 2. **Attachment Storage Snapshot:** Gzips all files from `/app/data/attachments`.
-3. **Cross-Referential Mathematical Audit:** Queries `ticket_attachments` in the database dump for all active attachments (`status != 'DELETED'`), extracts the attachment archive into a temporary verification sandbox, and verifies that **every single attachment exists and matches its recorded `checksum_sha256`**.
-4. **Atomic Publication:** If any file is missing or corrupted, the backup aborts immediately, deletes the staging directory, and exits with a non-zero code.
+3. **Cross-Referential Snapshot Audit:** Parses `ticket_attachments` directly from the frozen database dump file (`database.sql.gz`) for all active attachments (`status != 'DELETED'`), extracts the attachment archive into a temporary verification sandbox, and cryptographically verifies that **every single attachment referenced in the dump exists and matches its recorded `checksum_sha256`**.
+4. **Atomic Publication:** If any file is missing or corrupted, the backup aborts immediately, deletes the staging directory, records a failure metric for Prometheus, and exits with a non-zero code.
 
 #### Strategy B: `quiescence` (Scheduled Low-Traffic Window)
 1. Executes `docker pause flowdesk-prod-backend` to freeze in-flight HTTP requests and database write transactions.
 2. Dumps PostgreSQL and archives attachments while the application is quiescent.
 3. Resumes backend with `docker unpause flowdesk-prod-backend` in a guaranteed `trap` cleanup handler.
-4. Executes the cross-referential mathematical audit.
+4. Executes the cross-referential snapshot audit against the dump file.
 
 ---
 
@@ -161,14 +161,14 @@ When configured with `METRICS_DIR=/var/lib/node_exporter/textfile_collector`, th
 Add to [`monitoring/prometheus/alert_rules.yml`](file:///C:/Users/gvibh/Projects/flowdesk/monitoring/prometheus/alert_rules.yml):
 ```yaml
 - alert: FlowDeskBackupMissingOrFailed
-  expr: (time() - flowdesk_backup_last_success_timestamp > 93600) or (flowdesk_backup_status == 0)
+  expr: (time() - flowdesk_backup_last_success_timestamp > 93600) or (flowdesk_backup_status == 0) or (absent(flowdesk_backup_collector_healthy) == 1)
   for: 15m
   labels:
     severity: critical
     service: flowdesk-backup
   annotations:
     summary: "FlowDesk production backup is missing or failed"
-    description: "No successful FlowDesk backup has completed in the last 26 hours, or the last backup attempt failed."
+    description: "No successful FlowDesk backup has completed in the last 26 hours, or the last backup attempt failed, or the metrics collector is down."
     action: "Check systemd journal on host: journalctl -u flowdesk-backup.service -xe"
 ```
 

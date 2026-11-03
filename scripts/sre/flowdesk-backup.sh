@@ -7,8 +7,8 @@
 #
 # Supported Consistency Strategies:
 #   1. verified_snapshot (Default): Captures database and attachment snapshots,
-#      then mathematically verifies that every active attachment referenced in
-#      the database dump exists on disk with matching SHA-256 checksum.
+#      then cryptographically and referentially verifies that every active attachment
+#      referenced in the frozen database dump exists with matching SHA-256 checksum.
 #   2. quiescence: Temporarily pauses the backend container during snapshot
 #      creation to guarantee zero write operations in flight, followed by
 #      referential consistency verification.
@@ -79,6 +79,18 @@ cleanup() {
     flock -u 200 2>/dev/null || true
     if [ $exit_code -ne 0 ]; then
         log_error "FlowDesk backup aborted with failure code $exit_code."
+        if [ -n "$METRICS_DIR" ] && [ -d "$METRICS_DIR" ]; then
+            cat > "${METRICS_DIR}/flowdesk_backup.prom.$$" <<EOF
+# HELP flowdesk_backup_status Binary indicator of last backup run (1 = success, 0 = failure)
+# TYPE flowdesk_backup_status gauge
+flowdesk_backup_status 0
+# HELP flowdesk_backup_collector_healthy Binary indicator of collector health
+# TYPE flowdesk_backup_collector_healthy gauge
+flowdesk_backup_collector_healthy 1
+EOF
+            mv "${METRICS_DIR}/flowdesk_backup.prom.$$" "${METRICS_DIR}/flowdesk_backup.prom" 2>/dev/null || true
+            chmod 644 "${METRICS_DIR}/flowdesk_backup.prom" 2>/dev/null || true
+        fi
     fi
 }
 trap cleanup EXIT ERR INT TERM
@@ -304,14 +316,43 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# Cross-Referential Consistency Verification
+# Snapshot Referential Consistency Verification
 # ------------------------------------------------------------------------------
-log_info "Verifying database and attachment cross-referential consistency..."
+log_info "Verifying database and attachment referential consistency directly from captured snapshot..."
 
-# Query database for all active ticket attachments
-DB_ATTACHMENTS_LIST=$(execute_sql "SELECT storage_key, checksum_sha256 FROM ticket_attachments WHERE status != 'DELETED' ORDER BY storage_key;")
-TOTAL_ACTIVE_ATTACHMENTS=$(echo "$DB_ATTACHMENTS_LIST" | grep -v '^$' | wc -l || true)
-log_info "Database records ${TOTAL_ACTIVE_ATTACHMENTS} active attachments."
+# Extract active attachment references directly from the database dump file (database.sql.gz)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if command -v python3 >/dev/null 2>&1 && [ -f "$SCRIPT_DIR/extract_dump_attachments.py" ]; then
+    DB_ATTACHMENTS_LIST=$(python3 "$SCRIPT_DIR/extract_dump_attachments.py" "$DB_DUMP_FILE")
+elif command -v python >/dev/null 2>&1 && [ -f "$SCRIPT_DIR/extract_dump_attachments.py" ]; then
+    DB_ATTACHMENTS_LIST=$(python "$SCRIPT_DIR/extract_dump_attachments.py" "$DB_DUMP_FILE")
+else
+    # Fallback to direct dump parsing via awk
+    DB_ATTACHMENTS_LIST=$(gunzip -c "$DB_DUMP_FILE" | awk -F'\t' '
+        BEGIN { in_copy = 0; k_idx = -1; s_idx = -1; stat_idx = -1; }
+        !in_copy && /^COPY .*ticket_attachments/ {
+            in_copy = 1;
+            match($0, /\((.*)\)/, m);
+            n = split(m[1], cols, ", ");
+            for (i = 1; i <= n; i++) {
+                gsub(/[ "]/, "", cols[i]);
+                if (cols[i] == "storage_key") k_idx = i;
+                if (cols[i] == "checksum_sha256") s_idx = i;
+                if (cols[i] == "status") stat_idx = i;
+            }
+            next;
+        }
+        in_copy && /^\\[.]/ { in_copy = 0; next; }
+        in_copy && k_idx > 0 && s_idx > 0 {
+            status = (stat_idx > 0) ? $stat_idx : "ACTIVE";
+            if (status != "DELETED" && $k_idx != "" && $s_idx != "") {
+                print $k_idx "|" tolower($s_idx);
+            }
+        }
+    ')
+fi
+TOTAL_ACTIVE_ATTACHMENTS=$(echo "$DB_ATTACHMENTS_LIST" | grep -v '^$' | wc -l | tr -d ' ' || true)
+log_info "Database dump contains ${TOTAL_ACTIVE_ATTACHMENTS} active attachment references."
 
 if [ "$TOTAL_ACTIVE_ATTACHMENTS" -gt 0 ]; then
     # Inspect files inside the generated attachments archive
@@ -460,6 +501,9 @@ flowdesk_backup_size_bytes ${TOTAL_BACKUP_BYTES}
 # HELP flowdesk_backup_status Binary indicator of last backup run (1 = success, 0 = failure)
 # TYPE flowdesk_backup_status gauge
 flowdesk_backup_status 1
+# HELP flowdesk_backup_collector_healthy Binary indicator of collector health
+# TYPE flowdesk_backup_collector_healthy gauge
+flowdesk_backup_collector_healthy 1
 EOF
     mv "${METRICS_FILE}.$$" "$METRICS_FILE"
     chmod 644 "$METRICS_FILE"
