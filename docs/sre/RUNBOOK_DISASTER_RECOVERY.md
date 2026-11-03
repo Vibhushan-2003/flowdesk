@@ -145,7 +145,10 @@ RESTORED_DIR=$(find /var/backups/flowdesk/restored_staging -maxdepth 2 -name "ma
 ```bash
 docker compose -f docker-compose.prod.yml up -d
 # Validate readiness
-curl -fsS http://localhost:8080/api/health/ready
+# Validate readiness via edge HTTPS reverse proxy (or container probe):
+curl -k -fsS https://${CADDY_DOMAIN:-localhost}/api/health/ready
+# Or probe directly inside backend container:
+docker exec flowdesk-prod-backend wget -qO- http://127.0.0.1:8080/api/health/ready
 ```
 
 ---
