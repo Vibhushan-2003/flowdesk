@@ -1,0 +1,35 @@
+[Unit]
+Description=FlowDesk Production Automated Backup & Disaster Recovery
+Documentation=file:///opt/flowdesk/docs/sre/RUNBOOK_BACKUP_AND_RESTORE.md
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+
+# Security Sandboxing
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+NoNewPrivileges=true
+ReadWritePaths=/var/backups/flowdesk /tmp /var/lib/node_exporter/textfile_collector
+
+# Load Production Environment Configuration
+EnvironmentFile=-/etc/flowdesk/backup.env
+
+# Execute FlowDesk Backup Orchestrator
+ExecStart=/opt/flowdesk/scripts/sre/flowdesk-backup.sh
+
+# Logging & Resource Governance
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=flowdesk-backup
+TimeoutStartSec=1800
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target
+
