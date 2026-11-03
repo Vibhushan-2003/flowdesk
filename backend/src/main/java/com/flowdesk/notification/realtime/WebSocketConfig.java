@@ -49,9 +49,14 @@ public class WebSocketConfig
             StompEndpointRegistry registry
     ) {
 
+        String[] origins = java.util.Arrays.stream(allowedOrigin.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toArray(String[]::new);
+
         registry
                 .addEndpoint("/ws")
-                .setAllowedOrigins(allowedOrigin);
+                .setAllowedOrigins(origins);
     }
 
     @Override

@@ -45,18 +45,45 @@ public class AdminBootstrapRunner implements ApplicationRunner, Ordered {
             return;
         }
 
-        log.info("Explicit FlowDesk initial administrator bootstrap requested.");
+        log.info("Explicit FlowDesk initial administrator bootstrap requested (cli={}, property={}).",
+                requestedViaCli, enabledViaProperty);
 
         try {
-            bootstrapService.provisionFirstAdmin(properties);
-            log.info("Administrator provisioning completed successfully.");
-            log.info("Terminating application process after successful bootstrap (exit code 0).");
-            initiateExit(0);
-        } catch (Exception e) {
-            log.error("Administrator bootstrap failed: {}", e.getMessage());
-            log.info("Terminating application process after bootstrap failure (exit code 1).");
-            initiateExit(1);
+            if (requestedViaCli) {
+                // Existing OCI CLI bootstrap behavior: one-shot command that terminates the JVM
+                try {
+                    bootstrapService.provisionFirstAdmin(properties);
+                    log.info("Administrator provisioning completed successfully.");
+                    log.info("Terminating application process after successful bootstrap (exit code 0).");
+                    initiateExit(0);
+                } catch (Exception e) {
+                    log.error("Administrator bootstrap failed: {}", e.getMessage());
+                    log.info("Terminating application process after bootstrap failure (exit code 1).");
+                    initiateExit(1);
+                }
+            } else {
+                // In-service web service mode (Render / long-running service):
+                // Idempotent and does NOT terminate the running web application.
+                if (bootstrapService.hasExistingUsers()) {
+                    log.info("Database already contains existing user(s). Initial administrator bootstrap skipped; continuing web application startup.");
+                } else {
+                    try {
+                        bootstrapService.provisionFirstAdmin(properties);
+                        log.info("Administrator provisioning completed successfully via web service startup. Continuing web application startup.");
+                    } catch (AdminBootstrapException e) {
+                        log.error("In-service administrator bootstrap failed: {}", e.getMessage());
+                        throw new IllegalStateException("Initial administrator bootstrap failed: " + e.getMessage(), e);
+                    }
+                }
+            }
+        } finally {
+            clearCredentials();
         }
+    }
+
+    private void clearCredentials() {
+        properties.setPassword(null);
+        properties.setEnabled(false);
     }
 
     void initiateExit(int exitCode) {

@@ -17,6 +17,15 @@ public class AttachmentStorageProperties {
     private Local local = new Local();
     private long maxFileSizeBytes = DEFAULT_MAX_FILE_SIZE_BYTES;
     private int maxAttachmentsPerTicket = DEFAULT_MAX_ATTACHMENTS_PER_TICKET;
+    private boolean uploadEnabled = true;
+
+    public boolean isUploadEnabled() {
+        return uploadEnabled;
+    }
+
+    public void setUploadEnabled(boolean uploadEnabled) {
+        this.uploadEnabled = uploadEnabled;
+    }
 
     public Local getLocal() {
         return local;

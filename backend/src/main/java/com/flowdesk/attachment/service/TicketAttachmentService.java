@@ -118,6 +118,12 @@ public class TicketAttachmentService {
             InputStream contentStream,
             long declaredSize
     ) {
+        if (!properties.isUploadEnabled()) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Attachment uploads are disabled in temporary demo environment due to ephemeral storage and absence of certified malware scanning infrastructure."
+            );
+        }
         String normalizedTicketNumber = normalizeTicketNumber(ticketNumber);
         User actor = findUser(employeeId);
 
@@ -142,6 +148,12 @@ public class TicketAttachmentService {
             InputStream contentStream,
             long declaredSize
     ) {
+        if (!properties.isUploadEnabled()) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Attachment uploads are disabled in temporary demo environment due to ephemeral storage and absence of certified malware scanning infrastructure."
+            );
+        }
         String normalizedTicketNumber = normalizeTicketNumber(ticketNumber);
         User actor = findUser(supportEngineerId);
 
@@ -255,6 +267,12 @@ public class TicketAttachmentService {
             InputStream contentStream,
             long declaredSize
     ) {
+        if (!properties.isUploadEnabled()) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Attachment uploads are disabled in temporary demo environment due to ephemeral storage and absence of certified malware scanning infrastructure."
+            );
+        }
         StoredFile storedFile = null;
         try {
             // 1. Stream into private storage under opaque key with bounded memory
@@ -489,6 +507,12 @@ public class TicketAttachmentService {
     }
 
     private void ensureUploadAllowed(Ticket ticket) {
+        if (!properties.isUploadEnabled()) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Attachment uploads are disabled in temporary demo environment due to ephemeral storage and absence of certified malware scanning infrastructure."
+            );
+        }
         TicketStatus status = ticket.getStatus();
         if (status == TicketStatus.RESOLVED || status == TicketStatus.CLOSED || status == TicketStatus.CANCELLED) {
             throw new ResponseStatusException(
