@@ -1,0 +1,14 @@
+# ==============================================================================
+# FlowDesk Daily Backup Cron Configuration
+# ==============================================================================
+# Location on Linux Host: /etc/cron.d/flowdesk-backup
+# Permissions: chmod 644 /etc/cron.d/flowdesk-backup
+#
+# Execution: Runs every night at 02:00 UTC with flock concurrency guard.
+# ==============================================================================
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+0 2 * * * root [ -f /etc/flowdesk/backup.env ] && set -a && . /etc/flowdesk/backup.env && set +a; /opt/flowdesk/scripts/sre/flowdesk-backup.sh >> /var/log/flowdesk/backup.log 2>&1
+

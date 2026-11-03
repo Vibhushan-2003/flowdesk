@@ -1,0 +1,16 @@
+[Unit]
+Description=Daily FlowDesk Production Backup Timer
+Documentation=file:///opt/flowdesk/docs/sre/RUNBOOK_BACKUP_AND_RESTORE.md
+
+[Timer]
+# Run every night at 02:00 UTC
+OnCalendar=*-*-* 02:00:00 UTC
+# If server was asleep or offline during scheduled run, execute immediately on boot
+Persistent=true
+# Apply randomized jitter up to 15 minutes to prevent cluster/disk resource contention
+RandomizedDelaySec=15m
+Unit=flowdesk-backup.service
+
+[Install]
+WantedBy=timers.target
+
