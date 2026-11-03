@@ -1,0 +1,97 @@
+# ==============================================================================
+# FlowDesk Prometheus SRE Alerting Rules
+# ==============================================================================
+# Initial practical Service Level Indicators (SLIs) and Alert Objectives (SLOs)
+# for FlowDesk single-VM Oracle Cloud Always Free deployment.
+# ==============================================================================
+
+groups:
+  - name: flowdesk_sre_alerts
+    rules:
+      # 1. Availability SLI / SLO: Backend Liveness & Uptime
+      - alert: FlowDeskBackendDown
+        expr: up{job="flowdesk-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: flowdesk-backend
+        annotations:
+          summary: "FlowDesk backend web application is unreachable"
+          description: "Prometheus has failed to scrape the backend actuator endpoint for more than 1 minute."
+          action: "Inspect Docker container status and logs: docker compose -f docker-compose.prod.yml logs backend"
+
+      # 2. HTTP 5xx Error Rate SLI / SLO: < 0.5% target under normal load
+      - alert: FlowDeskHighHttp5xxRate
+        expr: >-
+          (sum(rate(http_server_requests_seconds_count{status=~"5.."}[2m]))
+           /
+           sum(rate(http_server_requests_seconds_count[2m])) * 100) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: flowdesk-backend
+        annotations:
+          summary: "HTTP 5xx server error rate exceeds 5%"
+          description: "More than 5% of all HTTP requests resulted in 5xx server errors over the last 2 minutes."
+          action: "Check backend application logs for unhandled exceptions or database disconnections."
+
+      # 3. Latency SLI / SLO: 95th percentile under 500ms normal, alert at > 1.0s
+      - alert: FlowDeskHighLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[5m])) by (le)) > 1.0
+        for: 3m
+        labels:
+          severity: warning
+          service: flowdesk-backend
+        annotations:
+          summary: "P95 request latency exceeds 1000ms"
+          description: "95th percentile HTTP request latency is above 1.0 second for 3 consecutive minutes."
+          action: "Review database connection pool latency, slow queries, and CPU utilization."
+
+      # 4. Database Connection Pool Saturation & Starvation
+      - alert: FlowDeskHikariPoolExhaustionRisk
+        expr: (hikaricp_connections_pending > 0) and (hikaricp_connections_active == hikaricp_connections_max)
+        for: 1m
+        labels:
+          severity: critical
+          service: flowdesk-database
+        annotations:
+          summary: "HikariCP database connection pool is completely saturated"
+          description: "All database connections are actively leased and threads are waiting for connections."
+          action: "Check for unclosed transactions or increase DB_POOL_MAX_SIZE if memory permits."
+
+      # 5. Malware Scanner Availability: Fail-Closed Protection
+      - alert: FlowDeskClamAvScannerUnavailable
+        expr: flowdesk_clamav_available == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: flowdesk-clamav
+        annotations:
+          summary: "ClamAV malware scanner daemon is unavailable"
+          description: "FlowDesk cannot reach the ClamAV daemon. Ticket attachment uploads will fail closed."
+          action: "Check ClamAV daemon container logs and signature update memory consumption."
+
+      # 6. Disk Storage Pressure: Minimum 15% Free Space
+      - alert: FlowDeskDiskSpaceLow
+        expr: (disk_free_bytes / disk_total_bytes) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+          service: flowdesk-storage
+        annotations:
+          summary: "Available disk space is below 15%"
+          description: "Disk storage for attachments or database volumes has less than 15% free headroom."
+          action: "Prune unused Docker images/volumes and inspect /app/data/attachments volume growth."
+
+      # 7. JVM Heap Memory Saturation
+      - alert: FlowDeskHighJvmHeapUsage
+        expr: (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) * 100 > 85
+        for: 3m
+        labels:
+          severity: warning
+          service: flowdesk-backend
+        annotations:
+          summary: "JVM heap memory utilization exceeds 85%"
+          description: "Backend JVM heap memory usage has remained above 85% for 3 minutes."
+          action: "Inspect garbage collection frequency and review JVM heap limit (-Xmx) allocation."
+

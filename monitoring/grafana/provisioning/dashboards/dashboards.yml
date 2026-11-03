@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: "FlowDesk SRE Dashboards"
+    orgId: 1
+    folder: "FlowDesk"
+    type: file
+    disableDeletion: true
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
+

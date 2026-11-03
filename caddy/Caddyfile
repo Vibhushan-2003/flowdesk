@@ -43,6 +43,13 @@
 		respond "OK" 200
 	}
 
+	# Operational & Actuator Endpoints - Strictly Blocked at Edge
+	# Prevents public external callers from probing internal metrics or actuator.
+	# Prometheus scrapes backend directly over the private internal Docker bridge network.
+	handle /actuator* {
+		respond "Not Found" 404
+	}
+
 	# REST API Endpoints -> Spring Boot Backend
 	# Caddy sanitizes client headers: X-Forwarded-For is explicitly set to {remote_host},
 	# completely stripping any client-forged prefix before forwarding to Tomcat.
