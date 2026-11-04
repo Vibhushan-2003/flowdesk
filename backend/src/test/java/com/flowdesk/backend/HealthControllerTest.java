@@ -85,4 +85,16 @@ class HealthControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody()).containsEntry("status", "UNAVAILABLE");
     }
+
+    @Test
+    @DisplayName("Version probe /api/health/version returns 200 with status UP and commit metadata")
+    void versionReturnsOkWithMetadata() {
+        HealthController controller = new HealthController(null);
+        ResponseEntity<Map<String, String>> response = controller.version();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsEntry("status", "UP");
+        assertThat(response.getBody()).containsKey("commit");
+        assertThat(response.getBody()).containsKey("branch");
+    }
 }
