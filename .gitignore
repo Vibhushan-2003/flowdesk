@@ -24,3 +24,7 @@ id_ed25519*
 
 # Private attachment local storage
 data/
+
+# Python
+__pycache__/
+*.py[cod]

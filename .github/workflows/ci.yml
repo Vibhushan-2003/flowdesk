@@ -10,6 +10,14 @@ on:
     branches:
       - main
 
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Target environment to verify (render / custom)"
+        required: false
+        default: "render"
+        type: string
+
 jobs:
   backend:
     name: Backend Build & Test
@@ -81,6 +89,10 @@ jobs:
       - name: Run lint
         working-directory: frontend
         run: npm run lint
+
+      - name: Run dependency security audit
+        working-directory: frontend
+        run: npm audit --audit-level=high
 
       - name: Build frontend
         working-directory: frontend
@@ -241,3 +253,19 @@ jobs:
           name: playwright-live-report
           path: frontend/playwright-live-report/
           retention-days: 7
+
+  verify-live:
+    name: Live Deployment Verification
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run live deployment verification
+        run: python scripts/sre/verify_live_deployment.py --expected-commit "${{ github.sha }}"

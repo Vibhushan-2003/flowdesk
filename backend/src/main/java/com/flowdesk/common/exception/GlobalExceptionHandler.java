@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.flowdesk.attachment.storage.StorageException;
 import com.flowdesk.attachment.storage.StoragePathTraversalException;
@@ -235,6 +236,19 @@ public class GlobalExceptionHandler {
         return buildError(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Storage operation failed",
+                request,
+                Map.of()
+        );
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResourceFound(
+            NoResourceFoundException exception,
+            HttpServletRequest request
+    ) {
+        return buildError(
+                HttpStatus.NOT_FOUND,
+                "Resource not found",
                 request,
                 Map.of()
         );
