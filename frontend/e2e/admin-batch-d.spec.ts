@@ -166,6 +166,70 @@ test.describe('FlowDesk Horizon Batch D — Admin, SLA & Attachment Security Jou
     await expect(page.getByRole('heading', { name: /invite new user/i })).not.toBeVisible()
   })
 
+  test('User Management: resending invitation returns shareable link and opens link modal when email disabled', async ({ page }) => {
+    await setupApiMocks(page, MOCK_ADMIN)
+    const token = createMockToken(MOCK_ADMIN)
+    await page.addInitScript((t) => {
+      sessionStorage.setItem('flowdesk_access_token', t)
+    }, token)
+
+    await page.route('**/api/admin/users?*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          content: [
+            {
+              id: 'user-invited-001',
+              email: 'invited.user@flowdesk.test',
+              firstName: 'Invited',
+              lastName: 'User',
+              status: 'INVITED',
+              roles: ['EMPLOYEE'],
+              createdAt: '2026-11-01T10:00:00Z',
+            },
+          ],
+          page: 0,
+          size: 10,
+          totalElements: 1,
+          totalPages: 1,
+          first: true,
+          last: true,
+        }),
+      })
+    })
+
+    await page.route('**/api/admin/users/user-invited-001/invitations/resend', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Invitation re-issued for "invited.user@flowdesk.test".',
+          invitationUrl: 'http://localhost:5173/accept-invitation?token=mock-secure-token-12345',
+        }),
+      })
+    })
+
+    await page.goto('/admin/users')
+    await expect(page.getByRole('heading', { name: /user management/i })).toBeVisible()
+    await expect(page.getByRole('table').getByText('invited.user@flowdesk.test')).toBeVisible()
+
+    // Click Resend Invitation button
+    await page.getByRole('table').getByRole('button', { name: /^resend$/i }).click()
+
+    // Verify Invitation Link Ready modal opens
+    await expect(page.getByRole('heading', { name: /invitation link ready/i })).toBeVisible()
+    await expect(page.getByText(/outbound email is disabled/i)).toBeVisible()
+    await expect(page.getByText('Invited User (invited.user@flowdesk.test)')).toBeVisible()
+
+    const linkInput = page.locator('#invitation-url-input')
+    await expect(linkInput).toHaveValue('http://localhost:5173/accept-invitation?token=mock-secure-token-12345')
+
+    // Dismiss modal
+    await page.getByRole('button', { name: /done/i }).click()
+    await expect(page.getByRole('heading', { name: /invitation link ready/i })).not.toBeVisible()
+  })
+
   test('Administrative Attachment Rescan: confirms batch size and displays execution report', async ({ page }) => {
     await setupApiMocks(page, MOCK_ADMIN)
     const token = createMockToken(MOCK_ADMIN)

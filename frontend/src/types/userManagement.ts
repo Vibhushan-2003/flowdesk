@@ -29,6 +29,7 @@ export interface CreateUserInvitationRequest {
 
 export interface ResendInvitationResponse {
   message: string
+  invitationUrl?: string
 }
 
 export interface UpdateUserRolesRequest {

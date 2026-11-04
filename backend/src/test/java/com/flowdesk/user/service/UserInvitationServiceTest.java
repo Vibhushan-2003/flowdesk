@@ -9,6 +9,7 @@ import com.flowdesk.email.model.EmailDeliveryResult;
 import com.flowdesk.email.model.EmailDeliveryStatus;
 import com.flowdesk.email.model.EmailMessage;
 import com.flowdesk.email.service.EmailSender;
+import com.flowdesk.email.config.EmailProperties;
 import com.flowdesk.email.template.EmailTemplateService;
 import com.flowdesk.user.config.UserInvitationProperties;
 import com.flowdesk.user.domain.Role;
@@ -45,6 +46,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -327,6 +329,7 @@ class UserInvitationServiceTest {
 
             assertNotNull(response);
             assertEquals("Invitation resent successfully", response.message());
+            assertNull(response.invitationUrl(), "When email is enabled, invitationUrl must be null");
 
             // Verify previous tokens invalidated
             verify(userInvitationRepository).invalidateActiveInvitationsForUser(eq(targetUserId), any(Instant.class));
@@ -343,6 +346,104 @@ class UserInvitationServiceTest {
                     eq("invited@flowdesk.test"),
                     any()
             );
+        }
+
+
+        @Test
+        @DisplayName("Should include invitationUrl in resend response when outbound email is disabled")
+        void shouldIncludeInvitationUrlWhenEmailDisabled() {
+            EmailProperties emailProps = new EmailProperties();
+            emailProps.setEnabled(false);
+
+            UserInvitationService customService = new UserInvitationService(
+                    userRepository,
+                    userInvitationRepository,
+                    roleRepository,
+                    passwordEncoder,
+                    emailSender,
+                    emailTemplateService,
+                    properties,
+                    auditService,
+                    emailProps
+            );
+
+            UUID targetUserId = UUID.randomUUID();
+            User invitedUser = User.createInvitedUser("invited@flowdesk.test", "Bob", "Smith", "!INVITED!xyz");
+            ReflectionTestUtils.setField(invitedUser, "id", targetUserId);
+
+            when(userRepository.findByIdForUpdate(targetUserId)).thenReturn(Optional.of(invitedUser));
+            when(userRepository.findWithRolesById(actorAdminId)).thenReturn(Optional.of(actorAdmin));
+            when(emailTemplateService.buildUserInvitationEmail(any(), any(), any(), any()))
+                    .thenReturn(EmailMessage.builder().to("invited@flowdesk.test").subject("Invite").textBody("Body").build());
+
+            ResendInvitationResponse response = customService.resendInvitation(targetUserId, actorAdminId);
+
+            assertNotNull(response);
+            assertEquals("Invitation resent successfully", response.message());
+            assertNotNull(response.invitationUrl(), "When email is disabled, invitationUrl must be returned");
+            assertTrue(response.invitationUrl().startsWith("http://localhost:5173/accept-invitation?token="));
+
+            // Extract the raw token from the URL
+            String rawToken = response.invitationUrl().substring(response.invitationUrl().indexOf("token=") + 6);
+            assertFalse(rawToken.isBlank());
+
+            // Capture the saved UserInvitation and verify token was stored hashed, NOT in raw format
+            ArgumentCaptor<UserInvitation> invitationCaptor = ArgumentCaptor.forClass(UserInvitation.class);
+            verify(userInvitationRepository).save(invitationCaptor.capture());
+            UserInvitation savedInvitation = invitationCaptor.getValue();
+            assertNotEquals(rawToken, savedInvitation.getTokenHash());
+            assertEquals(64, savedInvitation.getTokenHash().length()); // SHA-256 hex string
+
+            // Capture audit action and verify raw token is NOT in audit metadata
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<Map<String, Object>> auditCaptor = ArgumentCaptor.forClass(Map.class);
+            verify(auditService).recordUserAction(
+                    eq(actorAdmin),
+                    eq(AuditAction.USER_INVITATION_RESENT),
+                    eq(AuditTargetType.USER),
+                    eq(targetUserId),
+                    eq("invited@flowdesk.test"),
+                    auditCaptor.capture()
+            );
+            Map<String, Object> auditMetadata = auditCaptor.getValue();
+            assertFalse(auditMetadata.containsKey("token"));
+            assertFalse(auditMetadata.containsKey("invitationUrl"));
+            assertFalse(auditMetadata.containsValue(rawToken));
+        }
+
+        @Test
+        @DisplayName("Should omit invitationUrl in resend response when outbound email is enabled")
+        void shouldOmitInvitationUrlWhenEmailEnabled() {
+            EmailProperties emailProps = new EmailProperties();
+            emailProps.setEnabled(true);
+
+            UserInvitationService customService = new UserInvitationService(
+                    userRepository,
+                    userInvitationRepository,
+                    roleRepository,
+                    passwordEncoder,
+                    emailSender,
+                    emailTemplateService,
+                    properties,
+                    auditService,
+                    emailProps
+            );
+
+            UUID targetUserId = UUID.randomUUID();
+            User invitedUser = User.createInvitedUser("invited@flowdesk.test", "Bob", "Smith", "!INVITED!xyz");
+            ReflectionTestUtils.setField(invitedUser, "id", targetUserId);
+
+            when(userRepository.findByIdForUpdate(targetUserId)).thenReturn(Optional.of(invitedUser));
+            when(userRepository.findWithRolesById(actorAdminId)).thenReturn(Optional.of(actorAdmin));
+            when(emailTemplateService.buildUserInvitationEmail(any(), any(), any(), any()))
+                    .thenReturn(EmailMessage.builder().to("invited@flowdesk.test").subject("Invite").textBody("Body").build());
+            when(emailSender.send(any())).thenReturn(EmailDeliveryResult.accepted("msg-3", "invited@flowdesk.test"));
+
+            ResendInvitationResponse response = customService.resendInvitation(targetUserId, actorAdminId);
+
+            assertNotNull(response);
+            assertEquals("Invitation resent successfully", response.message());
+            assertNull(response.invitationUrl(), "When email is enabled, invitationUrl must NOT be included in the response");
         }
 
         @Test
