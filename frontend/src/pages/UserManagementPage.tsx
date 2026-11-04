@@ -5,7 +5,9 @@ import {
 } from 'react'
 import {
   AlertCircle,
+  Check,
   CheckCircle2,
+  Copy,
   Mail,
   Plus,
   RefreshCw,
@@ -53,6 +55,13 @@ const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrator',
 }
 
+interface ShareableInvitation {
+  userId: string
+  userEmail: string
+  userName: string
+  invitationUrl: string
+}
+
 export function UserManagementPage() {
   const { accessToken, user } = useAuth()
 
@@ -90,6 +99,8 @@ export function UserManagementPage() {
   const [isInviting, setIsInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [isResendingId, setIsResendingId] = useState<string | null>(null)
+  const [shareableInvitation, setShareableInvitation] = useState<ShareableInvitation | null>(null)
+  const [hasCopiedLink, setHasCopiedLink] = useState(false)
 
   // Edit Roles Modal state
   const [roleModalUser, setRoleModalUser] = useState<AdminUserResponse | null>(null)
@@ -307,8 +318,29 @@ export function UserManagementPage() {
     setError(null)
 
     try {
-      await resendInvitation(accessToken, targetUser.id)
-      setSuccessMessage(`Invitation re-issued for "${targetUser.email}".`)
+      const response = await resendInvitation(accessToken, targetUser.id)
+      const targetName = `${targetUser.firstName} ${targetUser.lastName}`.trim() || targetUser.email
+
+      if (response.invitationUrl) {
+        setShareableInvitation({
+          userId: targetUser.id,
+          userEmail: targetUser.email,
+          userName: targetName,
+          invitationUrl: response.invitationUrl,
+        })
+        setHasCopiedLink(false)
+
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(response.invitationUrl)
+            .then(() => setHasCopiedLink(true))
+            .catch(() => {
+              // Ignore clipboard failure on auto-copy
+            })
+        }
+        setSuccessMessage(`Invitation re-issued for "${targetUser.email}". Shareable link generated.`)
+      } else {
+        setSuccessMessage(`Invitation re-issued for "${targetUser.email}".`)
+      }
       setRefreshTrigger((prev) => prev + 1)
     } catch (caughtError) {
       setError(
@@ -317,6 +349,23 @@ export function UserManagementPage() {
     } finally {
       setIsResendingId(null)
     }
+  }
+
+  async function handleCopyShareableLink() {
+    if (!shareableInvitation) return
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(shareableInvitation.invitationUrl)
+        setHasCopiedLink(true)
+      }
+    } catch {
+      // Fallback: clipboard permission denied
+    }
+  }
+
+  function closeShareableInvitationModal() {
+    setShareableInvitation(null)
+    setHasCopiedLink(false)
   }
 
   // Edit Roles Handlers
@@ -1038,6 +1087,102 @@ export function UserManagementPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Modal: Shareable Invitation Link (Zero-SMTP Demo) */}
+      <Modal
+        isOpen={shareableInvitation !== null}
+        onClose={closeShareableInvitationModal}
+        title="Invitation Link Ready"
+        subtitle={shareableInvitation ? `Manual activation link for ${shareableInvitation.userEmail}` : undefined}
+        footer={
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', width: '100%' }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={closeShareableInvitationModal}
+            >
+              Done
+            </Button>
+          </div>
+        }
+      >
+        {shareableInvitation && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div
+              className="horizon-auth-alert horizon-auth-alert--info"
+              role="status"
+              style={{ margin: 0 }}
+            >
+              <Mail size={16} className="horizon-auth-alert-icon" />
+              <div style={{ fontSize: 'var(--font-size-xs)', lineHeight: 'var(--line-height-relaxed)' }}>
+                <strong>Outbound email is disabled</strong> on this environment. Deliver this secure invitation link directly to the recipient to complete account activation or Google sign-in.
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: '0.75rem',
+                backgroundColor: 'var(--color-surface-subtle, rgba(0, 0, 0, 0.02))',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.25rem',
+              }}
+            >
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                Target Recipient
+              </div>
+              <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)' }}>
+                {shareableInvitation.userName} ({shareableInvitation.userEmail})
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="invitation-url-input"
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  marginBottom: '6px',
+                }}
+              >
+                Shareable Invitation URL
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  id="invitation-url-input"
+                  type="text"
+                  readOnly
+                  className="horizon-input"
+                  value={shareableInvitation.invitationUrl}
+                  onFocus={(e) => e.target.select()}
+                  style={{ flex: 1, fontFamily: 'monospace', fontSize: 'var(--font-size-xs)' }}
+                />
+                <Button
+                  type="button"
+                  variant={hasCopiedLink ? 'secondary' : 'primary'}
+                  size="sm"
+                  onClick={() => void handleCopyShareableLink()}
+                  leadingIcon={hasCopiedLink ? <Check size={14} /> : <Copy size={14} />}
+                >
+                  {hasCopiedLink ? 'Copied' : 'Copy Link'}
+                </Button>
+              </div>
+              <p
+                style={{
+                  margin: '6px 0 0',
+                  fontSize: 'var(--font-size-xs)',
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
+                This single-use link expires in 24 hours. The token is never stored in browser storage.
+              </p>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Modal: Status Confirmation */}

@@ -9,7 +9,9 @@ import com.flowdesk.email.model.EmailDeliveryResult;
 import com.flowdesk.email.model.EmailDeliveryStatus;
 import com.flowdesk.email.model.EmailMessage;
 import com.flowdesk.email.service.EmailSender;
+import com.flowdesk.email.config.EmailProperties;
 import com.flowdesk.email.template.EmailTemplateService;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.flowdesk.user.config.UserInvitationProperties;
 import com.flowdesk.user.domain.Role;
 import com.flowdesk.user.domain.RoleCode;
@@ -65,6 +67,30 @@ public class UserInvitationService {
     private final EmailTemplateService emailTemplateService;
     private final UserInvitationProperties properties;
     private final AuditService auditService;
+    private final EmailProperties emailProperties;
+
+    @Autowired
+    public UserInvitationService(
+            UserRepository userRepository,
+            UserInvitationRepository userInvitationRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            EmailSender emailSender,
+            EmailTemplateService emailTemplateService,
+            UserInvitationProperties properties,
+            AuditService auditService,
+            @Autowired(required = false) EmailProperties emailProperties
+    ) {
+        this.userRepository = userRepository;
+        this.userInvitationRepository = userInvitationRepository;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.emailSender = emailSender;
+        this.emailTemplateService = emailTemplateService;
+        this.properties = properties;
+        this.auditService = auditService;
+        this.emailProperties = emailProperties;
+    }
 
     public UserInvitationService(
             UserRepository userRepository,
@@ -76,14 +102,8 @@ public class UserInvitationService {
             UserInvitationProperties properties,
             AuditService auditService
     ) {
-        this.userRepository = userRepository;
-        this.userInvitationRepository = userInvitationRepository;
-        this.roleRepository = roleRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.emailSender = emailSender;
-        this.emailTemplateService = emailTemplateService;
-        this.properties = properties;
-        this.auditService = auditService;
+        this(userRepository, userInvitationRepository, roleRepository, passwordEncoder,
+                emailSender, emailTemplateService, properties, auditService, null);
     }
 
     /**
@@ -218,7 +238,12 @@ public class UserInvitationService {
                 properties.getTokenValidityDuration()
         );
 
-        return new ResendInvitationResponse("Invitation resent successfully");
+        // When outbound email delivery is disabled, provide the generated invitation URL to the authenticated administrator
+        // so that the account can be activated without SMTP. In email-enabled production, this remains null.
+        boolean isEmailDisabled = emailProperties != null && !emailProperties.isEnabled();
+        String shareableUrl = isEmailDisabled ? invitationUrl : null;
+
+        return new ResendInvitationResponse("Invitation resent successfully", shareableUrl);
     }
 
     /**

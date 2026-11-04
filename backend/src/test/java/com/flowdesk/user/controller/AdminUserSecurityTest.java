@@ -6,6 +6,7 @@ import com.flowdesk.user.domain.UserStatus;
 import com.flowdesk.user.dto.UserResponse;
 import com.flowdesk.user.service.AdminUserService;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,6 +23,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -29,6 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -277,6 +280,23 @@ class AdminUserSecurityTest {
         mockMvc.perform(post("/api/admin/users/" + TARGET_USER_ID + "/invitations/resend")
                         .with(jwt().jwt(builder -> builder.subject(ACTOR_ADMIN_ID.toString()))
                                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Invitation resent successfully"))
+                .andExpect(jsonPath("$.invitationUrl").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Admin resend invitation includes invitationUrl when outbound email is disabled")
+    void adminResendInvitationIncludesUrlWhenDisabled() throws Exception {
+        String testUrl = "http://localhost:5173/accept-invitation?token=mockToken123";
+        when(userInvitationService.resendInvitation(eq(TARGET_USER_ID), eq(ACTOR_ADMIN_ID)))
+                .thenReturn(new com.flowdesk.user.dto.ResendInvitationResponse("Invitation resent successfully", testUrl));
+
+        mockMvc.perform(post("/api/admin/users/" + TARGET_USER_ID + "/invitations/resend")
+                        .with(jwt().jwt(builder -> builder.subject(ACTOR_ADMIN_ID.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Invitation resent successfully"))
+                .andExpect(jsonPath("$.invitationUrl").value(testUrl));
     }
 }
