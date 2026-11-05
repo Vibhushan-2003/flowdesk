@@ -1,3 +1,4 @@
+import { Bell } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -369,12 +370,7 @@ export function NotificationBell() {
           void handleBellClick()
         }}
       >
-        <span
-          className="notification-bell-icon"
-          aria-hidden="true"
-        >
-          🔔
-        </span>
+        <span className="notification-bell-icon" aria-hidden="true"><Bell size={18} /></span>
 
         {unreadCount > 0 && (
           <span className="notification-badge">

@@ -37,22 +37,34 @@ export function KPIStatCard({
           : undefined
       }
       className={`horizon-kpi-card dashboard-kpi-chip ${
-        alert ? 'dashboard-kpi-chip-alert is-alert' : ''
-      } ${isClickable ? 'is-clickable' : ''} ${className}`}
+        alert ? 'dashboard-kpi-chip-alert is-alert horizon-kpi-card--alert' : ''
+      } ${isClickable ? 'is-clickable horizon-kpi-card--clickable' : ''} ${className}`}
     >
-      <div className="horizon-kpi-top">
-        <span className="horizon-kpi-label dashboard-kpi-label">{label}</span>
+      <div className="horizon-kpi-top horizon-kpi-card__top">
+        <span className="horizon-kpi-label dashboard-kpi-label horizon-kpi-card__title">
+          {label}
+        </span>
         {icon && (
-          <div className="horizon-kpi-icon-wrap" aria-hidden="true">
+          <div
+            className={`horizon-kpi-icon-wrap horizon-kpi-card__icon-wrapper ${
+              alert ? 'horizon-kpi-card__icon-wrapper--danger' : 'horizon-kpi-card__icon-wrapper--primary'
+            }`}
+            aria-hidden="true"
+          >
             {icon}
           </div>
         )}
       </div>
 
-      <div className="horizon-kpi-value dashboard-kpi-value">{value}</div>
+      <div className="horizon-kpi-value dashboard-kpi-value horizon-kpi-card__value">
+        {value}
+      </div>
 
-      {description && <div className="horizon-kpi-desc">{description}</div>}
+      {description && (
+        <div className="horizon-kpi-desc horizon-kpi-card__subtitle">
+          {description}
+        </div>
+      )}
     </div>
   )
 }
-

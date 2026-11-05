@@ -31,13 +31,12 @@ export function Badge({
 }: BadgeProps) {
   return (
     <span
-      className={`horizon-badge horizon-badge-${variant} horizon-badge-${size} ${className}`}
+      className={`horizon-badge horizon-badge--${variant} horizon-badge-${variant} horizon-badge--${size} horizon-badge-${size} ${className}`}
       {...props}
     >
-      {dot && <span className="horizon-badge-dot" aria-hidden="true" />}
-      {icon && <span className="horizon-badge-icon" aria-hidden="true">{icon}</span>}
-      <span className="horizon-badge-label">{children}</span>
+      {dot && <span className="horizon-badge__dot horizon-badge-dot" aria-hidden="true" />}
+      {icon && <span className="horizon-badge__icon horizon-badge-icon" aria-hidden="true">{icon}</span>}
+      <span className="horizon-badge__label horizon-badge-label">{children}</span>
     </span>
   )
 }
-

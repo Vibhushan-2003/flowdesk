@@ -169,7 +169,7 @@ export function CreateTicketPage() {
     <div className="ticket-page horizon-create-ticket-workspace">
       {/* Page Header */}
       <PageHeader
-        title="Create a ticket"
+        title="Create a Ticket"
         subtitle="Report an IT incident or request assistance from IT support."
         actions={
           <Button

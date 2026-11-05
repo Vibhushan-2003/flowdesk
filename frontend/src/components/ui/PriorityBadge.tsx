@@ -12,11 +12,13 @@ function getPriorityVariant(priority: string): 'neutral' | 'primary' | 'warning'
   switch (priority.toUpperCase()) {
     case 'LOW':
       return 'neutral'
+    case 'NORMAL':
     case 'MEDIUM':
       return 'primary'
     case 'HIGH':
       return 'warning'
     case 'CRITICAL':
+    case 'URGENT':
       return 'danger'
     default:
       return 'neutral'

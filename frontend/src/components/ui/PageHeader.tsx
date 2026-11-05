@@ -41,22 +41,21 @@ export function PageHeader({
         </nav>
       )}
 
-      <div className="horizon-page-header-row">
+      <div className="horizon-page-header-row horizon-page-header__main">
         <div className="horizon-page-title-wrap">
-          <div className="horizon-page-title-line">
-            <h1 className="horizon-page-title">{title}</h1>
+          <div className="horizon-page-title-line horizon-page-header__title-row">
+            <h1 className="horizon-page-title horizon-page-header__title">{title}</h1>
             {badge && <div className="horizon-page-title-badge">{badge}</div>}
           </div>
           {subtitle && (
-            <p className="horizon-page-subtitle">{subtitle}</p>
+            <p className="horizon-page-subtitle horizon-page-header__subtitle">{subtitle}</p>
           )}
         </div>
 
         {actions && (
-          <div className="horizon-page-actions">{actions}</div>
+          <div className="horizon-page-actions horizon-page-header__actions">{actions}</div>
         )}
       </div>
     </header>
   )
 }
-

@@ -137,7 +137,7 @@ export function MyTicketsPage() {
     <div className="tickets-page horizon-tickets-workspace">
       {/* Horizon Page Header */}
       <PageHeader
-        title="My tickets"
+        title="My Tickets"
         subtitle="View and track the IT support tickets and service requests you have created."
         actions={
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

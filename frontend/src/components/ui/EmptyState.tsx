@@ -18,13 +18,14 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className={`horizon-empty-state ${className}`}>
-      <div className="horizon-empty-icon" aria-hidden="true">
+      <div className="horizon-empty-icon horizon-empty-state__icon-wrapper" aria-hidden="true">
         {icon}
       </div>
-      <h4 className="horizon-empty-title">{title}</h4>
-      {description && <p className="horizon-empty-desc">{description}</p>}
+      <h4 className="horizon-empty-title horizon-empty-state__title">{title}</h4>
+      {description && (
+        <p className="horizon-empty-desc horizon-empty-state__description">{description}</p>
+      )}
       {action && <div className="horizon-empty-action">{action}</div>}
     </div>
   )
 }
-
