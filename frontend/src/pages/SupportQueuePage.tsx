@@ -24,6 +24,7 @@ import { PriorityBadge } from '../components/ui/PriorityBadge'
 import { DataTable, type Column } from '../components/ui/DataTable'
 import { Pagination } from '../components/ui/Pagination'
 import { EmptyState } from '../components/ui/EmptyState'
+import { KPIStatCard } from '../components/ui/KPIStatCard'
 
 const PAGE_SIZE = 10
 
@@ -265,40 +266,31 @@ export function SupportQueuePage() {
       />
 
       {/* Queue Stat Overview Cards */}
-      <div className="horizon-queue-stats">
-        <div className="horizon-queue-stat-card">
-          <div className="horizon-queue-stat-icon horizon-queue-stat-icon--primary">
-            <Inbox size={22} />
-          </div>
-          <div className="horizon-queue-stat-info">
-            <span className="horizon-queue-stat-label">Open in Queue</span>
-            <span className="horizon-queue-stat-value">{queue?.totalElements ?? 0}</span>
-          </div>
-        </div>
-
-        <div className="horizon-queue-stat-card">
-          <div className="horizon-queue-stat-icon horizon-queue-stat-icon--warning">
-            <Clock size={22} />
-          </div>
-          <div className="horizon-queue-stat-info">
-            <span className="horizon-queue-stat-label">Dispatch Strategy</span>
-            <span className="horizon-queue-stat-value" style={{ fontSize: 'var(--font-size-base)', marginTop: '4px' }}>
-              FIFO (Oldest First)
-            </span>
-          </div>
-        </div>
-
-        <div className="horizon-queue-stat-card">
-          <div className="horizon-queue-stat-icon horizon-queue-stat-icon--success">
-            <UserCheck size={22} />
-          </div>
-          <div className="horizon-queue-stat-info">
-            <span className="horizon-queue-stat-label">Triage Readiness</span>
-            <span className="horizon-queue-stat-value" style={{ fontSize: 'var(--font-size-base)', marginTop: '4px' }}>
-              {queue?.totalElements === 0 ? 'Queue Clear' : 'Action Required'}
-            </span>
-          </div>
-        </div>
+      <div
+        className="horizon-queue-stats"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '16px',
+          marginBottom: '24px',
+        }}
+      >
+        <KPIStatCard
+          label="Open in Queue"
+          value={queue?.totalElements ?? 0}
+          icon={<Inbox size={18} />}
+        />
+        <KPIStatCard
+          label="Dispatch Strategy"
+          value="FIFO (Oldest First)"
+          icon={<Clock size={18} />}
+        />
+        <KPIStatCard
+          label="Triage Readiness"
+          value={queue?.totalElements === 0 ? 'Queue Clear' : 'Action Required'}
+          alert={Boolean(queue?.totalElements && queue.totalElements > 0)}
+          icon={<UserCheck size={18} />}
+        />
       </div>
 
       {/* Notifications and Alerts */}

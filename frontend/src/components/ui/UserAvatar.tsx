@@ -31,13 +31,12 @@ export function UserAvatar({
 
   return (
     <div
-      className={`horizon-avatar horizon-avatar-${size} ${className}`}
+      className={`horizon-avatar horizon-avatar--${size} horizon-avatar-${size} ${className}`}
       title={name || email || 'User'}
       aria-label={name || email || 'User Avatar'}
       {...props}
     >
-      <span className="horizon-avatar-initials">{initials}</span>
+      <span className="horizon-avatar-initials horizon-avatar__initials">{initials}</span>
     </div>
   )
 }
-

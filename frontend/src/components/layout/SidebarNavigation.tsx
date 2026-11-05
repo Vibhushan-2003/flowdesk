@@ -314,7 +314,7 @@ export function SidebarNavigation({
             {(!isCollapsed || isMobile) && (
               <div className="horizon-user-info-text">
                 <span className="horizon-user-email" title={user?.email}>
-                  {user?.email?.split('@')[0]}
+                  {user?.email}
                 </span>
                 <Badge variant="neutral" size="sm" className="horizon-user-role-badge">
                   {primaryRole.replace('_', ' ')}

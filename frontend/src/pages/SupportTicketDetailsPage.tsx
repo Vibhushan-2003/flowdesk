@@ -434,27 +434,7 @@ export function SupportTicketDetailsPage() {
                 Status:
               </span>
               <StatusBadge status={ticket.status} size="md" />
-              {(ticket.status === 'ASSIGNED' || ticket.status === 'IN_PROGRESS' || ticket.status === 'WAITING_FOR_USER') ? (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <PriorityBadge priority={ticket.priority} size="md" />
-                  <select
-                    id="ticket-priority-update-select"
-                    aria-label="Update ticket priority"
-                    className="horizon-select"
-                    style={{ height: '28px', padding: '0 0.5rem', fontSize: 'var(--font-size-xs)', width: 'auto', minWidth: '95px' }}
-                    value={ticket.priority}
-                    disabled={isUpdatingPriority || isUpdating}
-                    onChange={(e) => void handlePriorityChange(e.target.value as TicketPriority)}
-                  >
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                    <option value="CRITICAL">Critical</option>
-                  </select>
-                </div>
-              ) : (
-                <PriorityBadge priority={ticket.priority} size="md" />
-              )}
+              <PriorityBadge priority={ticket.priority} size="md" />
               <Badge variant="neutral" size="md">
                 {formatLabel(ticket.type)}
               </Badge>
@@ -762,6 +742,32 @@ export function SupportTicketDetailsPage() {
                   <Badge variant="neutral" size="sm">
                     {ticket.ticketNumber}
                   </Badge>
+                </div>
+
+                <div className="horizon-context-row">
+                  <span className="horizon-context-row-label">Priority</span>
+                  <span className="horizon-context-row-value">
+                    {(ticket.status === 'ASSIGNED' || ticket.status === 'IN_PROGRESS' || ticket.status === 'WAITING_FOR_USER') ? (
+                      <div className="horizon-select-wrapper" style={{ width: 'auto' }}>
+                        <select
+                          id="ticket-priority-update-select"
+                          aria-label="Update ticket priority"
+                          className="horizon-select"
+                          style={{ height: '30px', padding: '0 1.75rem 0 0.5rem', fontSize: 'var(--font-size-xs)', width: 'auto', minWidth: '105px' }}
+                          value={ticket.priority}
+                          disabled={isUpdatingPriority || isUpdating}
+                          onChange={(e) => void handlePriorityChange(e.target.value as TicketPriority)}
+                        >
+                          <option value="LOW">Low</option>
+                          <option value="MEDIUM">Medium</option>
+                          <option value="HIGH">High</option>
+                          <option value="CRITICAL">Critical</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <PriorityBadge priority={ticket.priority} size="sm" />
+                    )}
+                  </span>
                 </div>
 
                 <div className="horizon-context-row">

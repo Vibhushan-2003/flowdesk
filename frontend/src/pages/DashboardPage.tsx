@@ -18,7 +18,8 @@ import {
   BookOpen,
   HelpCircle,
   AlertTriangle,
-} from 'lucide-react'
+  ArrowRight,
+  } from 'lucide-react'
 
 import { getDashboardStats } from '../api/dashboard'
 import { useAuth } from '../auth/useAuth'
@@ -120,8 +121,11 @@ export function DashboardPage() {
     pendingApprovals: (metrics as unknown as { pendingApprovals?: number | null })?.pendingApprovals ?? null,
   }
 
-  const activeSlaBreachesCount =
-    metrics?.operations?.activeSlaBreaches ?? metrics?.operations?.slaBreaches ?? 0
+  // Safe normalization for operations metrics and breach evaluation
+  const hasOperationsData = Boolean(metrics?.operations)
+  const rawBreaches = metrics?.operations?.activeSlaBreaches ?? metrics?.operations?.slaBreaches
+  const isBreachesKnown = hasOperationsData && typeof rawBreaches === 'number'
+  const activeSlaBreachesCount = isBreachesKnown ? rawBreaches : null
 
   return (
     <div className="dashboard-page horizon-dashboard">
@@ -135,7 +139,7 @@ export function DashboardPage() {
           </Badge>
         }
         actions={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <Button
               variant="outline"
               size="sm"
@@ -156,15 +160,6 @@ export function DashboardPage() {
           </div>
         }
       />
-
-      {/* Account Info Pill */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', margin: '12px 0 20px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-        <span>Signed in as: <strong style={{ color: 'var(--color-text-primary)' }}>{user?.email}</strong></span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-success)' }} />
-          Online & Connected
-        </span>
-      </div>
 
       {/* Loading Shimmer / Banner */}
       {isLoading && (
@@ -195,30 +190,41 @@ export function DashboardPage() {
           ROLE-SPECIFIC KPI METRICS STRIP
           ========================================================= */}
       {metrics && (
-        <div className="dashboard-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', margin: '20px 0 28px' }}>
+        <div
+          className="dashboard-kpi-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '16px',
+            marginBottom: '28px',
+          }}
+        >
           {/* Employee KPI Metrics */}
           {!isSupportEngineer && !canViewOperations && (
             <>
               <KPIStatCard
                 label="Open Tickets"
                 value={employeeData.openTickets}
-                icon={<Inbox size={16} />}
+                icon={<Inbox size={18} />}
+                onClick={() => navigate('/tickets')}
               />
               <KPIStatCard
                 label="Awaiting Your Reply"
                 value={employeeData.ticketsAwaitingResponse}
                 alert={employeeData.ticketsAwaitingResponse > 0}
-                icon={<Clock size={16} />}
+                icon={<Clock size={18} />}
+                onClick={() => navigate('/tickets?status=WAITING_FOR_USER')}
               />
               <KPIStatCard
                 label="Resolved Tickets"
                 value={employeeData.resolvedTickets}
-                icon={<CheckCircle2 size={16} />}
+                icon={<CheckCircle2 size={18} />}
+                onClick={() => navigate('/tickets?status=RESOLVED')}
               />
               <KPIStatCard
                 label="Pending Approvals"
                 value={employeeData.pendingApprovals ?? 0}
-                icon={<CheckSquare size={16} />}
+                icon={<CheckSquare size={18} />}
               />
             </>
           )}
@@ -229,23 +235,27 @@ export function DashboardPage() {
               <KPIStatCard
                 label="My Assigned Work"
                 value={metrics.support?.assignedActiveTickets ?? 0}
-                icon={<UserCheck size={16} />}
+                icon={<UserCheck size={18} />}
+                onClick={() => navigate('/support/tickets')}
               />
               <KPIStatCard
                 label="Unassigned Queue"
                 value={metrics.support?.unassignedQueueTickets ?? 0}
-                icon={<Inbox size={16} />}
+                icon={<Inbox size={18} />}
+                onClick={() => navigate('/support/queue')}
               />
               <KPIStatCard
                 label="Assigned SLA Breaches"
                 value={metrics.support?.assignedSlaBreaches ?? 0}
                 alert={(metrics.support?.assignedSlaBreaches ?? 0) > 0}
-                icon={<AlertTriangle size={16} />}
+                icon={<AlertTriangle size={18} />}
+                onClick={() => navigate('/support/tickets')}
               />
               <KPIStatCard
                 label="My Personal Tickets"
                 value={employeeData.openTickets}
-                icon={<Ticket size={16} />}
+                icon={<Ticket size={18} />}
+                onClick={() => navigate('/tickets')}
               />
             </>
           )}
@@ -256,24 +266,28 @@ export function DashboardPage() {
               <KPIStatCard
                 label="Total Active Tickets"
                 value={metrics.operations?.totalActiveTickets ?? 0}
-                icon={<Ticket size={16} />}
+                icon={<Ticket size={18} />}
+                onClick={() => navigate('/tickets')}
               />
               <KPIStatCard
                 label="Unassigned Queue"
                 value={metrics.operations?.unassignedQueueTickets ?? 0}
-                icon={<Inbox size={16} />}
+                icon={<Inbox size={18} />}
+                onClick={() => navigate('/support/tickets')}
               />
               <KPIStatCard
                 label="Pending Approvals"
                 value={metrics.operations?.pendingApprovals ?? 0}
                 alert={(metrics.operations?.pendingApprovals ?? 0) > 0}
-                icon={<CheckSquare size={16} />}
+                icon={<CheckSquare size={18} />}
+                onClick={() => navigate('/approvals')}
               />
               <KPIStatCard
                 label="Active SLA Breaches"
-                value={activeSlaBreachesCount}
-                alert={activeSlaBreachesCount > 0}
-                icon={<AlertTriangle size={16} />}
+                value={isBreachesKnown ? activeSlaBreachesCount! : (isLoading ? '...' : '—')}
+                alert={Boolean(isBreachesKnown && activeSlaBreachesCount! > 0)}
+                icon={<AlertTriangle size={18} />}
+                onClick={() => navigate('/sla/dashboard')}
               />
             </>
           )}
@@ -286,14 +300,19 @@ export function DashboardPage() {
 
       {/* 1. EMPLOYEE DASHBOARD WORKBENCH */}
       {!isSupportEngineer && !canViewOperations && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
           {/* Main Action Hub */}
-          <Card padded title="IT Support Actions" subtitle="Create new support inquiries or view historical resolutions.">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '10px' }}>
+          <Card
+            padded
+            title="IT Support Actions"
+            subtitle="Create new inquiries, review active issues, or search knowledge base."
+            headerActions={<Badge variant="primary" size="sm">Self-Service</Badge>}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
                 Submit incident reports, hardware requests, software access grants, or network inquiries directly to IT Support.
               </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '8px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                 <Button
                   variant="primary"
                   size="md"
@@ -323,9 +342,14 @@ export function DashboardPage() {
           </Card>
 
           {/* Self-Service & SLAs */}
-          <Card padded title="Self-Service & Response Expectations" subtitle="Find instant solutions and review enterprise turnaround targets.">
+          <Card
+            padded
+            title="Service Level Commitments"
+            subtitle="Enterprise turnaround standards and verified self-help."
+            headerActions={<Badge variant="success" size="sm">SLO Targets</Badge>}
+          >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                 <HelpCircle size={18} style={{ color: 'var(--color-primary)', marginTop: '2px', flexShrink: 0 }} />
                 <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
                   <strong>Need instant answers?</strong> Browse verified self-help articles in the Knowledge Base for password resets, VPN setups, and workstation troubleshooting before opening a ticket.
@@ -333,17 +357,21 @@ export function DashboardPage() {
               </div>
 
               <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--color-border)' }}>
-                  <span>Urgent / High Priority:</span>
-                  <strong>1 Hour Response / 8h Resolution</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
+                  <span>Critical / Urgent Priority:</span>
+                  <strong style={{ color: 'var(--color-danger)' }}>15m Response / 4h Resolution</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--color-border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
+                  <span>High Priority:</span>
+                  <strong style={{ color: 'var(--color-warning)' }}>30m Response / 8h Resolution</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
                   <span>Standard / Medium Priority:</span>
-                  <strong>4 Hours Response / 24h Resolution</strong>
+                  <strong style={{ color: 'var(--color-primary)' }}>1h Response / 24h Resolution</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
                   <span>General / Low Priority:</span>
-                  <strong>8 Hours Response / 48h Resolution</strong>
+                  <strong style={{ color: 'var(--color-text-secondary)' }}>4h Response / 48h Resolution</strong>
                 </div>
               </div>
             </div>
@@ -353,11 +381,16 @@ export function DashboardPage() {
 
       {/* 2. SUPPORT ENGINEER DASHBOARD WORKBENCH */}
       {isSupportEngineer && !canViewOperations && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
           {/* Card A: My Assigned Work */}
-          <Card padded title="Assigned Incidents" subtitle="Active tickets currently assigned to you for investigation.">
-            <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-              Respond to customer inquiries, add internal staff notes, or apply AI Workbench resolution drafts.
+          <Card
+            padded
+            title="Assigned Incidents"
+            subtitle="Active tickets currently assigned to you for investigation."
+            headerActions={<Badge variant="primary" size="sm">Active Queue</Badge>}
+          >
+            <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              Respond to customer inquiries, add internal staff notes, or apply Gemini AI Copilot resolution drafts.
             </p>
             <Button
               variant="primary"
@@ -370,9 +403,14 @@ export function DashboardPage() {
           </Card>
 
           {/* Card B: Support Queue */}
-          <Card padded title="Unassigned Support Queue" subtitle="Incoming unassigned tickets awaiting engineer claim.">
-            <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-              Review new submissions, inspect priority and initial SLA targets, and claim ownership.
+          <Card
+            padded
+            title="Unassigned Support Queue"
+            subtitle="Incoming unassigned tickets awaiting engineer claim."
+            headerActions={<Badge variant="warning" size="sm">Intake</Badge>}
+          >
+            <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              Review incoming triage submissions, inspect urgency and initial response deadlines, and claim ownership.
             </p>
             <Button
               variant="outline"
@@ -385,9 +423,14 @@ export function DashboardPage() {
           </Card>
 
           {/* Card C: Knowledge Base */}
-          <Card padded title="Knowledge Base" subtitle="Browse, author, and maintain IT support resolution articles.">
-            <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-              Publish verified articles to deflect common issues and power AI triage matching.
+          <Card
+            padded
+            title="Knowledge Base & Deflection"
+            subtitle="Browse, author, and maintain IT support resolution articles."
+            headerActions={<Badge variant="neutral" size="sm">Documentation</Badge>}
+          >
+            <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              Publish verified solutions to deflect recurring issues and ground Gemini AI Copilot suggestions.
             </p>
             <Button
               variant="outline"
@@ -401,112 +444,265 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* 3. TEAM LEAD & ADMIN DASHBOARD WORKBENCH */}
+      {/* 3. TEAM LEAD & ADMIN DASHBOARD WORKBENCH — OPERATIONAL COMMAND CENTER */}
       {canViewOperations && (
         <div>
-          {/* Section Heading specifically for SLA Operations (matches e2e tests) */}
-          <div style={{ marginBottom: '16px' }}>
-            <h2 className="horizon-workspace-card__title" style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>
-              SLA Operations & Oversight
-            </h2>
+          {/* Section Heading specifically for SLA Operations (matches e2e tests) + Quick Actions */}
+          <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h2
+                className="horizon-workspace-card__title"
+                style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 600,
+                  color: 'var(--color-text-primary)',
+                  margin: 0,
+                }}
+              >
+                SLA Operations & Operational Command
+              </h2>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                Real-time incident posture, SLA threshold compliance, and supervisory governance
+              </span>
+            </div>
+
+            {/* Quick Console Navigation Toolbar */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/sla/dashboard')}
+                leadingIcon={<Clock size={14} />}
+              >
+                SLA Monitor
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/reports')}
+                leadingIcon={<BarChart3 size={14} />}
+              >
+                Reports
+              </Button>
+              {isAdmin && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/admin/users')}
+                    leadingIcon={<Users size={14} />}
+                  >
+                    Directory
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/audit')}
+                    leadingIcon={<ShieldCheck size={14} />}
+                  >
+                    Audit Ledger
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-            {/* Approvals */}
-            <Card padded title="Approval Inbox" subtitle="Pending manager reviews and service authorizations.">
-              <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                Review high-impact hardware and access authorization requests requiring supervisory sign-off.
-              </p>
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => navigate('/approvals')}
-                leadingIcon={<CheckSquare size={16} />}
-              >
-                Approval Inbox ({metrics?.operations?.pendingApprovals ?? 0})
-              </Button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
+            {/* Widget 1: SLA Queue Breaches & Policy Targets */}
+            <Card
+              padded
+              title="SLA Queue Health & Policy Targets"
+              subtitle="Active breach monitoring and database SLA response/resolution commitments."
+              headerActions={
+                isLoading ? (
+                  <Badge variant="neutral" size="sm">Evaluating...</Badge>
+                ) : !isBreachesKnown ? (
+                  <Badge variant="neutral" size="sm">Status Unavailable</Badge>
+                ) : activeSlaBreachesCount! > 0 ? (
+                  <Badge variant="danger" size="sm" dot>Active Breaches ({activeSlaBreachesCount})</Badge>
+                ) : (
+                  <Badge variant="success" size="sm">0 Active Breaches</Badge>
+                )
+              }
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    background: isBreachesKnown && activeSlaBreachesCount! > 0
+                      ? 'var(--color-danger-subtle)'
+                      : isBreachesKnown
+                      ? 'var(--color-success-subtle)'
+                      : 'var(--color-surface-subtle)',
+                    border: `1px solid ${
+                      isBreachesKnown && activeSlaBreachesCount! > 0
+                        ? 'var(--color-danger-border)'
+                        : isBreachesKnown
+                        ? 'var(--color-success-border)'
+                        : 'var(--color-border)'
+                    }`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
+                  {isBreachesKnown && activeSlaBreachesCount! > 0 ? (
+                    <AlertTriangle size={18} style={{ color: 'var(--color-danger-text)', flexShrink: 0 }} />
+                  ) : isBreachesKnown ? (
+                    <CheckCircle2 size={18} style={{ color: 'var(--color-success-text)', flexShrink: 0 }} />
+                  ) : (
+                    <Clock size={18} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+                  )}
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
+                    {isBreachesKnown && activeSlaBreachesCount! > 0 ? (
+                      <>
+                        <strong>{activeSlaBreachesCount} Active SLA Breaches</strong> in open queue tickets. Immediate investigation required.
+                      </>
+                    ) : isBreachesKnown ? (
+                      <>
+                        <strong>0 Active SLA Breaches</strong> in production queues. All active tickets currently within policy response and resolution windows.
+                      </>
+                    ) : isLoading ? (
+                      <span>Evaluating queue SLA status...</span>
+                    ) : (
+                      <span>Queue SLA status is currently unavailable.</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                      Baseline SLA Policy Targets
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                      Database policy defaults (V7)
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
+                      <span>Critical / Urgent:</span>
+                      <strong style={{ color: 'var(--color-danger)' }}>15m Response / 4h Resolution</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
+                      <span>High Priority:</span>
+                      <strong style={{ color: 'var(--color-warning)' }}>30m Response / 8h Resolution</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
+                      <span>Standard / Medium:</span>
+                      <strong style={{ color: 'var(--color-primary)' }}>1h Response / 24h Resolution</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
+                      <span>Low / Routine:</span>
+                      <strong style={{ color: 'var(--color-text-secondary)' }}>4h Response / 48h Resolution</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => navigate('/sla/dashboard')}
+                  leadingIcon={<Clock size={16} />}
+                  trailingIcon={<ArrowRight size={14} />}
+                >
+                  Inspect SLA Dashboard
+                </Button>
+              </div>
             </Card>
 
-            {/* SLA Monitoring */}
-            <Card padded title="SLA Monitoring" subtitle="Real-time response & resolution deadline health.">
-              <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                Track upcoming deadlines, evaluate compliance ratios, and review breached milestones.
-              </p>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => navigate('/sla/dashboard')}
-                leadingIcon={<Clock size={16} />}
-              >
-                SLA Dashboard
-              </Button>
-            </Card>
+            {/* Widget 2: Pending Approvals & Service Authorizations */}
+            <Card
+              padded
+              title="Supervisory Approvals"
+              subtitle="Pending manager reviews and service authorizations."
+              headerActions={
+                (metrics?.operations?.pendingApprovals ?? 0) > 0 ? (
+                  <Badge variant="warning" size="sm" dot>Action Required</Badge>
+                ) : (
+                  <Badge variant="success" size="sm">Queue Cleared</Badge>
+                )
+              }
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    background: (metrics?.operations?.pendingApprovals ?? 0) > 0 ? 'var(--color-warning-subtle)' : 'var(--color-surface-subtle)',
+                    border: `1px solid ${(metrics?.operations?.pendingApprovals ?? 0) > 0 ? 'var(--color-warning-border)' : 'var(--color-border)'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
+                  <CheckSquare size={18} style={{ color: 'var(--color-warning-text)', flexShrink: 0 }} />
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
+                    <strong>{metrics?.operations?.pendingApprovals ?? 0} Pending Requests</strong> awaiting supervisory sign-off for hardware & access grants.
+                  </div>
+                </div>
 
-            {/* Reports */}
-            <Card padded title="Reports & Analytics" subtitle="Operational KPIs, resolution metrics, and workload balance.">
-              <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                Analyze ticket volumes, median resolution durations, team workload, and export audit CSVs.
-              </p>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => navigate('/reports')}
-                leadingIcon={<BarChart3 size={16} />}
-              >
-                Operational Reports
-              </Button>
-            </Card>
-
-            {/* Admin only: User Management */}
-            {isAdmin && (
-              <Card padded title="User Management" subtitle="Manage accounts, invitations, and role assignments.">
-                <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                  Invite team members, assign RBAC permissions, and oversee account activation statuses.
+                <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                  Review requests with elevated authorization requirements. Team lead approval is mandatory before hardware provisioning or elevated role assignments.
                 </p>
+
+                <Button
+                  variant={(metrics?.operations?.pendingApprovals ?? 0) > 0 ? 'primary' : 'outline'}
+                  size="md"
+                  onClick={() => navigate('/approvals')}
+                  leadingIcon={<CheckSquare size={16} />}
+                  trailingIcon={<ArrowRight size={14} />}
+                >
+                  Approval Inbox ({metrics?.operations?.pendingApprovals ?? 0})
+                </Button>
+              </div>
+            </Card>
+
+            {/* Widget 3: Platform Security Architecture */}
+            <Card
+              padded
+              title="Platform Security Architecture"
+              subtitle="Configured technical safeguards, audit controls, and onboarding policies."
+              headerActions={<Badge variant="neutral" size="sm">Engineered Safeguards</Badge>}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
+                    <ShieldAlert size={16} style={{ color: 'var(--color-primary)' }} />
+                    <span>Attachment Malware Scanning</span>
+                  </div>
+                  <Badge variant="neutral" size="sm">ClamAV Stream Protocol</Badge>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
+                    <ShieldCheck size={16} style={{ color: 'var(--color-primary)' }} />
+                    <span>Security Audit Trail</span>
+                  </div>
+                  <Badge variant="neutral" size="sm">PostgreSQL Prevent-Mutation Trigger</Badge>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
+                    <Users size={16} style={{ color: 'var(--color-primary)' }} />
+                    <span>User Provisioning Policy</span>
+                  </div>
+                  <Badge variant="neutral" size="sm">Invitation-Only Flow</Badge>
+                </div>
+
                 <Button
                   variant="outline"
                   size="md"
-                  onClick={() => navigate('/admin/users')}
-                  leadingIcon={<Users size={16} />}
+                  onClick={() => navigate(isAdmin ? '/admin/attachments' : '/reports')}
+                  leadingIcon={isAdmin ? <ShieldAlert size={16} /> : <BarChart3 size={16} />}
+                  trailingIcon={<ArrowRight size={14} />}
                 >
-                  Manage Users
+                  {isAdmin ? 'Attachment Security Console' : 'Compliance & Reports'}
                 </Button>
-              </Card>
-            )}
-
-            {/* Admin only: Audit Trail */}
-            {isAdmin && (
-              <Card padded title="Audit Trail" subtitle="Immutable compliance log of security & operational events.">
-                <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                  Inspect structured event metadata, role changes, priority updates, and system activities.
-                </p>
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={() => navigate('/audit')}
-                  leadingIcon={<ShieldCheck size={16} />}
-                >
-                  Audit Trail
-                </Button>
-              </Card>
-            )}
-
-            {/* Admin only: Attachment Security */}
-            {isAdmin && (
-              <Card padded title="Attachment Security" subtitle="Malware scanner oversight and administrative rescans.">
-                <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                  Monitor quarantine statuses, inspect file hashes, and execute authorized background scans.
-                </p>
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={() => navigate('/admin/attachments')}
-                  leadingIcon={<ShieldAlert size={16} />}
-                >
-                  Attachment Security
-                </Button>
-              </Card>
-            )}
+              </div>
+            </Card>
           </div>
         </div>
       )}

@@ -10,8 +10,7 @@
    Login
    ========================= */
 
-.login-page,
-.dashboard-page {
+.login-page {
   min-height: 100vh;
   padding: 2rem;
 }
@@ -249,8 +248,8 @@
    ========================= */
 
 .dashboard-page {
-  max-width: 1100px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
 }
 
 .dashboard-header {
