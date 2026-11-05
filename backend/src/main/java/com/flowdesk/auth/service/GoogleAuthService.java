@@ -8,6 +8,8 @@ import com.flowdesk.auth.domain.UserExternalIdentity;
 import com.flowdesk.auth.domain.UserPendingOAuthLink;
 import com.flowdesk.auth.dto.GoogleAuthRequest;
 import com.flowdesk.auth.dto.GoogleOAuthConfigResponse;
+import com.flowdesk.email.config.EmailProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.flowdesk.auth.dto.GoogleUserInfo;
 import com.flowdesk.auth.dto.LoginResponse;
 import com.flowdesk.auth.exception.OAuthLinkingInvalidPasswordException;
@@ -63,6 +65,32 @@ public class GoogleAuthService {
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final EmailProperties emailProperties;
+
+    @Autowired
+    public GoogleAuthService(
+            GoogleOAuthProperties properties,
+            GoogleTokenVerifier tokenVerifier,
+            UserExternalIdentityRepository externalIdentityRepository,
+            UserPendingOAuthLinkRepository pendingLinkRepository,
+            UserRepository userRepository,
+            UserInvitationService userInvitationService,
+            TokenService tokenService,
+            PasswordEncoder passwordEncoder,
+            AuditService auditService,
+            @Autowired(required = false) EmailProperties emailProperties
+    ) {
+        this.properties = Objects.requireNonNull(properties, "properties must not be null");
+        this.tokenVerifier = Objects.requireNonNull(tokenVerifier, "tokenVerifier must not be null");
+        this.externalIdentityRepository = Objects.requireNonNull(externalIdentityRepository, "externalIdentityRepository must not be null");
+        this.pendingLinkRepository = Objects.requireNonNull(pendingLinkRepository, "pendingLinkRepository must not be null");
+        this.userRepository = Objects.requireNonNull(userRepository, "userRepository must not be null");
+        this.userInvitationService = Objects.requireNonNull(userInvitationService, "userInvitationService must not be null");
+        this.tokenService = Objects.requireNonNull(tokenService, "tokenService must not be null");
+        this.passwordEncoder = Objects.requireNonNull(passwordEncoder, "passwordEncoder must not be null");
+        this.auditService = Objects.requireNonNull(auditService, "auditService must not be null");
+        this.emailProperties = emailProperties;
+    }
 
     public GoogleAuthService(
             GoogleOAuthProperties properties,
@@ -75,23 +103,18 @@ public class GoogleAuthService {
             PasswordEncoder passwordEncoder,
             AuditService auditService
     ) {
-        this.properties = Objects.requireNonNull(properties, "properties must not be null");
-        this.tokenVerifier = Objects.requireNonNull(tokenVerifier, "tokenVerifier must not be null");
-        this.externalIdentityRepository = Objects.requireNonNull(externalIdentityRepository, "externalIdentityRepository must not be null");
-        this.pendingLinkRepository = Objects.requireNonNull(pendingLinkRepository, "pendingLinkRepository must not be null");
-        this.userRepository = Objects.requireNonNull(userRepository, "userRepository must not be null");
-        this.userInvitationService = Objects.requireNonNull(userInvitationService, "userInvitationService must not be null");
-        this.tokenService = Objects.requireNonNull(tokenService, "tokenService must not be null");
-        this.passwordEncoder = Objects.requireNonNull(passwordEncoder, "passwordEncoder must not be null");
-        this.auditService = Objects.requireNonNull(auditService, "auditService must not be null");
+        this(properties, tokenVerifier, externalIdentityRepository, pendingLinkRepository,
+                userRepository, userInvitationService, tokenService, passwordEncoder, auditService, null);
     }
 
     public GoogleOAuthConfigResponse getOAuthConfig() {
+        boolean mailEnabled = emailProperties == null || emailProperties.isEnabled();
         return new GoogleOAuthConfigResponse(
                 properties.isEnabled(),
                 properties.getClientId(),
                 properties.getRedirectUri(),
-                properties.getAuthUri()
+                properties.getAuthUri(),
+                mailEnabled
         );
     }
 
@@ -127,7 +150,7 @@ public class GoogleAuthService {
         // 2. Google subject is not linked yet.
         // Check if caller presented an invitation token (Invitee onboarding path)
         if (request.invitationToken() != null && !request.invitationToken().isBlank()) {
-            User activatedUser = userInvitationService.acceptInvitationWithGoogle(request.invitationToken());
+            User activatedUser = userInvitationService.acceptInvitationWithGoogle(request.invitationToken(), normalizedEmail);
 
             UserExternalIdentity identity = new UserExternalIdentity(
                     activatedUser,

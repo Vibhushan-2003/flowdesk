@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Copy,
   Mail,
-  Plus,
   RefreshCw,
   Search,
   Users,
@@ -17,7 +16,6 @@ import {
 
 import {
   createInvitation,
-  createUser,
   getUsers,
   resendInvitation,
   updateUserRoles,
@@ -80,15 +78,6 @@ export function UserManagementPage() {
   const [appliedFilters, setAppliedFilters] = useState<UserDirectoryFilter>({})
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
-  // Create User Modal state
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [createEmail, setCreateEmail] = useState('')
-  const [createPassword, setCreatePassword] = useState('')
-  const [createFirstName, setCreateFirstName] = useState('')
-  const [createLastName, setCreateLastName] = useState('')
-  const [createRoles, setCreateRoles] = useState<Set<Role>>(() => new Set<Role>(['EMPLOYEE']))
-  const [isCreating, setIsCreating] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
 
   // Invite User Modal state
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
@@ -173,75 +162,6 @@ export function UserManagementPage() {
     setPage(0)
   }
 
-  // Create User Handlers
-  function openCreateModal() {
-    setCreateEmail('')
-    setCreatePassword('')
-    setCreateFirstName('')
-    setCreateLastName('')
-    setCreateRoles(new Set<Role>(['EMPLOYEE']))
-    setCreateError(null)
-    setIsCreateModalOpen(true)
-  }
-
-  function toggleCreateRole(role: Role) {
-    setCreateRoles((prev) => {
-      const next = new Set(prev)
-      if (next.has(role)) {
-        if (next.size > 1) next.delete(role)
-      } else {
-        next.add(role)
-      }
-      return next
-    })
-  }
-
-  async function handleCreateUserSubmit(event: FormEvent) {
-    event.preventDefault()
-    if (!accessToken) return
-
-    const trimmedEmail = createEmail.trim()
-    const trimmedFirstName = createFirstName.trim()
-    const trimmedLastName = createLastName.trim()
-
-    if (!trimmedEmail || !trimmedFirstName || !trimmedLastName || !createPassword) {
-      setCreateError('All fields are required.')
-      return
-    }
-
-    if (createPassword.length < 8) {
-      setCreateError('Password must be at least 8 characters.')
-      return
-    }
-
-    if (createRoles.size === 0) {
-      setCreateError('At least one role must be selected.')
-      return
-    }
-
-    setIsCreating(true)
-    setCreateError(null)
-
-    try {
-      await createUser(accessToken, {
-        email: trimmedEmail,
-        password: createPassword,
-        firstName: trimmedFirstName,
-        lastName: trimmedLastName,
-        roles: Array.from(createRoles),
-      })
-
-      setIsCreateModalOpen(false)
-      setSuccessMessage(`User "${trimmedEmail}" created successfully.`)
-      setRefreshTrigger((prev) => prev + 1)
-    } catch (caughtError) {
-      setCreateError(
-        caughtError instanceof Error ? caughtError.message : 'Failed to create user.',
-      )
-    } finally {
-      setIsCreating(false)
-    }
-  }
 
   // Invite User Handlers
   function openInviteModal() {
@@ -456,20 +376,12 @@ export function UserManagementPage() {
         actions={
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <Button
-              variant="secondary"
+              variant="primary"
               size="sm"
               onClick={openInviteModal}
               leadingIcon={<Mail size={14} />}
             >
               Invite User
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={openCreateModal}
-              leadingIcon={<Plus size={14} />}
-            >
-              Create User
             </Button>
             <Button
               variant="secondary"
@@ -616,7 +528,7 @@ export function UserManagementPage() {
             description={
               hasActiveFilters
                 ? 'Try adjusting your search query or role/status filters.'
-                : 'Click "+ Create User" or "+ Invite User" to add team members.'
+                : 'Click "+ Invite User" to add team members.'
             }
             action={
               hasActiveFilters ? (
@@ -820,117 +732,6 @@ export function UserManagementPage() {
         )}
       </Card>
 
-      {/* Modal: Create User */}
-      <Modal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        title="Create New User Account"
-        subtitle="Provision a local account directly with assigned credentials and organization roles."
-      >
-        <form onSubmit={handleCreateUserSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {createError && (
-            <div className="horizon-auth-alert horizon-auth-alert--error" role="alert">
-              <AlertCircle size={16} />
-              <span>{createError}</span>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)', marginBottom: '4px' }}>
-                First Name *
-              </label>
-              <input
-                type="text"
-                className="horizon-input"
-                value={createFirstName}
-                onChange={(e) => setCreateFirstName(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)', marginBottom: '4px' }}>
-                Last Name *
-              </label>
-              <input
-                type="text"
-                className="horizon-input"
-                value={createLastName}
-                onChange={(e) => setCreateLastName(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)', marginBottom: '4px' }}>
-              Email Address *
-            </label>
-            <input
-              type="email"
-              className="horizon-input"
-              value={createEmail}
-              onChange={(e) => setCreateEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)', marginBottom: '4px' }}>
-              Temporary Password * (min 8 characters)
-            </label>
-            <input
-              type="password"
-              className="horizon-input"
-              value={createPassword}
-              onChange={(e) => setCreatePassword(e.target.value)}
-              minLength={8}
-              required
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)', marginBottom: '8px' }}>
-              Assigned Roles * (select at least one)
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
-              {ALL_ROLES.map((role) => (
-                <label
-                  key={role}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-md)',
-                    background: createRoles.has(role) ? 'var(--color-primary-subtle, rgba(37, 99, 235, 0.08))' : 'var(--color-surface)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--font-size-xs)',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={createRoles.has(role)}
-                    onChange={() => toggleCreateRole(role)}
-                    style={{ cursor: 'pointer', accentColor: 'var(--color-primary)' }}
-                  />
-                  <span>{ROLE_LABELS[role]}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-divider)' }}>
-            <Button variant="secondary" size="sm" type="button" onClick={() => setIsCreateModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" size="sm" type="submit" isLoading={isCreating}>
-              Create Account
-            </Button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Modal: Invite User */}
       <Modal

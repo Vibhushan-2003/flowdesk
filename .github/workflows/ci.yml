@@ -143,6 +143,7 @@ jobs:
       FRONTEND_ORIGIN: http://127.0.0.1:3000
       FLOWDESK_FRONTEND_ORIGIN: http://127.0.0.1:3000
       FLOWDESK_MAIL_ENABLED: "false"
+      FLOWDESK_TEST_FIXTURES_ENABLED: "true"
       ATTACHMENT_STORAGE_DIR: /tmp/flowdesk_e2e_attachments
       FLOWDESK_BOOTSTRAP_ADMIN_ENABLED: "true"
       FLOWDESK_BOOTSTRAP_ADMIN_EMAIL: admin@flowdesk.test

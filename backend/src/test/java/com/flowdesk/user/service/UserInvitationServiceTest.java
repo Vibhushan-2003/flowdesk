@@ -693,6 +693,95 @@ class UserInvitationServiceTest {
             assertEquals(UserStatus.ACTIVE, user.getStatus(), "User account must be activated");
             assertEquals(2L, user.getCredentialVersion(), "Credential version must be incremented once");
         }
+
+        @Test
+        @DisplayName("Should reject password activation with HTTP 403 when email delivery is disabled")
+        void shouldRejectPasswordActivationWhenEmailIsDisabled() {
+            EmailProperties emailProps = new EmailProperties();
+            emailProps.setEnabled(false);
+
+            UserInvitationService customService = new UserInvitationService(
+                    userRepository,
+                    userInvitationRepository,
+                    roleRepository,
+                    passwordEncoder,
+                    emailSender,
+                    emailTemplateService,
+                    properties,
+                    auditService,
+                    emailProps
+            );
+
+            AcceptInvitationRequest request = new AcceptInvitationRequest("raw-token", "Password123!", "Password123!");
+
+            ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                    customService.acceptInvitation(request)
+            );
+            assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+            assertTrue(ex.getReason().contains("email delivery is disabled"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Google OAuth Invitation Acceptance Tests")
+    class GoogleAcceptanceTests {
+
+        @Test
+        @DisplayName("Should successfully activate invited user when Google email matches invited email")
+        void shouldAcceptInvitationWithMatchingGoogleEmail() {
+            String rawToken = "google-invitation-token";
+            String tokenHash = hashToken(rawToken);
+
+            UUID userId = UUID.randomUUID();
+            User user = User.createInvitedUser("alice@flowdesk.test", "Alice", "Smith", "!INVITED!token");
+            ReflectionTestUtils.setField(user, "id", userId);
+
+            UserInvitation invitation = new UserInvitation(user, tokenHash, Instant.now().plus(Duration.ofHours(24)));
+
+            when(userInvitationRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(invitation));
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+            when(userInvitationRepository.findByTokenHashForUpdate(tokenHash)).thenReturn(Optional.of(invitation));
+
+            User activatedUser = invitationService.acceptInvitationWithGoogle(rawToken, "alice@flowdesk.test");
+
+            assertNotNull(activatedUser);
+            assertEquals(UserStatus.ACTIVE, activatedUser.getStatus());
+            assertTrue(invitation.isConsumed());
+
+            verify(auditService).recordSystemAction(
+                    eq(AuditAction.USER_INVITATION_ACCEPTED),
+                    eq(AuditTargetType.USER),
+                    eq(userId),
+                    eq("alice@flowdesk.test"),
+                    any()
+            );
+        }
+
+        @Test
+        @DisplayName("Should reject Google activation when Google email does NOT match invited email")
+        void shouldRejectGoogleActivationOnEmailMismatch() {
+            String rawToken = "google-invitation-token";
+            String tokenHash = hashToken(rawToken);
+
+            UUID userId = UUID.randomUUID();
+            User user = User.createInvitedUser("alice@flowdesk.test", "Alice", "Smith", "!INVITED!token");
+            ReflectionTestUtils.setField(user, "id", userId);
+
+            UserInvitation invitation = new UserInvitation(user, tokenHash, Instant.now().plus(Duration.ofHours(24)));
+
+            when(userInvitationRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(invitation));
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+            when(userInvitationRepository.findByTokenHashForUpdate(tokenHash)).thenReturn(Optional.of(invitation));
+
+            ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                    invitationService.acceptInvitationWithGoogle(rawToken, "attacker@gmail.com")
+            );
+
+            assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+            assertTrue(ex.getReason().contains("does not match the invited email address"));
+            assertFalse(invitation.isConsumed());
+            assertEquals(UserStatus.INVITED, user.getStatus());
+        }
     }
 
     @Nested

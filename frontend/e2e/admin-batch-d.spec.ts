@@ -113,7 +113,7 @@ test.describe('FlowDesk Horizon Batch D — Admin, SLA & Attachment Security Jou
     await expect(page.getByRole('heading', { name: /audit event inspection/i })).not.toBeVisible()
   })
 
-  test('User Management: displays user directory, opens create and invite modals', async ({ page }) => {
+  test('User Management: displays user directory, verifies create user is removed, and opens invite modal', async ({ page }) => {
     await setupApiMocks(page, MOCK_ADMIN)
     const token = createMockToken(MOCK_ADMIN)
     await page.addInitScript((t) => {
@@ -153,11 +153,8 @@ test.describe('FlowDesk Horizon Batch D — Admin, SLA & Attachment Security Jou
     await expect(page.getByRole('table').getByText('Jane Smith')).toBeVisible()
     await expect(page.getByRole('table').getByText('jane.smith@flowdesk.test')).toBeVisible()
 
-    // Open Create User Modal
-    await page.getByRole('button', { name: /create user/i }).click()
-    await expect(page.getByRole('heading', { name: /create new user account/i })).toBeVisible()
-    await page.getByRole('button', { name: /cancel/i }).click()
-    await expect(page.getByRole('heading', { name: /create new user account/i })).not.toBeVisible()
+    // Verify Create User button is removed (invitation-only policy)
+    await expect(page.getByRole('button', { name: /create user/i })).not.toBeVisible()
 
     // Open Invite User Modal
     await page.getByRole('button', { name: /invite user/i }).click()
@@ -228,6 +225,31 @@ test.describe('FlowDesk Horizon Batch D — Admin, SLA & Attachment Security Jou
     // Dismiss modal
     await page.getByRole('button', { name: /done/i }).click()
     await expect(page.getByRole('heading', { name: /invitation link ready/i })).not.toBeVisible()
+  })
+
+  test('Accept Invitation: zero-SMTP environment requires verified Google OAuth activation and hides password form', async ({ page }) => {
+    await page.route('**/api/auth/oauth2/config', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          enabled: true,
+          clientId: 'mock-google-client-id',
+          redirectUri: 'http://localhost:5173/auth/google/callback',
+          authUri: 'https://accounts.google.com/o/oauth2/v2/auth',
+          mailEnabled: false,
+        }),
+      })
+    })
+
+    await page.goto('/accept-invitation?token=mock-secure-token-12345')
+
+    await expect(page.getByRole('heading', { name: /set up your account/i })).toBeVisible()
+    await expect(page.getByText(/email delivery is disabled on this environment/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: /activate with google/i })).toBeVisible()
+
+    await expect(page.locator('#accept-new-password')).not.toBeVisible()
+    await expect(page.locator('#accept-confirm-password')).not.toBeVisible()
   })
 
   test('Administrative Attachment Rescan: confirms batch size and displays execution report', async ({ page }) => {

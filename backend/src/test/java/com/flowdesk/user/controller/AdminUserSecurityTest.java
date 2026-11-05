@@ -158,7 +158,6 @@ class AdminUserSecurityTest {
         when(adminUserService.searchUsers(anyInt(), anyInt(), any(), any(), any()))
                 .thenReturn(new PageResponse<>(List.of(sampleResponse), 0, 20, 1, 1, true, true));
         when(adminUserService.getUserById(TARGET_USER_ID)).thenReturn(sampleResponse);
-        when(adminUserService.createUser(any(), any())).thenReturn(sampleResponse);
         when(adminUserService.updateUserRoles(any(), any(), any())).thenReturn(sampleResponse);
         when(adminUserService.updateUserStatus(any(), any(), any())).thenReturn(sampleResponse);
 
@@ -174,13 +173,13 @@ class AdminUserSecurityTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk());
 
-        // POST create user
+        // Direct POST to /api/admin/users is disabled (405 Method Not Allowed)
         mockMvc.perform(post("/api/admin/users")
                         .with(jwt().jwt(builder -> builder.subject(ACTOR_ADMIN_ID.toString()))
                                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CREATE_USER_BODY))
-                .andExpect(status().isCreated());
+                .andExpect(status().isMethodNotAllowed());
 
         // PUT update roles
         mockMvc.perform(put("/api/admin/users/" + TARGET_USER_ID + "/roles")

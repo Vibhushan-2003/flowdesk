@@ -65,6 +65,7 @@ export interface GoogleOAuthConfigResponse {
   clientId: string
   redirectUri: string
   authUri: string
+  mailEnabled?: boolean
 }
 
 export interface GoogleAuthRequest {

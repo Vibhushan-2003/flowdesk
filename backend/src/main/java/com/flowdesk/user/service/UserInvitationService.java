@@ -255,6 +255,15 @@ public class UserInvitationService {
     public AcceptInvitationResponse acceptInvitation(AcceptInvitationRequest request) {
         Objects.requireNonNull(request, "request must not be null");
 
+        boolean isEmailDisabled = emailProperties != null && !emailProperties.isEnabled();
+        if (isEmailDisabled) {
+            log.warn("Rejected password-based invitation acceptance because email delivery is disabled");
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Password-based activation is unavailable when email delivery is disabled. Please activate your account using a verified Google account matching your invited email address."
+            );
+        }
+
         if (request.token() == null || request.token().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invitation token is required");
         }
@@ -328,6 +337,72 @@ public class UserInvitationService {
      * without bypassing the required invitation token.
      * Enforces the same strict lock ordering (user row FIRST, invitation row SECOND).
      */
+    @Transactional
+    public User acceptInvitationWithGoogle(String rawToken, String verifiedGoogleEmail) {
+        Objects.requireNonNull(rawToken, "rawToken must not be null");
+        Objects.requireNonNull(verifiedGoogleEmail, "verifiedGoogleEmail must not be null");
+
+        String tokenHash = hashToken(rawToken.trim());
+        Instant now = Instant.now();
+
+        Optional<UserInvitation> initialOpt = userInvitationRepository.findByTokenHash(tokenHash);
+        if (initialOpt.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired invitation token");
+        }
+
+        UUID userId = initialOpt.get().getUser().getId();
+
+        // 1. Lock user row FIRST
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Account is unavailable"));
+
+        // 2. Lock invitation row SECOND
+        UserInvitation invitation = userInvitationRepository.findByTokenHashForUpdate(tokenHash)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired invitation token"));
+
+        if (invitation.isConsumed()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invitation token has already been used");
+        }
+
+        if (invitation.isExpired(now)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invitation token has expired");
+        }
+
+        if (user.getStatus() != UserStatus.INVITED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Account is not in invited status");
+        }
+
+        // 3. Strictly verify that the verified Google identity email matches the invited user email
+        String normalizedGoogleEmail = verifiedGoogleEmail.trim().toLowerCase(Locale.ROOT);
+        if (!user.getEmail().equalsIgnoreCase(normalizedGoogleEmail)) {
+            log.warn("Rejected Google OAuth invitation acceptance: verified Google email [{}] does not match invited account email [{}]",
+                    EmailMessage.maskEmail(normalizedGoogleEmail), EmailMessage.maskEmail(user.getEmail()));
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Your Google account email (" + normalizedGoogleEmail + ") does not match the invited email address (" + user.getEmail() + ")."
+            );
+        }
+
+        String unusableHash = generateUnusablePasswordHash();
+        user.acceptInvitation(unusableHash);
+        userRepository.save(user);
+
+        invitation.consume(now);
+        userInvitationRepository.save(invitation);
+
+        auditService.recordSystemAction(
+                AuditAction.USER_INVITATION_ACCEPTED,
+                AuditTargetType.USER,
+                user.getId(),
+                user.getEmail(),
+                Map.of("authProvider", "GOOGLE", "credentialVersion", user.getCredentialVersion())
+        );
+
+        log.info("Invitation accepted via Google OAuth successfully for account [{}]", EmailMessage.maskEmail(user.getEmail()));
+
+        return user;
+    }
+
     @Transactional
     public User acceptInvitationWithGoogle(String rawToken) {
         Objects.requireNonNull(rawToken, "rawToken must not be null");

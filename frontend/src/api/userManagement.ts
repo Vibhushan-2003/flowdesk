@@ -1,7 +1,6 @@
 import { notifySessionExpired } from '../auth/sessionEvents'
 import { API_BASE_URL } from './config'
 import type {
-  AdminCreateUserRequest,
   AdminUserResponse,
   CreateUserInvitationRequest,
   ResendInvitationResponse,
@@ -78,27 +77,6 @@ export async function getUserById(
 
   if (!response.ok) {
     const message = await extractErrorMessage(response, 'Unable to load user details.')
-    throw new Error(message)
-  }
-
-  return response.json() as Promise<AdminUserResponse>
-}
-
-export async function createUser(
-  accessToken: string,
-  request: AdminCreateUserRequest,
-): Promise<AdminUserResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(request),
-  })
-
-  if (!response.ok) {
-    const message = await extractErrorMessage(response, 'Failed to create user.')
     throw new Error(message)
   }
 
