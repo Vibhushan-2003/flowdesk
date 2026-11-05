@@ -166,7 +166,7 @@ export function CreateTicketPage() {
   }
 
   return (
-    <div className="ticket-page horizon-create-ticket-workspace">
+    <div className="horizon-create-ticket-page">
       {/* Page Header */}
       <PageHeader
         title="Create a Ticket"
@@ -286,62 +286,62 @@ export function CreateTicketPage() {
         </section>
       ) : (
         /* Purposeful Two-Area Form Layout: Main Form + Contextual Help */
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '1.5rem', alignItems: 'start' }} className="horizon-create-grid">
+        <div className="horizon-create-grid">
           {/* Main Incident / Request Form */}
           <Card padded className="ticket-form-card">
             <form className="ticket-form horizon-auth-form" onSubmit={handleSubmit}>
-              {/* Type Select */}
-              <div className="horizon-form-field">
-                <label htmlFor="ticket-type-select" className="horizon-label">
-                  Ticket type
-                </label>
-                <div className="horizon-select-wrapper">
-                  <select
-                    id="ticket-type-select"
-                    className="horizon-select"
-                    value={type}
-                    onChange={(event) => {
-                      setType(event.target.value as TicketType)
-                      idempotencyKeyRef.current = null
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    <option value="INCIDENT">Incident (something is broken)</option>
-                    <option value="SERVICE_REQUEST">Service request (request new access/hardware)</option>
-                  </select>
+              {/* Type & Priority Row */}
+              <div className="horizon-form-row horizon-form-row--2col">
+                {/* Type Select */}
+                <div className="horizon-form-field">
+                  <label htmlFor="ticket-type-select" className="horizon-label">
+                    Ticket type <span className="horizon-label__required">*</span>
+                  </label>
+                  <div className="horizon-select-wrapper">
+                    <select
+                      id="ticket-type-select"
+                      className="horizon-select"
+                      value={type}
+                      onChange={(event) => {
+                        setType(event.target.value as TicketType)
+                        idempotencyKeyRef.current = null
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      <option value="INCIDENT">Incident (something is broken)</option>
+                      <option value="SERVICE_REQUEST">Service request (request new access/hardware)</option>
+                    </select>
+                  </div>
                 </div>
-              </div>
 
-              {/* Urgency / Initial Priority */}
-              <div className="horizon-form-field">
-                <label htmlFor="ticket-priority-select" className="horizon-label">
-                  Urgency / Priority
-                </label>
-                <div className="horizon-select-wrapper">
-                  <select
-                    id="ticket-priority-select"
-                    className="horizon-select"
-                    value={priority}
-                    onChange={(event) => {
-                      setPriority(event.target.value as TicketPriority)
-                      idempotencyKeyRef.current = null
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    <option value="LOW">Low (minor inconvenience or cosmetic issue)</option>
-                    <option value="MEDIUM">Medium (standard business impact)</option>
-                    <option value="HIGH">High (significant impact on daily work)</option>
-                  </select>
+                {/* Urgency / Initial Priority */}
+                <div className="horizon-form-field">
+                  <label htmlFor="ticket-priority-select" className="horizon-label">
+                    Urgency / Priority <span className="horizon-label__required">*</span>
+                  </label>
+                  <div className="horizon-select-wrapper">
+                    <select
+                      id="ticket-priority-select"
+                      className="horizon-select"
+                      value={priority}
+                      onChange={(event) => {
+                        setPriority(event.target.value as TicketPriority)
+                        idempotencyKeyRef.current = null
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      <option value="LOW">Low (minor inconvenience or cosmetic)</option>
+                      <option value="MEDIUM">Medium (standard business impact)</option>
+                      <option value="HIGH">High (significant impact on daily work)</option>
+                    </select>
+                  </div>
                 </div>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '0.25rem', display: 'block' }}>
-                  Critical priorities are reserved for major system outages triaged directly by support staff.
-                </span>
               </div>
 
               {/* Title Input */}
               <div className="horizon-form-field">
                 <label htmlFor="ticket-title-input" className="horizon-label">
-                  Title
+                  Title <span className="horizon-label__required">*</span>
                 </label>
                 <div className="horizon-input-wrapper">
                   <input
@@ -359,7 +359,7 @@ export function CreateTicketPage() {
                       }
                     }}
                     maxLength={200}
-                    placeholder="Briefly summarize the issue (e.g. VPN not connecting after update)"
+                    placeholder="Briefly describe the issue (e.g. VPN connection failure after OS update)"
                     disabled={isSubmitting}
                     required
                   />
@@ -369,7 +369,7 @@ export function CreateTicketPage() {
               {/* Description Textarea */}
               <div className="horizon-form-field">
                 <label htmlFor="ticket-description-input" className="horizon-label">
-                  Description
+                  Description <span className="horizon-label__required">*</span>
                 </label>
                 <div className="horizon-input-wrapper">
                   <textarea
@@ -387,18 +387,18 @@ export function CreateTicketPage() {
                     required
                   />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                  <span>Markdown formatting supported in comments.</span>
-                  <span>{description.length}/5000</span>
+                <div className="horizon-field-bottom">
+                  <span className="horizon-field-helper">Markdown formatting supported in comments.</span>
+                  <span className="horizon-char-counter">{description.length} / 5000</span>
                 </div>
               </div>
 
               {/* Notice regarding file attachments */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
-                <Paperclip size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
-                <span>
-                  <strong>Attachments:</strong> You can upload screenshots and logs (up to 10 MB, malware scanned) immediately once your ticket is created.
-                </span>
+              <div className="horizon-attachment-hint-card">
+                <Paperclip size={16} className="horizon-attachment-hint-icon" />
+                <div className="horizon-attachment-hint-text">
+                  <strong>Attachments & Diagnostics:</strong> You can upload screenshots, crash logs, and diagnostic dumps (up to 10 MB, automated ClamAV scan) immediately once your ticket is created.
+                </div>
               </div>
 
               {/* Error Alert */}
@@ -422,7 +422,7 @@ export function CreateTicketPage() {
           </Card>
 
           {/* Contextual Side Panel: Knowledge Base Suggestions & Best Practices */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ position: 'sticky', top: '88px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {/* Deflection Card: dynamic live search as user types */}
             <TicketDeflectionCard
               title={title}
@@ -442,14 +442,14 @@ export function CreateTicketPage() {
 
             {/* Helper Guidance Card */}
             <Card padded>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                 <HelpCircle size={18} style={{ color: 'var(--color-primary)' }} />
-                <h3 style={{ margin: 0, fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)' }}>
-                  Submission Tips
+                <h3 style={{ margin: 0, fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)' }}>
+                  Submission Guidelines
                 </h3>
               </div>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-                <li>Include exact error messages where available.</li>
+              <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+                <li>Include exact error codes or stack traces where available.</li>
                 <li>State whether the issue affects only you or your entire team.</li>
                 <li>Tickets are routed to support engineers based on priority.</li>
                 <li>All uploaded attachments are automatically scanned for malware with ClamAV.</li>

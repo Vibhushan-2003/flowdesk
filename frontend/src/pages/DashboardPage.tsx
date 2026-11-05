@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Ticket,
+  Search,
   Inbox,
   Clock,
   CheckCircle2,
@@ -16,7 +17,6 @@ import {
   Loader2,
   RefreshCw,
   BookOpen,
-  HelpCircle,
   AlertTriangle,
   ArrowRight,
   } from 'lucide-react'
@@ -300,82 +300,148 @@ export function DashboardPage() {
 
       {/* 1. EMPLOYEE DASHBOARD WORKBENCH */}
       {!isSupportEngineer && !canViewOperations && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
-          {/* Main Action Hub */}
-          <Card
-            padded
-            title="IT Support Actions"
-            subtitle="Create new inquiries, review active issues, or search knowledge base."
-            headerActions={<Badge variant="primary" size="sm">Self-Service</Badge>}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                Submit incident reports, hardware requests, software access grants, or network inquiries directly to IT Support.
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={() => navigate('/tickets/new')}
-                  leadingIcon={<Plus size={16} />}
-                >
-                  Create New Ticket
-                </Button>
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={() => navigate('/tickets')}
-                  leadingIcon={<Ticket size={16} />}
-                >
-                  My Tickets
-                </Button>
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={() => navigate('/kb')}
-                  leadingIcon={<BookOpen size={16} />}
-                >
-                  Knowledge Base
-                </Button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Action Required Banner if waiting for response */}
+          {employeeData.ticketsAwaitingResponse > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+                padding: '14px 18px',
+                background: 'var(--color-warning-subtle)',
+                border: '1px solid var(--color-warning-border)',
+                borderRadius: 'var(--radius-lg)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Clock size={20} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
+                <div>
+                  <strong style={{ color: 'var(--color-warning)', fontSize: 'var(--font-size-sm)' }}>
+                    Action Required: {employeeData.ticketsAwaitingResponse} ticket{employeeData.ticketsAwaitingResponse > 1 ? 's' : ''} awaiting your reply
+                  </strong>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                    IT support engineers have requested further details or confirmation on your open inquiries.
+                  </div>
+                </div>
               </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => navigate('/tickets?status=WAITING_FOR_USER')}
+                trailingIcon={<ArrowRight size={14} />}
+              >
+                Review Tickets
+              </Button>
             </div>
-          </Card>
+          )}
 
-          {/* Self-Service & SLAs */}
-          <Card
-            padded
-            title="Service Level Commitments"
-            subtitle="Enterprise turnaround standards and verified self-help."
-            headerActions={<Badge variant="success" size="sm">SLO Targets</Badge>}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                <HelpCircle size={18} style={{ color: 'var(--color-primary)', marginTop: '2px', flexShrink: 0 }} />
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                  <strong>Need instant answers?</strong> Browse verified self-help articles in the Knowledge Base for password resets, VPN setups, and workstation troubleshooting before opening a ticket.
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+            {/* Self-Service & Quick Help Hub */}
+            <Card
+              padded
+              title="IT Self-Service Hub"
+              subtitle="Quickly submit inquiries, look up guides, or search verified solutions."
+              headerActions={<Badge variant="primary" size="sm">Self-Service</Badge>}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Search Bar launcher */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const form = e.currentTarget
+                    const q = new FormData(form).get('kbSearch') as string
+                    navigate(`/kb${q ? `?q=${encodeURIComponent(q)}` : ''}`)
+                  }}
+                  style={{ display: 'flex', gap: '8px' }}
+                >
+                  <div className="horizon-input-wrapper" style={{ flex: 1 }}>
+                    <Search size={16} className="horizon-input-icon horizon-input-icon--leading" />
+                    <input
+                      name="kbSearch"
+                      type="search"
+                      className="horizon-input has-leading-icon"
+                      placeholder="Search Knowledge Base (VPN, WiFi, Email)..."
+                    />
+                  </div>
+                  <Button type="submit" variant="secondary" size="md">
+                    Search
+                  </Button>
+                </form>
+
+                {/* Direct Action Buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => navigate('/tickets/new')}
+                    leadingIcon={<Plus size={16} />}
+                  >
+                    Create Ticket
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="md"
+                    onClick={() => navigate('/tickets')}
+                    leadingIcon={<Ticket size={16} />}
+                  >
+                    My Tickets
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="md"
+                    onClick={() => navigate('/kb')}
+                    leadingIcon={<BookOpen size={16} />}
+                  >
+                    Knowledge Base
+                  </Button>
+                </div>
+
+                {/* Helpful quick guide tips */}
+                <div style={{ padding: '10px 14px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                  <strong>Need immediate resolution?</strong> Most connectivity and password issues are resolved in under 2 minutes using self-help troubleshooting guides.
                 </div>
               </div>
+            </Card>
 
-              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
-                  <span>Critical / Urgent Priority:</span>
-                  <strong style={{ color: 'var(--color-danger)' }}>15m Response / 4h Resolution</strong>
+            {/* Service Level Commitments & Security */}
+            <Card
+              padded
+              title="Service Level Commitments"
+              subtitle="Guaranteed IT response targets and data protection standards."
+              headerActions={<Badge variant="success" size="sm">SLA Targets</Badge>}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <span>Critical Priority (Outages):</span>
+                    <Badge variant="danger" size="sm">15m Resp / 4h Res</Badge>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <span>High Priority:</span>
+                    <Badge variant="warning" size="sm">30m Resp / 8h Res</Badge>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <span>Standard / Medium Priority:</span>
+                    <Badge variant="primary" size="sm">1h Resp / 24h Res</Badge>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <span>General / Low Priority:</span>
+                    <Badge variant="neutral" size="sm">4h Resp / 48h Res</Badge>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
-                  <span>High Priority:</span>
-                  <strong style={{ color: 'var(--color-warning)' }}>30m Response / 8h Resolution</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
-                  <span>Standard / Medium Priority:</span>
-                  <strong style={{ color: 'var(--color-primary)' }}>1h Response / 24h Resolution</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-                  <span>General / Low Priority:</span>
-                  <strong style={{ color: 'var(--color-text-secondary)' }}>4h Response / 48h Resolution</strong>
+
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <ShieldCheck size={18} style={{ color: 'var(--color-success)', marginTop: '2px', flexShrink: 0 }} />
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                    <strong>Malware & Attachment Protection:</strong> All uploaded screenshots and logs are verified in real time through ClamAV stream protocol before reaching staff.
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          </div>
         </div>
       )}
 

@@ -352,89 +352,13 @@
    Create Ticket
    ========================= */
 
+/* Legacy ticket form styles neutralized in favour of Horizon design system */
 .ticket-page {
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 48px 20px;
+  width: 100%;
 }
 
 .ticket-form-card {
   width: 100%;
-  max-width: 640px;
-  padding: 32px;
-  background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text-primary);
-  border-radius: 12px;
-}
-
-.ticket-form-heading {
-  margin-bottom: 28px;
-}
-
-.ticket-form-heading h1 {
-  margin-top: 4px;
-  margin-bottom: 8px;
-}
-
-.ticket-form-heading p {
-  color: #6b7280;
-}
-
-.ticket-form {
-  display: grid;
-  gap: 20px;
-}
-
-.ticket-form label {
-  display: grid;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.ticket-form input,
-.ticket-form select,
-.ticket-form textarea {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #1f2937;
-  font: inherit;
-}
-
-.ticket-form textarea {
-  resize: vertical;
-  min-height: 140px;
-}
-
-.ticket-form input:focus,
-.ticket-form select:focus,
-.ticket-form textarea:focus {
-  outline: 2px solid #9ca3af;
-  outline-offset: 1px;
-}
-
-.ticket-form button {
-  margin-top: 4px;
-  padding: 12px 18px;
-  border: 0;
-  border-radius: 8px;
-  background: #1f2937;
-  color: #ffffff;
-  cursor: pointer;
-  font: inherit;
-  font-weight: 600;
-}
-
-.ticket-form button:hover {
-  background: #374151;
-}
-
-.ticket-form button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .ticket-success {

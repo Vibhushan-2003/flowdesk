@@ -174,17 +174,19 @@ export function AttachmentSecurityPage() {
             >
               Batch Size (Bounded 1–100) *
             </label>
-            <input
-              id="rescan-batch-size"
-              type="number"
-              min={1}
-              max={100}
-              className="horizon-input"
-              value={batchSize}
-              onChange={(e) => handleBatchSizeChange(parseInt(e.target.value, 10))}
-              required
-              disabled={isRescanning}
-            />
+            <div className="horizon-input-wrapper">
+              <input
+                id="rescan-batch-size"
+                type="number"
+                min={1}
+                max={100}
+                className="horizon-input"
+                value={batchSize}
+                onChange={(e) => handleBatchSizeChange(parseInt(e.target.value, 10))}
+                required
+                disabled={isRescanning}
+              />
+            </div>
             <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
               Specifies the maximum number of pending attachments scanned in this run. Uses PostgreSQL <code>FOR UPDATE SKIP LOCKED</code> to prevent duplicate concurrent processing.
             </span>
