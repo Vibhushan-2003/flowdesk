@@ -153,7 +153,7 @@ export async function ensureE2eAccountsProvisioned(baseUrl?: string): Promise<vo
     )
   }
 
-  // 2. Provision deterministic test users via POST /api/admin/users
+  // 2. Provision deterministic test users via internal test-fixture endpoint
   const accountsToProvision = [
     E2E_EMPLOYEE_A,
     E2E_EMPLOYEE_B,
@@ -161,7 +161,7 @@ export async function ensureE2eAccountsProvisioned(baseUrl?: string): Promise<vo
   ]
 
   for (const account of accountsToProvision) {
-    const res = await fetch(`${targetUrl}/api/admin/users`, {
+    const res = await fetch(`${targetUrl}/api/internal/test-fixtures/users`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
