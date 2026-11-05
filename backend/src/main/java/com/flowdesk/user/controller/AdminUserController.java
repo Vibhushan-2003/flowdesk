@@ -3,7 +3,6 @@ package com.flowdesk.user.controller;
 import com.flowdesk.common.dto.PageResponse;
 import com.flowdesk.user.domain.RoleCode;
 import com.flowdesk.user.domain.UserStatus;
-import com.flowdesk.user.dto.AdminCreateUserRequest;
 import com.flowdesk.user.dto.UpdateUserRolesRequest;
 import com.flowdesk.user.dto.UpdateUserStatusRequest;
 import com.flowdesk.user.dto.UserResponse;
@@ -71,19 +70,6 @@ public class AdminUserController {
         UserResponse response = adminUserService.getUserById(userId);
 
         return ResponseEntity.ok(response);
-    }
-
-    @PostMapping
-    public ResponseEntity<UserResponse> createUser(
-            @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody AdminCreateUserRequest request
-    ) {
-        UUID actorUserId = UUID.fromString(jwt.getSubject());
-        UserResponse response = adminUserService.createUser(request, actorUserId);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
     }
 
     @PutMapping("/{userId}/roles")

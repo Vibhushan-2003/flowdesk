@@ -8,7 +8,6 @@ import com.flowdesk.user.domain.Role;
 import com.flowdesk.user.domain.RoleCode;
 import com.flowdesk.user.domain.User;
 import com.flowdesk.user.domain.UserStatus;
-import com.flowdesk.user.dto.AdminCreateUserRequest;
 import com.flowdesk.user.dto.UpdateUserRolesRequest;
 import com.flowdesk.user.dto.UpdateUserStatusRequest;
 import com.flowdesk.user.dto.UserResponse;
@@ -147,61 +146,6 @@ class AdminUserServiceTest {
                 () -> adminUserService.getUserById(targetId)
         );
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
-    }
-
-    @Test
-    void createUserSuccessfullyCreatesUserAndAudits() {
-        AdminCreateUserRequest request = new AdminCreateUserRequest(
-                "new.user@flowdesk.test",
-                "Password123",
-                "New",
-                "User",
-                Set.of(RoleCode.EMPLOYEE, RoleCode.SUPPORT_ENGINEER)
-        );
-
-        when(userRepository.existsByEmailIgnoreCase("new.user@flowdesk.test")).thenReturn(false);
-        when(userRepository.findWithRolesById(actorAdminId)).thenReturn(Optional.of(actorAdmin));
-        when(roleRepository.findByCodeIn(request.roles())).thenReturn(List.of(employeeRole, supportRole));
-        when(passwordEncoder.encode("Password123")).thenReturn("encodedPassword");
-
-        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(inv -> {
-            User u = inv.getArgument(0);
-            ReflectionTestUtils.setField(u, "id", UUID.randomUUID());
-            return u;
-        });
-
-        UserResponse response = adminUserService.createUser(request, actorAdminId);
-
-        assertNotNull(response);
-        assertEquals("new.user@flowdesk.test", response.email());
-        assertEquals(2, response.roles().size());
-        assertTrue(response.roles().contains(RoleCode.EMPLOYEE));
-        assertTrue(response.roles().contains(RoleCode.SUPPORT_ENGINEER));
-
-        verify(auditService).recordUserAction(
-                eq(actorAdmin),
-                eq(AuditAction.USER_CREATED),
-                eq(AuditTargetType.USER),
-                any(UUID.class),
-                eq("new.user@flowdesk.test"),
-                any()
-        );
-    }
-
-    @Test
-    void createUserThrowsOnDuplicateEmail() {
-        AdminCreateUserRequest request = new AdminCreateUserRequest(
-                "duplicate@test.com",
-                "Password123",
-                "Dup",
-                "User",
-                Set.of(RoleCode.EMPLOYEE)
-        );
-
-        when(userRepository.existsByEmailIgnoreCase("duplicate@test.com")).thenReturn(true);
-
-        assertThrows(DuplicateEmailException.class, () -> adminUserService.createUser(request, actorAdminId));
-        verify(userRepository, never()).saveAndFlush(any());
     }
 
     @Test

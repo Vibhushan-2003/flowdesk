@@ -12,14 +12,6 @@ export interface AdminUserResponse {
   createdAt: string
 }
 
-export interface AdminCreateUserRequest {
-  email: string
-  password: string
-  firstName: string
-  lastName: string
-  roles: Role[]
-}
-
 export interface CreateUserInvitationRequest {
   email: string
   firstName: string

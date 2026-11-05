@@ -119,19 +119,6 @@ public class SecurityConfig {
                         )
                         .permitAll()
 
-                        /*
-                         * Day 35: Secure user provisioning.
-                         *
-                         * Only administrators can create users.
-                         * New users receive EMPLOYEE role
-                         * through UserService.
-                         */
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/users"
-                        )
-                        .hasRole("ADMIN")
-
                         // Public login, refresh, logout
                         .requestMatchers(
                                 HttpMethod.POST,

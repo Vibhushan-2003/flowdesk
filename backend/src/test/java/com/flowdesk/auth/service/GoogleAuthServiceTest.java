@@ -43,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -213,7 +214,7 @@ class GoogleAuthServiceTest {
 
         when(externalIdentityRepository.findByProviderAndProviderSubject("GOOGLE", "google-sub-invitee"))
                 .thenReturn(Optional.empty());
-        when(userInvitationService.acceptInvitationWithGoogle("raw-invitation-token"))
+        when(userInvitationService.acceptInvitationWithGoogle("raw-invitation-token", "invitee@company.com"))
                 .thenReturn(activatedUser);
         when(tokenService.generateAccessToken(any(AuthenticatedUser.class))).thenReturn("access-token-jwt");
 
@@ -236,6 +237,29 @@ class GoogleAuthServiceTest {
                 eq("invitee@company.com"),
                 any()
         );
+    }
+
+    @Test
+    @DisplayName("authenticate rejects invited user activation when Google email does not match invited account")
+    void authenticate_invitedUserWithMismatchedGoogleEmail_throwsForbidden() {
+        GoogleAuthRequest request = new GoogleAuthRequest(null, "valid-token", "state-1", "raw-invitation-token", null);
+        GoogleUserInfo userInfo = new GoogleUserInfo("google-sub-attacker", "attacker@other.com", "Attacker", true);
+        when(tokenVerifier.verifyIdToken("valid-token")).thenReturn(userInfo);
+
+        when(externalIdentityRepository.findByProviderAndProviderSubject("GOOGLE", "google-sub-attacker"))
+                .thenReturn(Optional.empty());
+        when(userInvitationService.acceptInvitationWithGoogle("raw-invitation-token", "attacker@other.com"))
+                .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Google account email does not match the invited email address."));
+
+        assertThatThrownBy(() -> googleAuthService.authenticate(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(rse.getReason()).contains("does not match the invited email address");
+                });
+
+        verify(externalIdentityRepository, never()).save(any());
     }
 
     @Test

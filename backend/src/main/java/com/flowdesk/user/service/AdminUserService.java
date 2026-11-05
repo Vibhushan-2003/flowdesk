@@ -8,7 +8,6 @@ import com.flowdesk.user.domain.Role;
 import com.flowdesk.user.domain.RoleCode;
 import com.flowdesk.user.domain.User;
 import com.flowdesk.user.domain.UserStatus;
-import com.flowdesk.user.dto.AdminCreateUserRequest;
 import com.flowdesk.user.dto.UpdateUserRolesRequest;
 import com.flowdesk.user.dto.UpdateUserStatusRequest;
 import com.flowdesk.user.dto.UserResponse;
@@ -116,62 +115,6 @@ public class AdminUserService {
                                 "User not found"
                         )
                 );
-    }
-
-    @Transactional
-    public UserResponse createUser(AdminCreateUserRequest request, UUID actorUserId) {
-        String normalizedEmail = request.email()
-                .trim()
-                .toLowerCase(Locale.ROOT);
-
-        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
-            throw new DuplicateEmailException(normalizedEmail);
-        }
-
-        User actorUser = userRepository.findWithRolesById(actorUserId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.UNAUTHORIZED,
-                                "Authenticated user not found"
-                        )
-                );
-
-        List<Role> resolvedRoles = roleRepository.findByCodeIn(request.roles());
-        if (resolvedRoles.size() != request.roles().size()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "One or more specified roles are invalid"
-            );
-        }
-
-        String passwordHash = passwordEncoder.encode(request.password());
-
-        User user = new User(
-                normalizedEmail,
-                passwordHash,
-                request.firstName().trim(),
-                request.lastName().trim()
-        );
-
-        user.replaceRoles(new HashSet<>(resolvedRoles));
-        User savedUser = userRepository.saveAndFlush(user);
-
-        List<String> assignedRoleNames = request.roles()
-                .stream()
-                .map(RoleCode::name)
-                .sorted()
-                .toList();
-
-        auditService.recordUserAction(
-                actorUser,
-                AuditAction.USER_CREATED,
-                AuditTargetType.USER,
-                savedUser.getId(),
-                savedUser.getEmail(),
-                Map.of("assignedRoles", assignedRoleNames)
-        );
-
-        return toResponse(savedUser);
     }
 
     @Transactional
