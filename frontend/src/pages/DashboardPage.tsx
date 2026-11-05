@@ -465,60 +465,75 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* 3. TEAM LEAD & ADMIN DASHBOARD WORKBENCH */}
+      {/* 3. TEAM LEAD & ADMIN DASHBOARD WORKBENCH — OPERATIONAL COMMAND CENTER */}
       {canViewOperations && (
         <div>
-          {/* Section Heading specifically for SLA Operations (matches e2e tests) */}
-          <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2
-              className="horizon-workspace-card__title"
-              style={{
-                fontSize: 'var(--font-size-lg)',
-                fontWeight: 600,
-                color: 'var(--color-text-primary)',
-                margin: 0,
-              }}
-            >
-              SLA Operations & Oversight
-            </h2>
-            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-              Operational Governance & Incident Management
-            </span>
+          {/* Section Heading specifically for SLA Operations (matches e2e tests) + Quick Actions */}
+          <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h2
+                className="horizon-workspace-card__title"
+                style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 600,
+                  color: 'var(--color-text-primary)',
+                  margin: 0,
+                }}
+              >
+                SLA Operations & Operational Command
+              </h2>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                Real-time incident posture, SLA threshold compliance, and supervisory governance
+              </span>
+            </div>
+
+            {/* Quick Console Navigation Toolbar */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/sla/dashboard')}
+                leadingIcon={<Clock size={14} />}
+              >
+                SLA Monitor
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/reports')}
+                leadingIcon={<BarChart3 size={14} />}
+              >
+                Reports
+              </Button>
+              {isAdmin && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/admin/users')}
+                    leadingIcon={<Users size={14} />}
+                  >
+                    Directory
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/audit')}
+                    leadingIcon={<ShieldCheck size={14} />}
+                  >
+                    Audit Ledger
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-            {/* Approvals */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
+            {/* Widget 1: SLA Real-Time Health & Incident Response */}
             <Card
               padded
-              title="Approval Inbox"
-              subtitle="Pending manager reviews and service authorizations."
-              headerActions={
-                (metrics?.operations?.pendingApprovals ?? 0) > 0 ? (
-                  <Badge variant="warning" size="sm" dot>Action Required</Badge>
-                ) : (
-                  <Badge variant="success" size="sm">Up to Date</Badge>
-                )
-              }
-            >
-              <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                Review high-impact hardware and access authorization requests requiring supervisory sign-off.
-              </p>
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => navigate('/approvals')}
-                leadingIcon={<CheckSquare size={16} />}
-                trailingIcon={<ArrowRight size={14} />}
-              >
-                Approval Inbox ({metrics?.operations?.pendingApprovals ?? 0})
-              </Button>
-            </Card>
-
-            {/* SLA Monitoring */}
-            <Card
-              padded
-              title="SLA Monitoring"
-              subtitle="Real-time response & resolution deadline health."
+              title="SLA Incident & Response Health"
+              subtitle="Response and resolution deadline adherence across active queues."
               headerActions={
                 activeSlaBreachesCount > 0 ? (
                   <Badge variant="danger" size="sm" dot>Breach Detected</Badge>
@@ -527,109 +542,149 @@ export function DashboardPage() {
                 )
               }
             >
-              <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                Track upcoming deadlines, evaluate compliance ratios, and review breached milestones.
-              </p>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => navigate('/sla/dashboard')}
-                leadingIcon={<Clock size={16} />}
-                trailingIcon={<ArrowRight size={14} />}
-              >
-                SLA Dashboard
-              </Button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    background: activeSlaBreachesCount > 0 ? 'var(--color-danger-subtle)' : 'var(--color-success-subtle)',
+                    border: `1px solid ${activeSlaBreachesCount > 0 ? 'var(--color-danger-border)' : 'var(--color-success-border)'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
+                  {activeSlaBreachesCount > 0 ? (
+                    <AlertTriangle size={18} style={{ color: 'var(--color-danger-text)', flexShrink: 0 }} />
+                  ) : (
+                    <CheckCircle2 size={18} style={{ color: 'var(--color-success-text)', flexShrink: 0 }} />
+                  )}
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
+                    <strong>{activeSlaBreachesCount} Active SLA Breaches</strong> in production queues. Response commitments require immediate review.
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <span>Urgent:</span>
+                    <strong style={{ color: 'var(--color-danger)' }}>1h Response / 8h Resolution</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <span>High:</span>
+                    <strong style={{ color: 'var(--color-warning)' }}>2h Response / 12h Resolution</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <span>Medium:</span>
+                    <strong style={{ color: 'var(--color-primary)' }}>4h Response / 24h Resolution</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
+                    <span>Low:</span>
+                    <strong style={{ color: 'var(--color-text-secondary)' }}>8h Response / 48h Resolution</strong>
+                  </div>
+                </div>
+
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => navigate('/sla/dashboard')}
+                  leadingIcon={<Clock size={16} />}
+                  trailingIcon={<ArrowRight size={14} />}
+                >
+                  Inspect SLA Dashboard
+                </Button>
+              </div>
             </Card>
 
-            {/* Reports */}
+            {/* Widget 2: Pending Approvals & Service Authorizations */}
             <Card
               padded
-              title="Reports & Analytics"
-              subtitle="Operational KPIs, resolution metrics, and workload balance."
-              headerActions={<Badge variant="neutral" size="sm">Intelligence</Badge>}
+              title="Supervisory Approvals"
+              subtitle="Pending manager reviews and service authorizations."
+              headerActions={
+                (metrics?.operations?.pendingApprovals ?? 0) > 0 ? (
+                  <Badge variant="warning" size="sm" dot>Action Required</Badge>
+                ) : (
+                  <Badge variant="success" size="sm">Queue Cleared</Badge>
+                )
+              }
             >
-              <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                Analyze ticket volumes, median resolution durations, team workload, and export audit CSVs.
-              </p>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => navigate('/reports')}
-                leadingIcon={<BarChart3 size={16} />}
-                trailingIcon={<ArrowRight size={14} />}
-              >
-                Operational Reports
-              </Button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    background: (metrics?.operations?.pendingApprovals ?? 0) > 0 ? 'var(--color-warning-subtle)' : 'var(--color-surface-subtle)',
+                    border: `1px solid ${(metrics?.operations?.pendingApprovals ?? 0) > 0 ? 'var(--color-warning-border)' : 'var(--color-border)'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
+                  <CheckSquare size={18} style={{ color: 'var(--color-warning-text)', flexShrink: 0 }} />
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
+                    <strong>{metrics?.operations?.pendingApprovals ?? 0} Pending Requests</strong> awaiting supervisory sign-off for hardware & access grants.
+                  </div>
+                </div>
+
+                <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                  Review requests with elevated authorization requirements. Team lead approval is mandatory before hardware provisioning or elevated role assignments.
+                </p>
+
+                <Button
+                  variant={(metrics?.operations?.pendingApprovals ?? 0) > 0 ? 'primary' : 'outline'}
+                  size="md"
+                  onClick={() => navigate('/approvals')}
+                  leadingIcon={<CheckSquare size={16} />}
+                  trailingIcon={<ArrowRight size={14} />}
+                >
+                  Approval Inbox ({metrics?.operations?.pendingApprovals ?? 0})
+                </Button>
+              </div>
             </Card>
 
-            {/* Admin only: User Management */}
-            {isAdmin && (
-              <Card
-                padded
-                title="User Management"
-                subtitle="Manage accounts, invitations, and role assignments."
-                headerActions={<Badge variant="primary" size="sm">RBAC Access</Badge>}
-              >
-                <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                  Invite team members, assign RBAC permissions, and oversee account activation statuses.
-                </p>
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={() => navigate('/admin/users')}
-                  leadingIcon={<Users size={16} />}
-                  trailingIcon={<ArrowRight size={14} />}
-                >
-                  Manage Users
-                </Button>
-              </Card>
-            )}
+            {/* Widget 3: Platform Governance & Compliance Posture */}
+            <Card
+              padded
+              title="Security & Governance Posture"
+              subtitle="Tamper-evident audit logging and stream malware defense."
+              headerActions={<Badge variant="primary" size="sm">Enforced</Badge>}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
+                    <ShieldAlert size={16} style={{ color: 'var(--color-success)' }} />
+                    <span>ClamAV Stream Scanner</span>
+                  </div>
+                  <Badge variant="success" size="sm">Active (TCP Daemon)</Badge>
+                </div>
 
-            {/* Admin only: Audit Trail */}
-            {isAdmin && (
-              <Card
-                padded
-                title="Audit Trail"
-                subtitle="Immutable compliance log of security & operational events."
-                headerActions={<Badge variant="neutral" size="sm">Audit Log</Badge>}
-              >
-                <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                  Inspect structured event metadata, role changes, priority updates, and system activities.
-                </p>
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={() => navigate('/audit')}
-                  leadingIcon={<ShieldCheck size={16} />}
-                  trailingIcon={<ArrowRight size={14} />}
-                >
-                  Audit Trail
-                </Button>
-              </Card>
-            )}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
+                    <ShieldCheck size={16} style={{ color: 'var(--color-primary)' }} />
+                    <span>Security Audit Ledger</span>
+                  </div>
+                  <Badge variant="primary" size="sm">Immutable JSONB</Badge>
+                </div>
 
-            {/* Admin only: Attachment Security */}
-            {isAdmin && (
-              <Card
-                padded
-                title="Attachment Security"
-                subtitle="Malware scanner oversight and administrative rescans."
-                headerActions={<Badge variant="neutral" size="sm">Antivirus</Badge>}
-              >
-                <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                  Monitor quarantine statuses, inspect file hashes, and execute authorized background scans.
-                </p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
+                    <Users size={16} style={{ color: 'var(--color-warning-text)' }} />
+                    <span>Human Onboarding</span>
+                  </div>
+                  <Badge variant="warning" size="sm">Invitation Only</Badge>
+                </div>
+
                 <Button
                   variant="outline"
                   size="md"
-                  onClick={() => navigate('/admin/attachments')}
-                  leadingIcon={<ShieldAlert size={16} />}
+                  onClick={() => navigate(isAdmin ? '/admin/attachments' : '/reports')}
+                  leadingIcon={isAdmin ? <ShieldAlert size={16} /> : <BarChart3 size={16} />}
                   trailingIcon={<ArrowRight size={14} />}
                 >
-                  Attachment Security
+                  {isAdmin ? 'Attachment Security Console' : 'Compliance & Reports'}
                 </Button>
-              </Card>
-            )}
+              </div>
+            </Card>
           </div>
         </div>
       )}

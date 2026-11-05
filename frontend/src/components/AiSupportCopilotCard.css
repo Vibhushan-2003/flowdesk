@@ -1,10 +1,14 @@
+/* ==========================================================================
+   FlowDesk Horizon — AI Support Copilot Styles
+   ========================================================================== */
 
 .ai-copilot-card {
   margin: 1.5rem 0;
   padding: 1.25rem;
-  border: 1px solid var(--border-color, #dbe2ea);
-  border-radius: 0.9rem;
-  background: var(--surface-color, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
   min-width: 0;
 }
 
@@ -18,49 +22,55 @@
 
 .ai-copilot-heading h3 {
   margin: 0.25rem 0;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
 .ai-copilot-readonly {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  border-radius: 100px;
-  padding: 0.3rem 0.7rem;
-  background: #eaf4ef;
-  color: #205b42;
-  font-size: 0.8rem;
-  font-weight: 700;
+  border-radius: var(--radius-full);
+  padding: 0.25rem 0.65rem;
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
 }
 
 .ai-copilot-help,
 .ai-copilot-model,
 .ai-copilot-sources {
-  font-size: 0.9rem;
-  color: var(--text-muted, #526273);
-  line-height: 1.6;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-relaxed);
 }
 
 .ai-copilot-card form {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.75rem;
 }
 
 .ai-copilot-card textarea {
   box-sizing: border-box;
   width: 100%;
   min-height: 5.5rem;
-  padding: 0.8rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
-  color: #172033;
-  font: inherit;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
   resize: vertical;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .ai-copilot-card textarea:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-focus);
 }
 
 .ai-copilot-actions {
@@ -69,22 +79,26 @@
 
 .ai-copilot-answer {
   margin-top: 1.25rem;
-  padding: 1rem;
+  padding: 1.25rem;
   min-width: 0;
-  border-radius: 0.7rem;
-  background: #f4f7fb;
-  color: #172033;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
 }
 
 .ai-copilot-answer h4 {
   margin: 0 0 0.5rem;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
 /* Markdown answer formatting */
-
 .ai-copilot-answer-text {
   overflow-wrap: anywhere;
-  line-height: 1.65;
+  line-height: var(--line-height-relaxed);
+  font-size: var(--font-size-sm);
 }
 
 .ai-copilot-answer-text > :first-child {
@@ -97,7 +111,8 @@
 
 .ai-copilot-answer-text p {
   margin: 0.65rem 0;
-  line-height: 1.65;
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-primary);
 }
 
 .ai-copilot-answer-text h1,
@@ -107,36 +122,26 @@
 .ai-copilot-answer-text h5,
 .ai-copilot-answer-text h6 {
   margin: 1rem 0 0.5rem;
-  line-height: 1.4;
-  font-weight: 700;
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
-.ai-copilot-answer-text h1 {
-  font-size: 1.2rem;
-}
-
-.ai-copilot-answer-text h2 {
-  font-size: 1.1rem;
-}
-
-.ai-copilot-answer-text h3 {
-  font-size: 1rem;
-}
-
-.ai-copilot-answer-text h4,
-.ai-copilot-answer-text h5,
-.ai-copilot-answer-text h6 {
-  font-size: 0.95rem;
-}
+.ai-copilot-answer-text h1 { font-size: var(--font-size-lg); }
+.ai-copilot-answer-text h2 { font-size: var(--font-size-md); }
+.ai-copilot-answer-text h3 { font-size: var(--font-size-base); }
+.ai-copilot-answer-text h4 { font-size: var(--font-size-sm); }
 
 .ai-copilot-answer-text strong {
-  font-weight: 700;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
 .ai-copilot-answer-text ul,
 .ai-copilot-answer-text ol {
   margin: 0.65rem 0;
   padding-left: 1.5rem;
+  color: var(--color-text-primary);
 }
 
 .ai-copilot-answer-text ul {
@@ -159,16 +164,21 @@
 .ai-copilot-answer-text blockquote {
   margin: 0.8rem 0;
   padding: 0.5rem 0.9rem;
-  border-left: 3px solid #94a3b8;
-  background: #eaf0f7;
-  border-radius: 0.25rem;
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-surface);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--color-text-secondary);
+  font-style: italic;
 }
 
 .ai-copilot-answer-text code {
-  padding: 0.1rem 0.3rem;
-  border-radius: 0.3rem;
-  background: #e5eaf1;
-  font-size: 0.9em;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 0.88em;
+  font-family: var(--font-family-mono);
+  border: 1px solid var(--color-border);
   overflow-wrap: anywhere;
 }
 
@@ -177,13 +187,16 @@
   margin: 0.8rem 0;
   padding: 0.85rem;
   overflow-x: auto;
-  border-radius: 0.5rem;
-  background: #e5eaf1;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
 }
 
 .ai-copilot-answer-text pre code {
   padding: 0;
   background: transparent;
+  border: none;
+  color: var(--color-text-primary);
   white-space: pre;
   overflow-wrap: normal;
 }
@@ -191,11 +204,10 @@
 .ai-copilot-answer-text hr {
   margin: 1rem 0;
   border: 0;
-  border-top: 1px solid #cbd5e1;
+  border-top: 1px solid var(--color-divider);
 }
 
 /* Responsive layout */
-
 @media (max-width: 600px) {
   .ai-copilot-card {
     margin: 1rem 0;
@@ -205,15 +217,6 @@
   .ai-copilot-heading {
     align-items: flex-start;
     gap: 0.6rem;
-  }
-
-  .ai-copilot-heading h3 {
-    font-size: 1.1rem;
-  }
-
-  .ai-copilot-readonly {
-    font-size: 0.75rem;
-    white-space: nowrap;
   }
 
   .ai-copilot-actions {
