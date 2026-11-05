@@ -573,6 +573,15 @@
 
   .horizon-topbar-breadcrumbs {
     font-size: var(--font-size-xs);
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .horizon-topbar-crumb-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .horizon-page-viewport {

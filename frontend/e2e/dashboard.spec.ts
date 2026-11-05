@@ -132,5 +132,88 @@ test.describe('Role-Based Operational Dashboard Journeys', () => {
     await expect(page.getByText('20', { exact: true })).toBeVisible()
     await expect(page.getByRole('alert')).not.toBeVisible()
   })
-})
+  test('Administrator dashboard distinguishes confirmed zero breaches and displays verified SLA policy targets and architecture safeguards', async ({ page }) => {
+    await setupApiMocks(page, MOCK_ADMIN)
 
+    const token = createMockToken(MOCK_ADMIN)
+    await page.addInitScript((t) => {
+      sessionStorage.setItem('flowdesk_access_token', t)
+    }, token)
+
+    await page.route('**/api/dashboard/stats', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          employee: {
+            openTickets: 0,
+            resolvedTickets: 10,
+            ticketsAwaitingResponse: 0,
+            pendingApprovals: 0,
+          },
+          support: null,
+          operations: {
+            totalActiveTickets: 15,
+            unassignedQueueTickets: 3,
+            pendingApprovals: 0,
+            activeSlaBreaches: 0,
+          },
+        }),
+      })
+    })
+
+    await page.goto('/dashboard')
+
+    // Confirmed zero breaches badge (not generic "Target Met")
+    await expect(page.getByText('0 Active Breaches')).toBeVisible()
+    await expect(page.getByText(/All active tickets currently within policy response and resolution windows/i)).toBeVisible()
+
+    // Verified SLA policy commitments (15m/4h, 30m/8h, 1h/24h, 4h/48h)
+    await expect(page.getByText('15m Response / 4h Resolution')).toBeVisible()
+    await expect(page.getByText('30m Response / 8h Resolution')).toBeVisible()
+    await expect(page.getByText('1h Response / 24h Resolution')).toBeVisible()
+    await expect(page.getByText('4h Response / 48h Resolution')).toBeVisible()
+
+    // Truthful architectural safeguards (not unverified live health claims)
+    await expect(page.getByText('ClamAV Stream Protocol')).toBeVisible()
+    await expect(page.getByText('PostgreSQL Prevent-Mutation Trigger')).toBeVisible()
+    await expect(page.getByText('Invitation-Only Flow')).toBeVisible()
+  })
+
+  test('Administrator dashboard displays active breach alerts and does not treat missing operations data as zero breaches', async ({ page }) => {
+    await setupApiMocks(page, MOCK_ADMIN)
+
+    const token = createMockToken(MOCK_ADMIN)
+    await page.addInitScript((t) => {
+      sessionStorage.setItem('flowdesk_access_token', t)
+    }, token)
+
+    await page.route('**/api/dashboard/stats', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          employee: {
+            openTickets: 2,
+            resolvedTickets: 8,
+            ticketsAwaitingResponse: 1,
+            pendingApprovals: 3,
+          },
+          support: null,
+          operations: {
+            totalActiveTickets: 24,
+            unassignedQueueTickets: 5,
+            pendingApprovals: 3,
+            activeSlaBreaches: 3,
+          },
+        }),
+      })
+    })
+
+    await page.goto('/dashboard')
+
+    // Confirmed active breaches badge and alert
+    await expect(page.getByText('Active Breaches (3)')).toBeVisible()
+    await expect(page.getByText(/3 Active SLA Breaches in open queue tickets/i)).toBeVisible()
+  })
+});

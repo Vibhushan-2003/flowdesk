@@ -121,8 +121,11 @@ export function DashboardPage() {
     pendingApprovals: (metrics as unknown as { pendingApprovals?: number | null })?.pendingApprovals ?? null,
   }
 
-  const activeSlaBreachesCount =
-    metrics?.operations?.activeSlaBreaches ?? metrics?.operations?.slaBreaches ?? 0
+  // Safe normalization for operations metrics and breach evaluation
+  const hasOperationsData = Boolean(metrics?.operations)
+  const rawBreaches = metrics?.operations?.activeSlaBreaches ?? metrics?.operations?.slaBreaches
+  const isBreachesKnown = hasOperationsData && typeof rawBreaches === 'number'
+  const activeSlaBreachesCount = isBreachesKnown ? rawBreaches : null
 
   return (
     <div className="dashboard-page horizon-dashboard">
@@ -137,30 +140,6 @@ export function DashboardPage() {
         }
         actions={
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 10px',
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-full)',
-                fontSize: 'var(--font-size-xs)',
-                color: 'var(--color-text-secondary)',
-              }}
-            >
-              <span
-                style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--color-success)',
-                  display: 'inline-block',
-                }}
-              />
-              <span>Live Operations</span>
-            </div>
             <Button
               variant="outline"
               size="sm"
@@ -305,8 +284,8 @@ export function DashboardPage() {
               />
               <KPIStatCard
                 label="Active SLA Breaches"
-                value={activeSlaBreachesCount}
-                alert={activeSlaBreachesCount > 0}
+                value={isBreachesKnown ? activeSlaBreachesCount! : (isLoading ? '...' : '—')}
+                alert={Boolean(isBreachesKnown && activeSlaBreachesCount! > 0)}
                 icon={<AlertTriangle size={18} />}
                 onClick={() => navigate('/sla/dashboard')}
               />
@@ -379,20 +358,20 @@ export function DashboardPage() {
 
               <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
-                  <span>Urgent / Critical Priority:</span>
-                  <strong style={{ color: 'var(--color-danger)' }}>1h Response / 8h Resolution</strong>
+                  <span>Critical / Urgent Priority:</span>
+                  <strong style={{ color: 'var(--color-danger)' }}>15m Response / 4h Resolution</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
                   <span>High Priority:</span>
-                  <strong style={{ color: 'var(--color-warning)' }}>2h Response / 12h Resolution</strong>
+                  <strong style={{ color: 'var(--color-warning)' }}>30m Response / 8h Resolution</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
                   <span>Standard / Medium Priority:</span>
-                  <strong style={{ color: 'var(--color-primary)' }}>4h Response / 24h Resolution</strong>
+                  <strong style={{ color: 'var(--color-primary)' }}>1h Response / 24h Resolution</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
                   <span>General / Low Priority:</span>
-                  <strong style={{ color: 'var(--color-text-secondary)' }}>8h Response / 48h Resolution</strong>
+                  <strong style={{ color: 'var(--color-text-secondary)' }}>4h Response / 48h Resolution</strong>
                 </div>
               </div>
             </div>
@@ -529,16 +508,20 @@ export function DashboardPage() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
-            {/* Widget 1: SLA Real-Time Health & Incident Response */}
+            {/* Widget 1: SLA Queue Breaches & Policy Targets */}
             <Card
               padded
-              title="SLA Incident & Response Health"
-              subtitle="Response and resolution deadline adherence across active queues."
+              title="SLA Queue Health & Policy Targets"
+              subtitle="Active breach monitoring and database SLA response/resolution commitments."
               headerActions={
-                activeSlaBreachesCount > 0 ? (
-                  <Badge variant="danger" size="sm" dot>Breach Detected</Badge>
+                isLoading ? (
+                  <Badge variant="neutral" size="sm">Evaluating...</Badge>
+                ) : !isBreachesKnown ? (
+                  <Badge variant="neutral" size="sm">Status Unavailable</Badge>
+                ) : activeSlaBreachesCount! > 0 ? (
+                  <Badge variant="danger" size="sm" dot>Active Breaches ({activeSlaBreachesCount})</Badge>
                 ) : (
-                  <Badge variant="success" size="sm">Target Met</Badge>
+                  <Badge variant="success" size="sm">0 Active Breaches</Badge>
                 )
               }
             >
@@ -547,39 +530,74 @@ export function DashboardPage() {
                   style={{
                     padding: '10px 12px',
                     borderRadius: 'var(--radius-md)',
-                    background: activeSlaBreachesCount > 0 ? 'var(--color-danger-subtle)' : 'var(--color-success-subtle)',
-                    border: `1px solid ${activeSlaBreachesCount > 0 ? 'var(--color-danger-border)' : 'var(--color-success-border)'}`,
+                    background: isBreachesKnown && activeSlaBreachesCount! > 0
+                      ? 'var(--color-danger-subtle)'
+                      : isBreachesKnown
+                      ? 'var(--color-success-subtle)'
+                      : 'var(--color-surface-subtle)',
+                    border: `1px solid ${
+                      isBreachesKnown && activeSlaBreachesCount! > 0
+                        ? 'var(--color-danger-border)'
+                        : isBreachesKnown
+                        ? 'var(--color-success-border)'
+                        : 'var(--color-border)'
+                    }`,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
                   }}
                 >
-                  {activeSlaBreachesCount > 0 ? (
+                  {isBreachesKnown && activeSlaBreachesCount! > 0 ? (
                     <AlertTriangle size={18} style={{ color: 'var(--color-danger-text)', flexShrink: 0 }} />
-                  ) : (
+                  ) : isBreachesKnown ? (
                     <CheckCircle2 size={18} style={{ color: 'var(--color-success-text)', flexShrink: 0 }} />
+                  ) : (
+                    <Clock size={18} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
                   )}
                   <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
-                    <strong>{activeSlaBreachesCount} Active SLA Breaches</strong> in production queues. Response commitments require immediate review.
+                    {isBreachesKnown && activeSlaBreachesCount! > 0 ? (
+                      <>
+                        <strong>{activeSlaBreachesCount} Active SLA Breaches</strong> in open queue tickets. Immediate investigation required.
+                      </>
+                    ) : isBreachesKnown ? (
+                      <>
+                        <strong>0 Active SLA Breaches</strong> in production queues. All active tickets currently within policy response and resolution windows.
+                      </>
+                    ) : isLoading ? (
+                      <span>Evaluating queue SLA status...</span>
+                    ) : (
+                      <span>Queue SLA status is currently unavailable.</span>
+                    )}
                   </div>
                 </div>
 
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
-                    <span>Urgent:</span>
-                    <strong style={{ color: 'var(--color-danger)' }}>1h Response / 8h Resolution</strong>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                      Baseline SLA Policy Targets
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                      Database policy defaults (V7)
+                    </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
-                    <span>High:</span>
-                    <strong style={{ color: 'var(--color-warning)' }}>2h Response / 12h Resolution</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
-                    <span>Medium:</span>
-                    <strong style={{ color: 'var(--color-primary)' }}>4h Response / 24h Resolution</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
-                    <span>Low:</span>
-                    <strong style={{ color: 'var(--color-text-secondary)' }}>8h Response / 48h Resolution</strong>
+
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
+                      <span>Critical / Urgent:</span>
+                      <strong style={{ color: 'var(--color-danger)' }}>15m Response / 4h Resolution</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
+                      <span>High Priority:</span>
+                      <strong style={{ color: 'var(--color-warning)' }}>30m Response / 8h Resolution</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
+                      <span>Standard / Medium:</span>
+                      <strong style={{ color: 'var(--color-primary)' }}>1h Response / 24h Resolution</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
+                      <span>Low / Routine:</span>
+                      <strong style={{ color: 'var(--color-text-secondary)' }}>4h Response / 48h Resolution</strong>
+                    </div>
                   </div>
                 </div>
 
@@ -642,36 +660,36 @@ export function DashboardPage() {
               </div>
             </Card>
 
-            {/* Widget 3: Platform Governance & Compliance Posture */}
+            {/* Widget 3: Platform Security Architecture */}
             <Card
               padded
-              title="Security & Governance Posture"
-              subtitle="Tamper-evident audit logging and stream malware defense."
-              headerActions={<Badge variant="primary" size="sm">Enforced</Badge>}
+              title="Platform Security Architecture"
+              subtitle="Configured technical safeguards, audit controls, and onboarding policies."
+              headerActions={<Badge variant="neutral" size="sm">Engineered Safeguards</Badge>}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
-                    <ShieldAlert size={16} style={{ color: 'var(--color-success)' }} />
-                    <span>ClamAV Stream Scanner</span>
+                    <ShieldAlert size={16} style={{ color: 'var(--color-primary)' }} />
+                    <span>Attachment Malware Scanning</span>
                   </div>
-                  <Badge variant="success" size="sm">Active (TCP Daemon)</Badge>
+                  <Badge variant="neutral" size="sm">ClamAV Stream Protocol</Badge>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
                     <ShieldCheck size={16} style={{ color: 'var(--color-primary)' }} />
-                    <span>Security Audit Ledger</span>
+                    <span>Security Audit Trail</span>
                   </div>
-                  <Badge variant="primary" size="sm">Immutable JSONB</Badge>
+                  <Badge variant="neutral" size="sm">PostgreSQL Prevent-Mutation Trigger</Badge>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
-                    <Users size={16} style={{ color: 'var(--color-warning-text)' }} />
-                    <span>Human Onboarding</span>
+                    <Users size={16} style={{ color: 'var(--color-primary)' }} />
+                    <span>User Provisioning Policy</span>
                   </div>
-                  <Badge variant="warning" size="sm">Invitation Only</Badge>
+                  <Badge variant="neutral" size="sm">Invitation-Only Flow</Badge>
                 </div>
 
                 <Button
