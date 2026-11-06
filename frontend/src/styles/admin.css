@@ -82,7 +82,7 @@
 
 .horizon-date-input:focus {
   border-color: var(--color-focus-ring);
-  box-shadow: 0 0 0 2px var(--color-focus-ring-subtle, rgba(37, 99, 235, 0.15));
+  box-shadow: 0 0 0 2px var(--color-primary-subtle);
 }
 
 /* --------------------------------------------------------------------------

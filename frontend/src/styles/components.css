@@ -65,13 +65,13 @@
   background-color: var(--color-primary);
   color: var(--color-primary-contrast);
   border-color: var(--color-primary);
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 1px 2px var(--color-primary-glow, rgba(180, 77, 24, 0.2));
 }
 
 .horizon-btn--primary:hover:not(:disabled) {
   background-color: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 2px 4px var(--color-primary-glow, rgba(180, 77, 24, 0.3));
 }
 
 .horizon-btn--primary:active:not(:disabled) {
@@ -134,8 +134,9 @@
 }
 
 .horizon-btn--subtle:hover:not(:disabled) {
-  background-color: #dbeafe;
+  background-color: var(--color-primary-subtle);
   color: var(--color-primary-hover);
+  border-color: var(--color-primary-border);
 }
 
 .horizon-btn__spinner {
@@ -324,16 +325,40 @@
 }
 
 /* ==========================================================================
-   Cards
+   Cards — Coherent Inset Architecture (Headers, Bodies, Footers)
    ========================================================================== */
 
 .horizon-card {
+  --card-pad-x: var(--space-5);
+  --card-pad-y: var(--space-5);
   background-color: var(--color-surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
   transition: all var(--duration-fast) var(--ease-default);
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Card Densities */
+.horizon-card--density-compact,
+.horizon-card--padding-sm {
+  --card-pad-x: var(--space-3);
+  --card-pad-y: var(--space-3);
+}
+
+.horizon-card--density-standard,
+.horizon-card--padding-md {
+  --card-pad-x: var(--space-5);
+  --card-pad-y: var(--space-5);
+}
+
+.horizon-card--density-spacious,
+.horizon-card--padding-lg {
+  --card-pad-x: var(--space-6);
+  --card-pad-y: var(--space-6);
 }
 
 .horizon-card--elevated {
@@ -357,29 +382,30 @@
   transform: translateY(-1px);
 }
 
-.horizon-card--padding-none {
-  padding: 0;
-}
-
-.horizon-card--padding-sm {
-  padding: var(--space-3);
-}
-
-.horizon-card--padding-md {
-  padding: var(--space-5);
-}
-
-.horizon-card--padding-lg {
-  padding: var(--space-6);
-}
-
+/* Card Header: Inset horizontal and vertical spacing prevents border touching */
 .horizon-card__header,
 .horizon-card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  padding: var(--card-pad-y) var(--card-pad-x) var(--space-3);
+  margin: 0;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.horizon-card--with-divider .horizon-card-header {
+  padding-bottom: var(--card-pad-y);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.horizon-card-titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
 }
 
 .horizon-card__title,
@@ -389,13 +415,15 @@
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   line-height: var(--line-height-tight);
+  word-break: break-word;
 }
 
 .horizon-card__subtitle,
 .horizon-card-subtitle {
-  margin: var(--space-1) 0 0;
+  margin: 0;
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
+  line-height: var(--line-height-base);
 }
 
 .horizon-card__actions,
@@ -403,16 +431,48 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  max-width: 100%;
 }
 
+/* Card Body: Aligned insets */
+.horizon-card-body {
+  box-sizing: border-box;
+  flex: 1;
+}
+
+.horizon-card--with-header .horizon-card-body.is-padded,
+.horizon-card--with-header .horizon-card-body.horizon-card--padding-md {
+  padding: 0 var(--card-pad-x) var(--card-pad-y);
+}
+
+.horizon-card--with-divider .horizon-card-body.is-padded,
+.horizon-card--with-divider .horizon-card-body.horizon-card--padding-md {
+  padding: var(--card-pad-y) var(--card-pad-x);
+}
+
+.horizon-card--no-header .horizon-card-body.is-padded,
+.horizon-card--no-header .horizon-card-body.horizon-card--padding-md {
+  padding: var(--card-pad-y) var(--card-pad-x);
+}
+
+.horizon-card-body.horizon-card--padding-none {
+  padding: 0;
+}
+
+/* Card Footer: Aligned insets and clean top boundary */
 .horizon-card__footer,
 .horizon-card-footer {
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--card-pad-x) var(--card-pad-y);
   border-top: 1px solid var(--color-divider);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  flex-wrap: wrap;
 }
 
 /* ==========================================================================
@@ -1281,7 +1341,7 @@ input.horizon-input:not(.horizon-input-wrapper input):focus {
   justify-content: center;
   padding: var(--space-8) var(--space-4);
   background-color: var(--color-canvas);
-  background-image: radial-gradient(circle at 50% -10%, rgba(37, 99, 235, 0.08) 0%, transparent 60%);
+  background-image: radial-gradient(circle at 50% -10%, var(--color-primary-glow, rgba(180, 77, 24, 0.08)) 0%, transparent 60%);
   position: relative;
 }
 
@@ -1307,12 +1367,12 @@ input.horizon-input:not(.horizon-input-wrapper input):focus {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-md);
-  background-color: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 2px 4px var(--color-primary-glow, rgba(180, 77, 24, 0.25));
 }
 
 .horizon-auth-brand-name {
@@ -2054,21 +2114,6 @@ input.horizon-input:not(.horizon-input-wrapper input):focus {
   justify-content: center;
 }
 
-/* Card titles container & body padding */
-.horizon-card-titles {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.horizon-card-body.is-padded,
-.horizon-card-body.horizon-card--padding-md {
-  padding: var(--space-5);
-}
-
-.horizon-card-body.horizon-card--padding-none {
-  padding: 0;
-}
 
 /* Page Header Title Badge */
 .horizon-page-title-badge {
@@ -2749,7 +2794,7 @@ input.horizon-input:not(.horizon-input-wrapper input):focus {
 
 .horizon-auth-brand-side {
   flex: 1;
-  background: linear-gradient(145deg, #090d16 0%, #131b2e 50%, #0f172a 100%);
+  background: linear-gradient(145deg, #090e15 0%, #121924 50%, #182230 100%);
   color: #ffffff;
   display: flex;
   flex-direction: column;
@@ -2767,7 +2812,7 @@ input.horizon-input:not(.horizon-input-wrapper input):focus {
   width: 450px;
   height: 450px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, rgba(37, 99, 235, 0) 70%);
+  background: radial-gradient(circle, rgba(224, 122, 75, 0.16) 0%, rgba(180, 77, 24, 0) 70%);
   pointer-events: none;
 }
 
@@ -2779,7 +2824,7 @@ input.horizon-input:not(.horizon-input-wrapper input):focus {
   width: 450px;
   height: 450px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(37, 99, 235, 0) 70%);
+  background: radial-gradient(circle, rgba(180, 77, 24, 0.14) 0%, rgba(180, 77, 24, 0) 70%);
   pointer-events: none;
 }
 
@@ -2794,12 +2839,12 @@ input.horizon-input:not(.horizon-input-wrapper input):focus {
   width: 38px;
   height: 38px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 12px var(--color-primary-glow, rgba(180, 77, 24, 0.35));
 }
 
 .horizon-auth-brand-title {

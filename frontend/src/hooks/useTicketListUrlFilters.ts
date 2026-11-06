@@ -1,4 +1,3 @@
-
 import { type FormEvent, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -25,6 +24,8 @@ const PRIORITIES: TicketPriority[] = [
   'HIGH',
   'CRITICAL',
 ]
+
+const FILTER_PARAM_KEYS = new Set(['page', 'search', 'status', 'priority', 'sort'])
 
 interface DraftFilters {
   urlKey: string
@@ -78,8 +79,18 @@ function readUrlState(params: URLSearchParams) {
 function toUrlParams(
   page: number,
   filters: TicketListFilters,
+  currentParams?: URLSearchParams,
 ) {
   const params = new URLSearchParams()
+
+  // Preserve non-filter URL parameters (such as 'view')
+  if (currentParams) {
+    for (const [key, value] of currentParams.entries()) {
+      if (!FILTER_PARAM_KEYS.has(key)) {
+        params.set(key, value)
+      }
+    }
+  }
 
   if (filters.search?.trim()) {
     params.set('search', filters.search.trim())
@@ -105,8 +116,7 @@ function toUrlParams(
 }
 
 export function useTicketListUrlFilters() {
-  const [searchParams, setSearchParams] =
-    useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const urlKey = searchParams.toString()
 
@@ -115,39 +125,21 @@ export function useTicketListUrlFilters() {
     [searchParams],
   )
 
-  const [draft, setDraft] =
-    useState<DraftFilters | null>(null)
+  const [draft, setDraft] = useState<DraftFilters | null>(null)
 
   // A draft only belongs to the URL it was edited on.
   // Back/Forward navigation automatically restores URL values.
-  const activeDraft =
-    draft?.urlKey === urlKey ? draft : null
+  const activeDraft = draft?.urlKey === urlKey ? draft : null
 
-  const searchText =
-    activeDraft?.searchText ??
-    appliedFilters.search ??
-    ''
+  const searchText = activeDraft?.searchText ?? appliedFilters.search ?? ''
 
-  const selectedStatus =
-    activeDraft?.selectedStatus ??
-    appliedFilters.status ??
-    ''
+  const selectedStatus = activeDraft?.selectedStatus ?? appliedFilters.status ?? ''
 
-  const selectedPriority =
-    activeDraft?.selectedPriority ??
-    appliedFilters.priority ??
-    ''
+  const selectedPriority = activeDraft?.selectedPriority ?? appliedFilters.priority ?? ''
 
-  const selectedSort =
-    activeDraft?.selectedSort ??
-    appliedFilters.sort ??
-    'newest'
+  const selectedSort = activeDraft?.selectedSort ?? appliedFilters.sort ?? 'newest'
 
-  function updateDraft(
-    changes: Partial<
-      Omit<DraftFilters, 'urlKey'>
-    >,
-  ) {
+  function updateDraft(changes: Partial<Omit<DraftFilters, 'urlKey'>>) {
     setDraft({
       urlKey,
       searchText,
@@ -162,60 +154,57 @@ export function useTicketListUrlFilters() {
     updateDraft({ searchText: value })
   }
 
-  function setSelectedStatus(
-    value: TicketStatus | '',
-  ) {
+  function setSelectedStatus(value: TicketStatus | '') {
     updateDraft({ selectedStatus: value })
   }
 
-  function setSelectedPriority(
-    value: TicketPriority | '',
-  ) {
+  function setSelectedPriority(value: TicketPriority | '') {
     updateDraft({ selectedPriority: value })
   }
 
-  function setSelectedSort(
-    value: 'newest' | 'oldest',
-  ) {
+  function setSelectedSort(value: 'newest' | 'oldest') {
     updateDraft({ selectedSort: value })
   }
 
-  function applyFilters(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-
     setDraft(null)
 
     setSearchParams(
-      toUrlParams(0, {
-        search: searchText.trim(),
-        status: selectedStatus,
-        priority: selectedPriority,
-        sort: selectedSort,
-      }),
+      toUrlParams(
+        0,
+        {
+          search: searchText.trim(),
+          status: selectedStatus,
+          priority: selectedPriority,
+          sort: selectedSort,
+        },
+        searchParams,
+      ),
     )
   }
 
   function resetFilters() {
     setDraft(null)
-    setSearchParams(new URLSearchParams())
+    const params = new URLSearchParams()
+    // Retain non-filter URL parameters like 'view'
+    for (const [key, value] of searchParams.entries()) {
+      if (!FILTER_PARAM_KEYS.has(key)) {
+        params.set(key, value)
+      }
+    }
+    setSearchParams(params)
   }
 
-  function setPage(
-    next: number | ((previous: number) => number),
-  ) {
-    const value =
-      typeof next === 'function'
-        ? next(page)
-        : next
-
+  function setPage(next: number | ((previous: number) => number)) {
+    const value = typeof next === 'function' ? next(page) : next
     setDraft(null)
 
     setSearchParams(
       toUrlParams(
         Math.max(0, value),
         appliedFilters,
+        searchParams,
       ),
     )
   }

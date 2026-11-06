@@ -383,10 +383,12 @@ export function ArticleEditorPage() {
 
           {/* Edit vs Preview Segmented Switcher */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-divider)', paddingBottom: '0.75rem', marginTop: '0.5rem' }}>
-            <div style={{ display: 'inline-flex', padding: '3px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', gap: '4px' }}>
+            <div className="horizon-view-tabs" role="tablist" aria-label="Editor mode">
               <button
                 type="button"
-                className={`horizon-btn horizon-btn--sm ${activeTab === 'edit' ? 'horizon-btn--primary' : 'horizon-btn--ghost'}`}
+                role="tab"
+                aria-selected={activeTab === 'edit'}
+                className={`horizon-view-tab ${activeTab === 'edit' ? 'is-active active' : ''}`}
                 onClick={() => setActiveTab('edit')}
               >
                 <Edit3 size={14} />
@@ -394,7 +396,9 @@ export function ArticleEditorPage() {
               </button>
               <button
                 type="button"
-                className={`horizon-btn horizon-btn--sm ${activeTab === 'preview' ? 'horizon-btn--primary' : 'horizon-btn--ghost'}`}
+                role="tab"
+                aria-selected={activeTab === 'preview'}
+                className={`horizon-view-tab ${activeTab === 'preview' ? 'is-active active' : ''}`}
                 onClick={() => setActiveTab('preview')}
               >
                 <Eye size={14} />

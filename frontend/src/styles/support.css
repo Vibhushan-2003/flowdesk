@@ -107,9 +107,17 @@
 
 .horizon-view-tab:hover {
   color: var(--color-text-primary);
+  background-color: var(--color-surface-subtle);
 }
 
-.horizon-view-tab.is-active {
+.horizon-view-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  color: var(--color-text-primary);
+}
+
+.horizon-view-tab.is-active,
+.horizon-view-tab[aria-selected="true"] {
   background-color: var(--color-surface);
   color: var(--color-primary);
   font-weight: var(--font-weight-semibold);

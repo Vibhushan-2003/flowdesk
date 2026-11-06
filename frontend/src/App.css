@@ -108,7 +108,7 @@
 .forgot-password-link {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #2563eb;
+  color: var(--color-primary);
   text-decoration: none;
 }
 

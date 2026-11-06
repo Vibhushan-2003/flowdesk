@@ -169,11 +169,11 @@ export function LoginPage() {
               fontWeight: 600,
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
-              background: 'rgba(59, 130, 246, 0.2)',
-              color: '#93c5fd',
+              background: 'rgba(224, 122, 75, 0.2)',
+              color: '#fdba74',
               padding: '2px 8px',
               borderRadius: '999px',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
+              border: '1px solid rgba(224, 122, 75, 0.35)',
             }}
           >
             Horizon

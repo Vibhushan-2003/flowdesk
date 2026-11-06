@@ -8,7 +8,6 @@ import {
   Search,
   AlertCircle,
   CheckCircle2,
-  Filter,
 } from 'lucide-react'
 
 import { claimTicket, getSupportQueue } from '../api/ticket'
@@ -236,12 +235,16 @@ export function SupportQueuePage() {
     },
   ]
 
+  const urgentCount = queue?.content
+    ? queue.content.filter((t) => t.priority === 'CRITICAL' || t.priority === 'HIGH').length
+    : 0
+
   return (
     <div className="support-queue-page horizon-page-container">
       {/* Page Header */}
       <PageHeader
         title="Support Queue"
-        subtitle="Review and claim unassigned open tickets. Queue is strictly ordered oldest first (FIFO)."
+        subtitle="Review and claim unassigned tickets. Ordered oldest first (FIFO) for service fairness."
         actions={
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <Button
@@ -250,7 +253,7 @@ export function SupportQueuePage() {
               onClick={() => navigate('/support/tickets')}
               leadingIcon={<UserCheck size={14} />}
             >
-              My Assigned Tickets
+              Assigned Tickets
             </Button>
             <Button
               variant="secondary"
@@ -272,7 +275,7 @@ export function SupportQueuePage() {
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
           gap: '16px',
-          marginBottom: '24px',
+          marginBottom: '20px',
         }}
       >
         <KPIStatCard
@@ -281,13 +284,14 @@ export function SupportQueuePage() {
           icon={<Inbox size={18} />}
         />
         <KPIStatCard
-          label="Dispatch Strategy"
-          value="FIFO (Oldest First)"
+          label="Urgent Tickets"
+          value={urgentCount}
+          alert={urgentCount > 0}
           icon={<Clock size={18} />}
         />
         <KPIStatCard
-          label="Triage Readiness"
-          value={queue?.totalElements === 0 ? 'Queue Clear' : 'Action Required'}
+          label="Queue Status"
+          value={queue?.totalElements === 0 ? 'Clear' : 'Needs Attention'}
           alert={Boolean(queue?.totalElements && queue.totalElements > 0)}
           icon={<UserCheck size={18} />}
         />
@@ -298,7 +302,7 @@ export function SupportQueuePage() {
         <div
           className="horizon-auth-alert horizon-auth-alert--error"
           role="alert"
-          style={{ marginBottom: '1.5rem' }}
+          style={{ marginBottom: '1.25rem' }}
         >
           <AlertCircle size={18} className="horizon-auth-alert-icon" />
           <span>{error}</span>
@@ -309,74 +313,81 @@ export function SupportQueuePage() {
         <div
           className="horizon-auth-alert horizon-auth-alert--success"
           role="status"
-          style={{ marginBottom: '1.5rem' }}
+          style={{ marginBottom: '1.25rem' }}
         >
           <CheckCircle2 size={18} className="horizon-auth-alert-icon" />
           <span>{successNotice}</span>
         </div>
       )}
 
-      {/* Filter & Search Bar */}
-      <Card padded style={{ marginBottom: '1.5rem' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem',
-            flexWrap: 'wrap',
-          }}
+      {/* Filter & Search Bar — Unified Workbench */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <form
+          className="ticket-filters-form"
+          onSubmit={(e) => e.preventDefault()}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '240px' }}>
-            <div className="horizon-input-wrapper" style={{ flex: 1 }}>
+          <div className="horizon-filter-fields">
+            {/* Search Input */}
+            <div className="horizon-input-wrapper" style={{ flex: '2 1 240px', minWidth: '200px' }}>
               <span className="horizon-input-icon horizon-input-icon--leading">
                 <Search size={16} />
               </span>
               <input
                 type="text"
                 className="horizon-input has-leading-icon"
-                placeholder="Filter current queue by ticket # or title..."
+                placeholder="Search queue by ticket # or subject..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
               />
             </div>
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             {/* Priority Filter */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Filter size={14} style={{ color: 'var(--color-text-muted)' }} />
-              <div className="horizon-select-wrapper">
-                <select
-                  className="horizon-select"
-                  style={{ padding: '6px 28px 6px 10px', fontSize: 'var(--font-size-xs)' }}
-                  value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value)}
-                >
-                  <option value="ALL">All Priorities</option>
-                  <option value="CRITICAL">Critical</option>
-                  <option value="HIGH">High</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="LOW">Low</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Sort Toggle */}
-            <div className="horizon-select-wrapper">
+            <div className="horizon-select-wrapper" style={{ flex: '1 1 150px', minWidth: '140px' }}>
               <select
                 className="horizon-select"
-                style={{ padding: '6px 28px 6px 10px', fontSize: 'var(--font-size-xs)' }}
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                aria-label="Filter by priority"
+              >
+                <option value="ALL">All Priorities</option>
+                <option value="CRITICAL">Critical</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+              </select>
+            </div>
+
+            {/* Sort Order */}
+            <div className="horizon-select-wrapper" style={{ flex: '1 1 160px', minWidth: '150px' }}>
+              <select
+                className="horizon-select"
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value as 'oldest' | 'newest')}
+                aria-label="Sort queue order"
               >
-                <option value="oldest">Sort: Oldest first (FIFO)</option>
-                <option value="newest">Sort: Newest first</option>
+                <option value="oldest">Oldest first (FIFO)</option>
+                <option value="newest">Newest first</option>
               </select>
             </div>
           </div>
-        </div>
-      </Card>
+
+          {(searchFilter.trim() || priorityFilter !== 'ALL') && (
+            <div className="horizon-filter-actions">
+              <Button
+                variant="secondary"
+                size="sm"
+                type="button"
+                onClick={() => {
+                  setSearchFilter('')
+                  setPriorityFilter('ALL')
+                }}
+              >
+                Reset Filters
+              </Button>
+            </div>
+          )}
+        </form>
+      </div>
 
       {/* Desktop Table View (>=768px) */}
       <div className="desktop-ticket-table-view">

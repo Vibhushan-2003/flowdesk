@@ -6,6 +6,8 @@ import {
   Eye,
   ExternalLink,
   RotateCcw,
+  BookOpen,
+  FileText,
 } from 'lucide-react'
 
 import { getArticles, getCategories, getManagementArticles } from '../api/kb'
@@ -218,26 +220,32 @@ export function KnowledgeBasePage() {
       {/* Staff Management Tab Bar */}
       {isStaff && (
         <div className="kb-management-bar horizon-card" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-          <div className="kb-tabs" style={{ display: 'inline-flex', padding: '3px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', gap: '4px' }}>
+          <div className="horizon-view-tabs" role="tablist" aria-label="Knowledge Base views" style={{ margin: 0 }}>
             <button
               type="button"
-              className={`kb-tab-btn horizon-btn horizon-btn--sm ${activeTab === 'published' ? 'horizon-btn--primary' : 'horizon-btn--ghost'}`}
+              role="tab"
+              aria-selected={activeTab === 'published'}
+              className={`horizon-view-tab ${activeTab === 'published' ? 'is-active' : ''}`}
               onClick={() => {
                 setActiveTab('published')
                 setPage(0)
               }}
             >
-              Published Library
+              <BookOpen size={15} />
+              <span>Published Articles</span>
             </button>
             <button
               type="button"
-              className={`kb-tab-btn horizon-btn horizon-btn--sm ${activeTab === 'management' ? 'horizon-btn--primary' : 'horizon-btn--ghost'}`}
+              role="tab"
+              aria-selected={activeTab === 'management'}
+              className={`horizon-view-tab ${activeTab === 'management' ? 'is-active' : ''}`}
               onClick={() => {
                 setActiveTab('management')
                 setPage(0)
               }}
             >
-              Staff Management (All Statuses)
+              <FileText size={15} />
+              <span>Staff Management</span>
             </button>
           </div>
 

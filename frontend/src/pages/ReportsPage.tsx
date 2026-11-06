@@ -171,7 +171,7 @@ export function ReportsPage() {
       {/* Page Header */}
       <PageHeader
         title="Operational Reporting & Analytics"
-        subtitle="Real-time aggregated ticket volume, resolution duration, SLA compliance, workload distribution, and Knowledge Base deflection."
+        subtitle="Track ticket volumes, resolution times, SLA compliance, and team workload."
         actions={
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <Button
@@ -436,7 +436,7 @@ export function ReportsPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
               <Users size={18} style={{ color: 'var(--color-primary)' }} />
               <h2 className="reports-section-title" style={{ margin: 0, fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>
-                Support Engineer Workload & Performance
+                Engineer Workload
               </h2>
             </div>
 
@@ -499,7 +499,7 @@ export function ReportsPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
               <HelpCircle size={18} style={{ color: 'var(--color-primary)' }} />
               <h2 className="reports-section-title" style={{ margin: 0, fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>
-                Self-Service Knowledge Base Impact
+                Help Article Deflections
               </h2>
             </div>
 
@@ -551,7 +551,7 @@ export function ReportsPage() {
                 <h3>Export Data</h3>
               </div>
               <p>
-                Download sanitized, RFC 4180 compliant CSV files with formula-injection protection.
+                Download report summaries or raw ticket details as spreadsheet-ready CSV files.
               </p>
             </div>
             <div className="horizon-export-buttons reports-export-buttons">

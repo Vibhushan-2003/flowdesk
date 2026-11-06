@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle,
   ArrowRight,
   CheckCircle2,
   Clock,
@@ -91,7 +90,7 @@ export function SlaDashboardPage() {
       {/* Page Header */}
       <PageHeader
         title="SLA Operations"
-        subtitle="Monitor active service levels, resolution compliance, and real-time SLA breach audit events."
+        subtitle="Track response and resolution deadlines across support tickets."
         actions={
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {isSupport && (
@@ -236,19 +235,14 @@ export function SlaDashboardPage() {
             </div>
           </div>
 
-          {/* Current Exposure: Breached Tickets by Priority */}
-          <Card padded style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--color-divider)', paddingBottom: '0.75rem' }}>
-              <AlertTriangle size={18} style={{ color: 'var(--color-warning)' }} />
-              <div>
-                <h2 style={{ margin: 0, fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)' }}>
-                  Current Exposure: Breached Tickets by Priority
-                </h2>
-                <p style={{ margin: '2px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                  Breakdown of active tickets currently violating response or resolution thresholds.
-                </p>
-              </div>
-            </div>
+          {/* Overdue Tickets by Priority */}
+          <Card
+            title="Overdue Tickets by Priority"
+            subtitle="Active tickets currently past their response or resolution target."
+            density="standard"
+            divider
+            style={{ marginBottom: '1.5rem' }}
+          >
 
             <div className="horizon-sla-exposure-grid">
               {PRIORITIES.map((priority) => {
@@ -276,23 +270,17 @@ export function SlaDashboardPage() {
           </Card>
 
           {/* Recent SLA Breaches Table */}
-          <Card padded>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--color-divider)', paddingBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clock size={18} style={{ color: 'var(--color-primary)' }} />
-                <div>
-                  <h2 style={{ margin: 0, fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)' }}>
-                    Recent SLA Breaches
-                  </h2>
-                  <p style={{ margin: '2px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                    Immutable historical breach events logged across operational queues.
-                  </p>
-                </div>
-              </div>
+          <Card
+            title="Recent SLA Breaches"
+            subtitle="Overdue ticket events recorded across queues."
+            density="standard"
+            divider
+            headerActions={
               <Badge variant="neutral" size="sm">
                 {dashboard.recentBreaches.length} {dashboard.recentBreaches.length === 1 ? 'event' : 'events'}
               </Badge>
-            </div>
+            }
+          >
 
             {dashboard.recentBreaches.length === 0 ? (
               <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>

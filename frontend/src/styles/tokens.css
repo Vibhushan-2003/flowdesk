@@ -5,21 +5,22 @@
  */
 
 :root {
-  /* Color Palette - Light Theme */
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-active: #1e40af;
-  --color-primary-subtle: #eff6ff;
-  --color-primary-border: #bfdbfe;
+  /* Color Palette - Mineral & Copper Identity (Light Theme) */
+  --color-primary: #b44d18;
+  --color-primary-hover: #9e4112;
+  --color-primary-active: #82340c;
+  --color-primary-subtle: #fdf5f0;
+  --color-primary-border: #f5d3bf;
   --color-primary-contrast: #ffffff;
+  --color-primary-glow: rgba(180, 77, 24, 0.22);
 
-  --color-ink: #101828;
-  --color-text-primary: #101828;
-  --color-text-secondary: #64748b;
-  --color-text-muted: #94a3b8;
-  --color-text-disabled: #cbd5e1;
+  --color-ink: #0f172a;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-text-disabled: #94a3b8;
 
-  --color-canvas: #f7f9fc;
+  --color-canvas: #f8fafc;
   --color-surface: #ffffff;
   --color-surface-subtle: #f1f5f9;
   --color-surface-muted: #e2e8f0;
@@ -34,37 +35,41 @@
   --color-input-bg: #ffffff;
   --color-input-border: #cbd5e1;
   --color-input-border-hover: #94a3b8;
-  --color-input-border-focus: #2563eb;
-  --color-input-text: #101828;
+  --color-input-border-focus: #b44d18;
+  --color-input-text: #0f172a;
   --color-input-placeholder: #94a3b8;
 
   /* Semantic Feedback - Light */
-  --color-success: #0f766e;
-  --color-success-hover: #115e59;
-  --color-success-subtle: #f0fdf4;
-  --color-success-border: #bbf7d0;
-  --color-success-text: #0f766e;
+  --color-success: #0d7366;
+  --color-success-hover: #09544a;
+  --color-success-subtle: #f0fdf9;
+  --color-success-border: #b2eadd;
+  --color-success-text: #0d7366;
 
-  --color-warning: #d97706;
-  --color-warning-hover: #b45309;
+  --color-warning: #b45309;
+  --color-warning-hover: #92400e;
   --color-warning-subtle: #fffbeb;
   --color-warning-border: #fde68a;
-  --color-warning-text: #b45309;
+  --color-warning-text: #92400e;
 
-  --color-danger: #dc2626;
-  --color-danger-hover: #b91c1c;
+  --color-danger: #b91c1c;
+  --color-danger-hover: #991b1b;
   --color-danger-subtle: #fef2f2;
   --color-danger-border: #fecaca;
-  --color-danger-text: #b91c1c;
+  --color-danger-text: #991b1b;
 
-  --color-info: #2563eb;
-  --color-info-subtle: #eff6ff;
-  --color-info-border: #bfdbfe;
-  --color-info-text: #1d4ed8;
+  --color-info: #334155;
+  --color-info-subtle: #f1f5f9;
+  --color-info-border: #cbd5e1;
+  --color-info-text: #1e293b;
 
   --color-internal: #92400e;
   --color-internal-subtle: #fef3c7;
   --color-internal-border: #fcd34d;
+
+  /* Card Inset Geometry Tokens */
+  --card-padding-x: var(--space-5);
+  --card-padding-y: var(--space-5);
 
   /* Typography */
   --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -138,14 +143,15 @@
   --control-height-lg: 44px;
 }
 
-/* Dark Theme Tokens */
+/* Dark Theme Tokens - Mineral Obsidian & Illuminated Copper */
 [data-theme="dark"] {
-  --color-primary: #3b82f6;
-  --color-primary-hover: #60a5fa;
-  --color-primary-active: #2563eb;
-  --color-primary-subtle: rgba(59, 130, 246, 0.15);
-  --color-primary-border: rgba(59, 130, 246, 0.3);
+  --color-primary: #e07a4b;
+  --color-primary-hover: #ea8e62;
+  --color-primary-active: #d4693a;
+  --color-primary-subtle: rgba(224, 122, 75, 0.15);
+  --color-primary-border: rgba(224, 122, 75, 0.32);
   --color-primary-contrast: #ffffff;
+  --color-primary-glow: rgba(224, 122, 75, 0.25);
 
   --color-ink: #f8fafc;
   --color-text-primary: #f8fafc;
@@ -153,48 +159,48 @@
   --color-text-muted: #64748b;
   --color-text-disabled: #475569;
 
-  --color-canvas: #0b0f17;
-  --color-surface: #131b2e;
-  --color-surface-subtle: #1a243b;
-  --color-surface-muted: #24304d;
-  --color-surface-elevated: #1e293b;
+  --color-canvas: #0c1017;
+  --color-surface: #141a24;
+  --color-surface-subtle: #1a2230;
+  --color-surface-muted: #232d3f;
+  --color-surface-elevated: #1e2738;
 
-  --color-border: #1e293b;
-  --color-border-subtle: #172033;
-  --color-border-strong: #334155;
-  --color-divider: #1e293b;
+  --color-border: #263244;
+  --color-border-subtle: #1e2738;
+  --color-border-strong: #38465c;
+  --color-divider: #232d3f;
 
   /* Form Controls - Dark */
-  --color-input-bg: #1a243b;
-  --color-input-border: #334155;
-  --color-input-border-hover: #475569;
-  --color-input-border-focus: #3b82f6;
+  --color-input-bg: #1a2230;
+  --color-input-border: #263244;
+  --color-input-border-hover: #38465c;
+  --color-input-border-focus: #e07a4b;
   --color-input-text: #f8fafc;
   --color-input-placeholder: #64748b;
 
   /* Semantic Feedback - Dark */
-  --color-success: #14b8a6;
-  --color-success-hover: #2dd4bf;
-  --color-success-subtle: rgba(20, 184, 166, 0.15);
-  --color-success-border: rgba(20, 184, 166, 0.3);
+  --color-success: #2dd4bf;
+  --color-success-hover: #14b8a6;
+  --color-success-subtle: rgba(45, 212, 191, 0.15);
+  --color-success-border: rgba(45, 212, 191, 0.3);
   --color-success-text: #2dd4bf;
 
-  --color-warning: #f59e0b;
-  --color-warning-hover: #fbbf24;
-  --color-warning-subtle: rgba(245, 158, 11, 0.15);
-  --color-warning-border: rgba(245, 158, 11, 0.3);
+  --color-warning: #fbbf24;
+  --color-warning-hover: #f59e0b;
+  --color-warning-subtle: rgba(251, 191, 36, 0.15);
+  --color-warning-border: rgba(251, 191, 36, 0.3);
   --color-warning-text: #fbbf24;
 
-  --color-danger: #ef4444;
-  --color-danger-hover: #f87171;
-  --color-danger-subtle: rgba(239, 68, 68, 0.15);
-  --color-danger-border: rgba(239, 68, 68, 0.3);
+  --color-danger: #f87171;
+  --color-danger-hover: #ef4444;
+  --color-danger-subtle: rgba(248, 113, 113, 0.15);
+  --color-danger-border: rgba(248, 113, 113, 0.3);
   --color-danger-text: #f87171;
 
-  --color-info: #3b82f6;
-  --color-info-subtle: rgba(59, 130, 246, 0.15);
-  --color-info-border: rgba(59, 130, 246, 0.3);
-  --color-info-text: #60a5fa;
+  --color-info: #94a3b8;
+  --color-info-subtle: rgba(148, 163, 184, 0.15);
+  --color-info-border: rgba(148, 163, 184, 0.3);
+  --color-info-text: #cbd5e1;
 
   --color-internal: #fbbf24;
   --color-internal-subtle: rgba(251, 191, 36, 0.15);
