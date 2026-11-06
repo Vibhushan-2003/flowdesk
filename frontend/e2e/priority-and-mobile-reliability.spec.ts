@@ -373,8 +373,44 @@ test.describe('Priority System & Mobile Responsiveness Reliability Suite', () =>
     expect(filterOptions.some((o) => /low/i.test(o))).toBe(true)
   })
 
-  test('All 24 application routes load cleanly with zero element clipping across mobile viewports (320px, 360px, 390px, 412px, 430px)', async ({ page }) => {
-    // Setup full suite mocks with Admin user
+  // =========================================================================
+  // CANONICAL 24-ROUTE MATRIX AUDIT (320px, 360px, 390px, 412px, 430px)
+  // Derived directly from App.tsx route definitions
+  // =========================================================================
+
+  test('Canonical 24-Route Matrix Audit: 320px (iPhone SE 1st Gen)', async ({ page }) => {
+    test.setTimeout(45000)
+    await run24RouteMatrixAudit(page, { name: 'iPhone SE (320px)', width: 320, height: 568 })
+  })
+
+  test('Canonical 24-Route Matrix Audit: 360px (Samsung Galaxy S8)', async ({ page }) => {
+    test.setTimeout(45000)
+    await run24RouteMatrixAudit(page, { name: 'Samsung Galaxy S8 (360px)', width: 360, height: 740 })
+  })
+
+  test('Canonical 24-Route Matrix Audit: 390px (iPhone 12/13/14)', async ({ page }) => {
+    test.setTimeout(45000)
+    await run24RouteMatrixAudit(page, { name: 'iPhone 12/13/14 (390px)', width: 390, height: 844 })
+  })
+
+  test('Canonical 24-Route Matrix Audit: 412px (Samsung Galaxy A54)', async ({ page }) => {
+    test.setTimeout(45000)
+    await run24RouteMatrixAudit(page, { name: 'Samsung Galaxy A54 (412px)', width: 412, height: 915 })
+  })
+
+  test('Canonical 24-Route Matrix Audit: 430px (iPhone 14/15 Pro Max)', async ({ page }) => {
+    test.setTimeout(45000)
+    await run24RouteMatrixAudit(page, { name: 'iPhone 14/15 Pro Max (430px)', width: 430, height: 932 })
+  })
+
+  test('Real Mobile Interaction: Android touch events and virtual keyboard typing on Samsung Galaxy A54 (412x915)', async ({ browser }) => {
+    const context = await browser.newContext({
+      viewport: { width: 412, height: 915 },
+      hasTouch: true,
+      isMobile: true,
+    })
+    const page = await context.newPage()
+
     const superAdmin = {
       id: 'e0000000-0000-0000-0000-000000000003',
       email: 'admin@flowdesk.test',
@@ -382,70 +418,40 @@ test.describe('Priority System & Mobile Responsiveness Reliability Suite', () =>
     }
     await setupComprehensiveMocks(page, superAdmin)
     const token = createMockToken(superAdmin)
-
-    // A. Public / Auth routes (without session token)
-    const publicRoutes = [
-      { path: '/login', heading: /welcome back/i },
-      { path: '/forgot-password', heading: /forgot password/i },
-      { path: '/reset-password?token=mock-token', heading: /reset your password|invalid reset link/i },
-      { path: '/accept-invitation?token=mock-token', heading: /set up your account|invalid invitation link/i },
-    ]
-
-    for (const routeInfo of publicRoutes) {
-      await page.setViewportSize({ width: 412, height: 915 })
-      await page.goto('/login')
-      await page.evaluate(() => sessionStorage.clear())
-      await page.goto(routeInfo.path)
-      await expect(page.getByRole('heading', { name: routeInfo.heading })).toBeVisible({ timeout: 6000 })
-      await checkElementBoundsAndReachability(page, 412)
-    }
-
-    // B. Authenticated routes (with session token)
     await page.addInitScript((t) => {
       sessionStorage.setItem('flowdesk_access_token', t)
     }, token)
 
-    const authenticatedRoutes = [
-      // Core Employee & General routes
-      { path: '/dashboard', heading: /dashboard|it self-service/i },
-      { path: '/tickets', heading: /my tickets/i },
-      { path: '/tickets/new', heading: /create a ticket/i },
-      { path: '/tickets/FD-100201', heading: /ticket details/i },
-      { path: '/profile', heading: /my profile/i },
-      { path: '/account', heading: /account settings/i },
-      { path: '/kb', heading: /knowledge base/i },
-      { path: '/kb/articles/how-to-reset-password', heading: /how to reset your corporate password/i },
-      // Support Engineer routes
-      { path: '/support/queue', heading: /support queue/i },
-      { path: '/support/tickets', heading: /assigned tickets|support tickets/i },
-      { path: '/support/tickets/FD-100200', heading: /support ticket details/i },
-      { path: '/support/kb/articles/new', heading: /create knowledge base article/i },
-      // Supervisor / Team Lead routes
-      { path: '/approvals', heading: /approval inbox/i },
-      { path: '/sla/dashboard', heading: /sla operations/i },
-      { path: '/reports', heading: /operational reporting & analytics/i },
-      // Administrator routes
-      { path: '/audit', heading: /security audit trail/i },
-      { path: '/admin/users', heading: /user management/i },
-      { path: '/admin/attachments', heading: /attachment security & malware quarantine/i },
-    ]
+    await page.goto('/kb')
 
-    // Verify authenticated routes at 412px (Galaxy A54)
-    for (const routeInfo of authenticatedRoutes) {
-      await page.setViewportSize({ width: 412, height: 915 })
-      await page.goto(routeInfo.path)
-      await expect(page.getByRole('heading', { name: routeInfo.heading })).toBeVisible({ timeout: 6000 })
-      await checkElementBoundsAndReachability(page, 412)
-    }
+    // 1. Locate mobile search input
+    const searchInput = page.locator('input[placeholder*="Search articles"]')
+    await expect(searchInput).toBeVisible()
 
-    // Verify key constrained routes at narrowest 320px
-    const narrowRoutes = ['/dashboard', '/tickets/new', '/support/queue', '/reports', '/admin/users']
-    for (const path of narrowRoutes) {
-      await page.setViewportSize({ width: 320, height: 568 })
-      await page.goto(path)
-      await page.waitForTimeout(200)
-      await checkElementBoundsAndReachability(page, 320)
-    }
+    // 2. Simulate Android touch tap on the search input
+    await searchInput.tap()
+    await expect(searchInput).toBeFocused()
+
+    // 3. Simulate mobile virtual keyboard typing with realistic delay
+    await page.keyboard.type('password', { delay: 40 })
+    await expect(searchInput).toHaveValue('password')
+
+    // 4. Press Enter to dispatch filter search
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(200)
+
+    // 5. Simulate mobile vertical drag/scroll
+    await page.evaluate(() => window.scrollBy(0, 150))
+    const scrollY = await page.evaluate(() => window.scrollY)
+    expect(scrollY).toBeGreaterThanOrEqual(0)
+
+    // 6. Clear search input via keyboard shortcut
+    await searchInput.tap()
+    await page.keyboard.press('Control+A')
+    await page.keyboard.press('Backspace')
+    await expect(searchInput).toHaveValue('')
+
+    await context.close()
   })
 
   test('Real Mobile Interaction: End-to-end ticket submission on iPhone 12/13/14 (390x844)', async ({ page }) => {
@@ -630,6 +636,237 @@ test.describe('Priority System & Mobile Responsiveness Reliability Suite', () =>
     expect(isLight).toBe(true)
   })
 })
+
+interface CanonicalRoute {
+  name: string
+  path: string
+  isPublic: boolean
+  heading: RegExp
+  landmarkSelector: string
+}
+
+const CANONICAL_24_ROUTES: CanonicalRoute[] = [
+  // --- Public Routes (5) ---
+  {
+    name: 'Login',
+    path: '/login',
+    isPublic: true,
+    heading: /welcome back|sign in to flowdesk/i,
+    landmarkSelector: 'input[type="email"], button[type="submit"]',
+  },
+  {
+    name: 'Google OAuth Callback Rejection',
+    path: '/auth/google/callback?error=access_denied&error_description=User%20cancelled',
+    isPublic: true,
+    heading: /sign in failed|access restricted/i,
+    landmarkSelector: 'a:has-text("Return to sign in"), a[href="/login"]',
+  },
+  {
+    name: 'Forgot Password',
+    path: '/forgot-password',
+    isPublic: true,
+    heading: /forgot password/i,
+    landmarkSelector: 'input[type="email"], button[type="submit"]',
+  },
+  {
+    name: 'Reset Password',
+    path: '/reset-password?token=mock-token',
+    isPublic: true,
+    heading: /reset your password|invalid reset link/i,
+    landmarkSelector: 'button, a',
+  },
+  {
+    name: 'Accept Invitation',
+    path: '/accept-invitation?token=mock-token',
+    isPublic: true,
+    heading: /set up your account|invalid invitation link/i,
+    landmarkSelector: 'button, a',
+  },
+
+  // --- Authenticated General / Employee Routes (8) ---
+  {
+    name: 'Dashboard',
+    path: '/dashboard',
+    isPublic: false,
+    heading: /dashboard|it self-service|operations command/i,
+    landmarkSelector: '.horizon-card',
+  },
+  {
+    name: 'My Tickets',
+    path: '/tickets',
+    isPublic: false,
+    heading: /my tickets/i,
+    landmarkSelector: '.horizon-page-header, .horizon-filter-bar',
+  },
+  {
+    name: 'Create Ticket',
+    path: '/tickets/new',
+    isPublic: false,
+    heading: /create a ticket/i,
+    landmarkSelector: '#ticket-title, button[type="submit"]',
+  },
+  {
+    name: 'Ticket Details',
+    path: '/tickets/FD-100201',
+    isPublic: false,
+    heading: /ticket details/i,
+    landmarkSelector: '.horizon-card',
+  },
+  {
+    name: 'User Profile',
+    path: '/profile',
+    isPublic: false,
+    heading: /my profile/i,
+    landmarkSelector: '.profile-page, .horizon-card',
+  },
+  {
+    name: 'Account Settings',
+    path: '/account',
+    isPublic: false,
+    heading: /account settings/i,
+    landmarkSelector: '.theme-toggle-btn, .horizon-card',
+  },
+  {
+    name: 'Knowledge Base',
+    path: '/kb',
+    isPublic: false,
+    heading: /knowledge base/i,
+    landmarkSelector: 'input[type="search"], .horizon-card',
+  },
+  {
+    name: 'Knowledge Base Article View',
+    path: '/kb/articles/how-to-reset-password',
+    isPublic: false,
+    heading: /how to reset your corporate password/i,
+    landmarkSelector: '.kb-breadcrumbs, .horizon-card',
+  },
+
+  // --- Authenticated Support Engineer Route (1) ---
+  {
+    name: 'Support Queue',
+    path: '/support/queue',
+    isPublic: false,
+    heading: /support queue/i,
+    landmarkSelector: '#queue-priority-filter, .horizon-filter-bar',
+  },
+
+  // --- Authenticated Support Engineer / Team Lead / Admin Routes (4) ---
+  {
+    name: 'Assigned Tickets',
+    path: '/support/tickets',
+    isPublic: false,
+    heading: /assigned tickets|support tickets/i,
+    landmarkSelector: '.horizon-view-tabs, .horizon-card',
+  },
+  {
+    name: 'Support Ticket Workbench',
+    path: '/support/tickets/FD-100200',
+    isPublic: false,
+    heading: /support ticket details/i,
+    landmarkSelector: '.horizon-workbench-grid, .horizon-card',
+  },
+  {
+    name: 'Create KB Article',
+    path: '/support/kb/articles/new',
+    isPublic: false,
+    heading: /create knowledge base article/i,
+    landmarkSelector: 'input, textarea',
+  },
+  {
+    name: 'Edit KB Article',
+    path: '/support/kb/articles/art-1/edit',
+    isPublic: false,
+    heading: /edit knowledge base article/i,
+    landmarkSelector: 'input, textarea',
+  },
+
+  // --- Authenticated Team Lead / Admin Routes (3) ---
+  {
+    name: 'Approval Inbox',
+    path: '/approvals',
+    isPublic: false,
+    heading: /approval inbox/i,
+    landmarkSelector: '.approvals-container, .horizon-card',
+  },
+  {
+    name: 'SLA Operations Dashboard',
+    path: '/sla/dashboard',
+    isPublic: false,
+    heading: /sla operations/i,
+    landmarkSelector: '.horizon-card',
+  },
+  {
+    name: 'Operational Reports',
+    path: '/reports',
+    isPublic: false,
+    heading: /operational reporting & analytics/i,
+    landmarkSelector: '.reports-date-presets, .horizon-btn',
+  },
+
+  // --- Authenticated Admin Only Routes (3) ---
+  {
+    name: 'Security Audit Trail',
+    path: '/audit',
+    isPublic: false,
+    heading: /security audit trail/i,
+    landmarkSelector: '.audit-trail-filter-bar, .horizon-btn, table',
+  },
+  {
+    name: 'User Management',
+    path: '/admin/users',
+    isPublic: false,
+    heading: /user management/i,
+    landmarkSelector: '#invite-user-btn, .horizon-btn',
+  },
+  {
+    name: 'Attachment Security',
+    path: '/admin/attachments',
+    isPublic: false,
+    heading: /attachment security & malware quarantine/i,
+    landmarkSelector: '.quarantine-rescan-btn, .horizon-btn',
+  },
+]
+
+async function run24RouteMatrixAudit(page: Page, vp: { name: string; width: number; height: number }) {
+  const superAdmin = {
+    id: 'e0000000-0000-0000-0000-000000000003',
+    email: 'admin@flowdesk.test',
+    roles: ['ADMIN', 'SUPPORT_ENGINEER', 'TEAM_LEAD', 'EMPLOYEE'],
+  }
+  await setupComprehensiveMocks(page, superAdmin)
+  const token = createMockToken(superAdmin)
+
+  await page.setViewportSize({ width: vp.width, height: vp.height })
+
+  // 1. Audit Public Routes (without session token)
+  const publicRoutes = CANONICAL_24_ROUTES.filter((r) => r.isPublic)
+  for (const route of publicRoutes) {
+    await page.goto('/login')
+    await page.evaluate(() => sessionStorage.clear())
+    await page.goto(route.path)
+    await expect(page.getByRole('heading', { name: route.heading })).toBeVisible({ timeout: 6000 })
+    await expect(page.locator(route.landmarkSelector).first()).toBeVisible({ timeout: 6000 })
+    await checkElementBoundsAndReachability(page, vp.width)
+  }
+
+  // 2. Audit Authenticated Routes (with session token)
+  await page.addInitScript((t) => {
+    sessionStorage.setItem('flowdesk_access_token', t)
+  }, token)
+
+  const authenticatedRoutes = CANONICAL_24_ROUTES.filter((r) => !r.isPublic)
+  for (const route of authenticatedRoutes) {
+    await page.goto(route.path)
+    await expect(page.getByRole('heading', { name: route.heading })).toBeVisible({ timeout: 6000 })
+    await expect(page.locator(route.landmarkSelector).first()).toBeVisible({ timeout: 6000 })
+    await checkElementBoundsAndReachability(page, vp.width)
+
+    // Vertical reachability & scroll containment check
+    await page.evaluate(() => window.scrollBy(0, 100))
+    const scrollLeft = await page.evaluate(() => document.documentElement.scrollLeft || document.body.scrollLeft)
+    expect(scrollLeft, `Horizontal document scroll detected on route ${route.path} at ${vp.width}px`).toBe(0)
+  }
+}
 
 async function checkElementBoundsAndReachability(page: Page, viewportWidth: number) {
   const result = await page.evaluate((vpWidth: number) => {
@@ -836,6 +1073,30 @@ async function setupComprehensiveMocks(page: Page, currentUser: MockUser) {
   })
 
   await page.route('**/api/kb/articles/*', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'art-1',
+        title: 'How to Reset Your Corporate Password',
+        slug: 'how-to-reset-password',
+        summary: 'Follow these steps to reset your corporate password securely.',
+        contentMarkdown: '## Steps to Reset Password\n\n1. Navigate to identity portal.\n2. Complete MFA challenge.',
+        categoryId: 'cat-1',
+        categoryName: 'Authentication',
+        categorySlug: 'authentication',
+        status: 'PUBLISHED',
+        createdAt: '2026-10-15T08:00:00Z',
+        updatedAt: '2026-11-01T14:00:00Z',
+        authorName: 'Alex Smith',
+        viewCount: 42,
+        helpfulCount: 20,
+        deflectedCount: 15,
+      }),
+    })
+  })
+
+  await page.route('**/api/support/kb/articles/*', async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

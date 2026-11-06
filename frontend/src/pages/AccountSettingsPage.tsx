@@ -146,7 +146,7 @@ export function AccountSettingsPage() {
       </div>
 
       {activeTab === 'security' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '24px' }}>
           {/* Change Password Card */}
           <Card padded title="Change Password" subtitle="Ensure your account stays secure by using a strong password.">
             <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
