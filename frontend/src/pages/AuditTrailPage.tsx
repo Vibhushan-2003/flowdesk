@@ -240,7 +240,7 @@ export function AuditTrailPage() {
       {/* Page Header */}
       <PageHeader
         title="Security Audit Trail"
-        subtitle="Review immutable business activity, operational state transitions, and compliance audit events."
+        subtitle="View chronological records of system actions, ticket updates, and user changes."
         actions={
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <Button
@@ -340,7 +340,7 @@ export function AuditTrailPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ShieldCheck size={18} style={{ color: 'var(--color-primary)' }} />
             <h2 style={{ margin: 0, fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)' }}>
-              Audit Events Log
+              Activity Log
             </h2>
           </div>
           {auditPage && (
@@ -366,7 +366,7 @@ export function AuditTrailPage() {
             description={
               hasActiveFilters
                 ? 'Try adjusting your search query or action filter.'
-                : 'Business activity will appear here once auditable system actions occur.'
+                : 'System events will appear here as activity occurs.'
             }
             action={
               hasActiveFilters ? (

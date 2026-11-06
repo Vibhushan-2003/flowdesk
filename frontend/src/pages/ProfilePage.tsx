@@ -39,7 +39,7 @@ export function ProfilePage() {
     <div className="profile-page horizon-page-container">
       <PageHeader
         title="My Profile"
-        subtitle="Manage your personal identity, organizational roles, and active workspace permissions."
+        subtitle="View your account details and assigned roles."
         badge={
           <Badge variant="primary" size="md">
             {primaryRole.replace('_', ' ')}
@@ -131,11 +131,11 @@ export function ProfilePage() {
         </Card>
 
         {/* Roles & Permissions Card */}
-        <Card padded title="Role Authorization & Scopes" subtitle="Assigned roles determine available workspaces, queues, and supervisory controls.">
+        <Card padded title="Your Roles & Permissions" subtitle="Your assigned roles determine which workspaces and actions you can access.">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
               <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', fontWeight: 'var(--font-weight-semibold)' }}>
-                Active Workspace Roles ({roles.length})
+                Your Roles ({roles.length})
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 {roles.map((r) => (
@@ -150,13 +150,13 @@ export function ProfilePage() {
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                 <Info size={16} style={{ color: 'var(--color-primary)', marginTop: '2px', flexShrink: 0 }} />
                 <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
-                  <strong>Role-Based Access Control (RBAC):</strong> Role assignments are governed by organization administrators. Staff members holding supervisory roles (Team Lead or Admin) can oversee operations and approve requests.
+                  <strong>Role-Based Access:</strong> Roles are managed by system administrators. Team Leads and Administrators can review approvals, inspect metrics, and manage user settings.
                 </div>
               </div>
             </div>
 
             <div style={{ marginTop: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', lineHeight: '1.5' }}>
-              <strong>Avatar Specification:</strong> Initials avatars are rendered deterministically using your primary account identifier. Photo upload is omitted to comply with enterprise zero-trust storage constraints.
+              Profile avatars are generated automatically from your registered email address.
             </div>
           </div>
         </Card>

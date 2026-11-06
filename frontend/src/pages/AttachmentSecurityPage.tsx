@@ -74,7 +74,7 @@ export function AttachmentSecurityPage() {
       {/* Page Header */}
       <PageHeader
         title="Attachment Security & Malware Quarantine"
-        subtitle="Administrative security maintenance to audit historical attachment scan states and trigger bounded batch rescans with ClamAV."
+        subtitle="Scan uploaded files for malware and manage attachment security policies."
         actions={
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <Button
@@ -111,10 +111,10 @@ export function AttachmentSecurityPage() {
           <Shield size={18} style={{ color: 'var(--color-primary)' }} />
           <div>
             <h2 style={{ margin: 0, fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)' }}>
-              Malware Scanner Lifecycle & Rescan Architecture
+              How Attachment Scanning Works
             </h2>
             <p style={{ margin: '2px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-              How FlowDesk protects users from malicious payloads using ClamAV stream analysis.
+              FlowDesk checks all uploaded files for security threats before allowing downloads.
             </p>
           </div>
         </div>
@@ -123,7 +123,7 @@ export function AttachmentSecurityPage() {
           <div style={{ padding: '1rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
               <Badge variant="warning" size="sm">PENDING_SCAN</Badge>
-              <span>Initial Quarantine</span>
+              <span>1. Quarantine on Upload</span>
             </div>
             <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
               Every uploaded file enters quarantine in an unreleased state. Direct customer and staff downloads are blocked until ClamAV stream inspection concludes.
@@ -143,7 +143,7 @@ export function AttachmentSecurityPage() {
           <div style={{ padding: '1rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
               <Badge variant="danger" size="sm">INFECTED</Badge>
-              <span>Permanent Isolation</span>
+              <span>3. Threat Blocked</span>
             </div>
             <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
               Malware detections trigger immutable quarantine. Infected payloads cannot be downloaded, with quarantine badges displayed in conversation threads.
@@ -158,10 +158,10 @@ export function AttachmentSecurityPage() {
           <ShieldAlert size={18} style={{ color: 'var(--color-warning)' }} />
           <div>
             <h2 style={{ margin: 0, fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)' }}>
-              Batch Rescan Routine
+              Batch File Rescan
             </h2>
             <p style={{ margin: '2px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-              Process historical or uninspected attachments using PostgreSQL row-level locks with FOR UPDATE SKIP LOCKED.
+              Scan pending or uninspected attachments on demand.
             </p>
           </div>
         </div>
@@ -188,7 +188,7 @@ export function AttachmentSecurityPage() {
               />
             </div>
             <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-              Specifies the maximum number of pending attachments scanned in this run. Uses PostgreSQL <code>FOR UPDATE SKIP LOCKED</code> to prevent duplicate concurrent processing.
+              Specifies the maximum number of pending attachments scanned in this batch.
             </span>
           </div>
 
@@ -269,7 +269,7 @@ export function AttachmentSecurityPage() {
         isOpen={isConfirming}
         onClose={() => setIsConfirming(false)}
         title="Confirm Attachment Rescan"
-        subtitle="Administrative Operation"
+        subtitle="Administrative Confirmation"
         footer={
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
             <Button variant="secondary" size="sm" onClick={() => setIsConfirming(false)}>
@@ -283,7 +283,7 @@ export function AttachmentSecurityPage() {
       >
         <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', lineHeight: 'var(--line-height-relaxed)', color: 'var(--color-text-primary)' }}>
           Are you sure you want to trigger a batch rescan for up to <strong>{batchSize}</strong> pending attachments?
-          This will stream files through ClamAV and update attachment security classifications in PostgreSQL.
+          This will evaluate pending files through the security scanner and update their status.
         </p>
       </Modal>
     </div>

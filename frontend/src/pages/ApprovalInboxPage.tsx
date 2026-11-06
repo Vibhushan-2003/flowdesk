@@ -149,7 +149,7 @@ export function ApprovalInboxPage() {
       {/* Page Header */}
       <PageHeader
         title="Approval Inbox"
-        subtitle="Review and authorize service requests before they enter the support queue and begin SLA tracking."
+        subtitle="Review and approve requests from team members."
         actions={
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <Button
@@ -204,7 +204,7 @@ export function ApprovalInboxPage() {
               <strong>{approvalPage.totalElements}</strong> {approvalPage.totalElements === 1 ? 'request' : 'requests'} awaiting decision
             </span>
             <span style={{ fontSize: 'var(--font-size-xs)' }}>
-              Team Lead / Admin authorization required
+              Requires Team Lead or Admin approval
             </span>
           </div>
 
@@ -260,7 +260,7 @@ export function ApprovalInboxPage() {
                   {isSelfRequest && (
                     <Badge variant="warning" size="sm" dot>
                       <ShieldAlert size={12} style={{ marginRight: '4px' }} />
-                      Self-Approval Forbidden (Must be decided by another lead)
+                      You cannot approve your own request
                     </Badge>
                   )}
                 </div>
@@ -283,7 +283,7 @@ export function ApprovalInboxPage() {
                     onClick={() => handleOpenDecisionModal(approval, 'approve')}
                     leadingIcon={<CheckCircle2 size={14} />}
                   >
-                    Approve Service Request
+                    Approve Request
                   </Button>
                 </div>
               </Card>
@@ -313,8 +313,8 @@ export function ApprovalInboxPage() {
         }
         subtitle={
           decisionType === 'approve'
-            ? 'Approving this service request will promote it to OPEN in the support queue and initiate SLA policy tracking.'
-            : 'Rejecting this service request will transition it to CANCELLED and notify the requester with your mandatory explanation.'
+            ? 'Approving this request will move it to the support queue for an engineer to fulfill.'
+            : 'Rejecting this request will cancel it and notify the requester with your reason.'
         }
         footer={
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>

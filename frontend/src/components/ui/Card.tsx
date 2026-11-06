@@ -1,5 +1,7 @@
 import { type HTMLAttributes, type ReactNode } from 'react'
 
+export type CardDensity = 'compact' | 'standard' | 'spacious'
+
 export interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   title?: ReactNode
   subtitle?: ReactNode
@@ -7,6 +9,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'>
   footer?: ReactNode
   padded?: boolean
   hoverable?: boolean
+  density?: CardDensity
+  divider?: boolean
 }
 
 export function Card({
@@ -16,6 +20,8 @@ export function Card({
   footer,
   padded = true,
   hoverable = false,
+  density = 'standard',
+  divider = false,
   className = '',
   children,
   ...props
@@ -24,7 +30,9 @@ export function Card({
 
   return (
     <div
-      className={`horizon-card ${
+      className={`horizon-card horizon-card--density-${density} ${
+        hasHeader ? 'horizon-card--with-header' : 'horizon-card--no-header'
+      } ${divider ? 'horizon-card--with-divider' : ''} ${
         hoverable ? 'horizon-card--interactive horizon-card-hoverable' : ''
       } ${className}`}
       {...props}
@@ -53,7 +61,11 @@ export function Card({
         </div>
       )}
 
-      <div className={`horizon-card-body ${padded ? 'is-padded horizon-card--padding-md' : 'horizon-card--padding-none'}`}>
+      <div
+        className={`horizon-card-body ${
+          padded ? 'is-padded horizon-card--padding-md' : 'horizon-card--padding-none'
+        }`}
+      >
         {children}
       </div>
 

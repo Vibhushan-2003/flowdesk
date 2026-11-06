@@ -76,15 +76,27 @@ export function MyAssignedTicketsPage() {
   const [error, setError] = useState<string | null>(null)
 
   function setViewMode(mode: 'active' | 'history') {
-    const nextParams = new URLSearchParams(searchParams)
+    const nextParams = new URLSearchParams()
     if (mode === 'history') {
       nextParams.set('view', 'history')
-    } else {
-      nextParams.delete('view')
     }
-    nextParams.set('page', '0')
+
+    // Keep applied status only if valid in target mode
+    const validStatuses = mode === 'history' ? HISTORY_STATUSES : ACTIVE_STATUSES
+    if (appliedFilters.status && validStatuses.includes(appliedFilters.status as TicketStatus)) {
+      nextParams.set('status', appliedFilters.status)
+    }
+    if (appliedFilters.priority) {
+      nextParams.set('priority', appliedFilters.priority)
+    }
+    if (appliedFilters.search) {
+      nextParams.set('search', appliedFilters.search)
+    }
+    if (appliedFilters.sort === 'oldest') {
+      nextParams.set('sort', 'oldest')
+    }
+
     setSearchParams(nextParams)
-    setPage(0)
   }
 
   useEffect(() => {
@@ -115,7 +127,7 @@ export function MyAssignedTicketsPage() {
         setError(
           caughtError instanceof Error
             ? caughtError.message
-            : 'Unable to load your assigned tickets. Please try again.',
+            : 'Unable to load tickets. Please try again.',
         )
       } finally {
         if (!cancelled) {
@@ -254,8 +266,8 @@ export function MyAssignedTicketsPage() {
         title={isHistoryMode ? 'Resolved Ticket History' : 'My Assigned Tickets'}
         subtitle={
           isHistoryMode
-            ? 'Review historical tickets you have successfully resolved or closed.'
-            : 'Track, update, and resolve tickets currently assigned to your workload.'
+            ? 'Review historical tickets you have resolved or closed.'
+            : 'Track, update, and resolve tickets currently assigned to you.'
         }
         actions={
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -297,101 +309,89 @@ export function MyAssignedTicketsPage() {
         </button>
       </div>
 
-      {/* Overview Stat Chips */}
-      {ticketPage && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <TicketListOverview
-            filters={appliedFilters}
-            totalElements={ticketPage.totalElements}
-            visibleCount={ticketPage.content.length}
-            isLoading={isLoading}
-            onRefresh={() => setPage(page)}
-          />
-        </div>
-      )}
-
       {/* Error alert */}
       {error && (
         <div
           className="horizon-auth-alert horizon-auth-alert--error"
           role="alert"
-          style={{ marginBottom: '1.5rem' }}
+          style={{ marginBottom: '1.25rem' }}
         >
           <AlertCircle size={18} className="horizon-auth-alert-icon" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Filter and Search Bar */}
-      <Card padded style={{ marginBottom: '1.5rem' }}>
+      {/* Unified Search & Filter Workbench */}
+      <div style={{ marginBottom: '1.25rem' }}>
         <form
           className="ticket-filters-form"
           onSubmit={applyFilters}
-          style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}
         >
-          {/* Search Input */}
-          <div className="horizon-input-wrapper" style={{ flex: '1 1 220px', minWidth: '180px' }}>
-            <span className="horizon-input-icon horizon-input-icon--leading">
-              <Search size={16} />
-            </span>
-            <input
-              type="text"
-              className="horizon-input has-leading-icon"
-              placeholder="Search assigned tickets..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-            />
+          <div className="horizon-filter-fields">
+            {/* Search Input */}
+            <div className="horizon-input-wrapper" style={{ flex: '2 1 240px', minWidth: '200px' }}>
+              <span className="horizon-input-icon horizon-input-icon--leading">
+                <Search size={16} />
+              </span>
+              <input
+                type="text"
+                className="horizon-input has-leading-icon"
+                placeholder={isHistoryMode ? 'Search resolved tickets...' : 'Search assigned tickets...'}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+            </div>
+
+            {/* Status Select */}
+            <div className="horizon-select-wrapper" style={{ flex: '1 1 150px', minWidth: '140px' }}>
+              <select
+                className="horizon-select"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value as TicketStatus | '')}
+                aria-label="Filter by status"
+              >
+                <option value="">All Statuses</option>
+                {statusOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {formatLabel(s)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Priority Select */}
+            <div className="horizon-select-wrapper" style={{ flex: '1 1 140px', minWidth: '130px' }}>
+              <select
+                className="horizon-select"
+                value={selectedPriority}
+                onChange={(e) => setSelectedPriority(e.target.value as TicketPriority | '')}
+                aria-label="Filter by priority"
+              >
+                <option value="">All Priorities</option>
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {formatLabel(p)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sort Select */}
+            <div className="horizon-select-wrapper" style={{ flex: '1 1 140px', minWidth: '130px' }}>
+              <select
+                className="horizon-select"
+                value={selectedSort}
+                onChange={(e) => setSelectedSort(e.target.value as 'newest' | 'oldest')}
+                aria-label="Sort tickets"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </div>
           </div>
 
-          {/* Status Select */}
-          <div className="horizon-select-wrapper" style={{ minWidth: '150px' }}>
-            <select
-              className="horizon-select"
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value as TicketStatus | '')}
-              aria-label="Filter by status"
-            >
-              <option value="">All Statuses</option>
-              {statusOptions.map((s) => (
-                <option key={s} value={s}>
-                  {formatLabel(s)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Priority Select */}
-          <div className="horizon-select-wrapper" style={{ minWidth: '140px' }}>
-            <select
-              className="horizon-select"
-              value={selectedPriority}
-              onChange={(e) => setSelectedPriority(e.target.value as TicketPriority | '')}
-              aria-label="Filter by priority"
-            >
-              <option value="">All Priorities</option>
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {formatLabel(p)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Sort Select */}
-          <div className="horizon-select-wrapper" style={{ minWidth: '140px' }}>
-            <select
-              className="horizon-select"
-              value={selectedSort}
-              onChange={(e) => setSelectedSort(e.target.value as 'newest' | 'oldest')}
-              aria-label="Sort tickets"
-            >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-            </select>
-          </div>
-
-          {/* Buttons */}
-          <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
+          {/* Action Buttons */}
+          <div className="horizon-filter-actions">
             <Button variant="primary" size="sm" type="submit">
               Apply
             </Button>
@@ -400,7 +400,18 @@ export function MyAssignedTicketsPage() {
             </Button>
           </div>
         </form>
-      </Card>
+
+        {/* Overview Stat Strip attached below filter bar */}
+        {ticketPage && (
+          <TicketListOverview
+            filters={appliedFilters}
+            totalElements={ticketPage.totalElements}
+            visibleCount={ticketPage.content.length}
+            isLoading={isLoading}
+            onRefresh={() => setPage(page)}
+          />
+        )}
+      </div>
 
       {/* Desktop Table View (>=768px) */}
       <div className="desktop-ticket-table-view">
@@ -412,12 +423,16 @@ export function MyAssignedTicketsPage() {
           onRowClick={(ticket) => navigate(`/support/tickets/${ticket.ticketNumber}`)}
           emptyMessage={
             isHistoryMode
-              ? 'You have not resolved or closed any tickets matching the current criteria.'
-              : 'You have no active tickets assigned to you. Visit the Support Queue to claim a ticket.'
+              ? 'No resolved or closed tickets match your current filters.'
+              : 'You have no active tickets assigned to you.'
           }
           emptyAction={
-            !isHistoryMode && isSupport ? (
-              <Button variant="primary" size="sm" onClick={() => navigate('/support/queue')}>
+            isHistoryMode ? (
+              <Button variant="secondary" size="sm" onClick={() => setViewMode('active')} leadingIcon={<UserCheck size={14} />}>
+                View Active Workload
+              </Button>
+            ) : isSupport ? (
+              <Button variant="primary" size="sm" onClick={() => navigate('/support/queue')} leadingIcon={<Inbox size={14} />}>
                 Browse Support Queue
               </Button>
             ) : undefined
@@ -433,12 +448,23 @@ export function MyAssignedTicketsPage() {
           </div>
         ) : !ticketPage || ticketPage.content.length === 0 ? (
           <EmptyState
-            icon={<UserCheck size={32} />}
-            title="No tickets found"
+            icon={isHistoryMode ? <Archive size={32} /> : <UserCheck size={32} />}
+            title={isHistoryMode ? 'No resolved tickets' : 'No active tickets'}
             description={
               isHistoryMode
-                ? 'No resolved tickets match your filters.'
-                : 'No active tickets currently assigned to you.'
+                ? 'Tickets you resolve or close will be recorded here.'
+                : 'Visit the Support Queue to claim a ticket.'
+            }
+            action={
+              isHistoryMode ? (
+                <Button variant="secondary" size="sm" onClick={() => setViewMode('active')} leadingIcon={<UserCheck size={14} />}>
+                  View Active Workload
+                </Button>
+              ) : isSupport ? (
+                <Button variant="primary" size="sm" onClick={() => navigate('/support/queue')} leadingIcon={<Inbox size={14} />}>
+                  Browse Support Queue
+                </Button>
+              ) : undefined
             }
           />
         ) : (
@@ -481,7 +507,7 @@ export function MyAssignedTicketsPage() {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--color-divider)', fontSize: 'var(--font-size-xs)' }}>
                 <span style={{ color: 'var(--color-primary)', fontWeight: 'var(--font-weight-medium)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  Open Workbench <ArrowRight size={12} />
+                  View Ticket <ArrowRight size={12} />
                 </span>
               </div>
             </Card>

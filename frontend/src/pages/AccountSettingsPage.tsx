@@ -117,28 +117,17 @@ export function AccountSettingsPage() {
     <div className="account-settings-page horizon-page-container">
       <PageHeader
         title="Account Settings"
-        subtitle="Manage your credentials, active authentication sessions, and interface preferences."
+        subtitle="Manage your password, account security, and display preferences."
       />
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--color-border)', marginBottom: '24px', marginTop: '16px' }}>
+      <div className="horizon-view-tabs" role="tablist" aria-label="Account settings sections" style={{ marginTop: '16px', marginBottom: '24px' }}>
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'security'}
           onClick={() => setSearchParams({ tab: 'security' })}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 16px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'security' ? '2px solid var(--color-primary)' : '2px solid transparent',
-            color: activeTab === 'security' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontWeight: activeTab === 'security' ? 600 : 500,
-            cursor: 'pointer',
-            fontSize: 'var(--font-size-sm)',
-            transition: 'color var(--transition-fast)',
-          }}
+          className={`horizon-view-tab ${activeTab === 'security' ? 'is-active' : ''}`}
         >
           <KeyRound size={16} />
           <span>Security & Credentials</span>
@@ -146,24 +135,13 @@ export function AccountSettingsPage() {
 
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'preferences'}
           onClick={() => setSearchParams({ tab: 'preferences' })}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 16px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'preferences' ? '2px solid var(--color-primary)' : '2px solid transparent',
-            color: activeTab === 'preferences' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontWeight: activeTab === 'preferences' ? 600 : 500,
-            cursor: 'pointer',
-            fontSize: 'var(--font-size-sm)',
-            transition: 'color var(--transition-fast)',
-          }}
+          className={`horizon-view-tab ${activeTab === 'preferences' ? 'is-active' : ''}`}
         >
           <Laptop size={16} />
-          <span>Preferences & Display</span>
+          <span>Display Preferences</span>
         </button>
       </div>
 
@@ -266,20 +244,20 @@ export function AccountSettingsPage() {
           </Card>
 
           {/* Session Information Card */}
-          <Card padded title="Session & Authentication" subtitle="Your current connection details and security posture.">
+          <Card padded title="Account Security" subtitle="Current sign-in status and session protection.">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                  Authentication Protocol
+                  Sign-In Method
                 </span>
                 <Badge variant="neutral" size="sm">
-                  JWT Bearer + HttpOnly Refresh
+                  Password & SSO
                 </Badge>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                  Active User Account
+                  Registered Email
                 </span>
                 <strong style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)' }}>
                   {user?.email}
@@ -288,16 +266,16 @@ export function AccountSettingsPage() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                  Session Isolation
+                  Session Security
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-sm)', color: 'var(--color-success-text)' }}>
-                  <ShieldCheck size={14} /> Strict Role Guard
+                  <ShieldCheck size={14} /> Active & Protected
                 </span>
               </div>
 
               <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px', marginTop: '8px' }}>
                 <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', lineHeight: '1.5', margin: '0 0 16px' }}>
-                  Changing your password automatically revokes all existing refresh tokens across all active devices to prevent unauthorized session continuity.
+                  Updating your password automatically signs you out of all other active sessions to keep your account safe.
                 </p>
                 <Button
                   type="button"
@@ -315,7 +293,7 @@ export function AccountSettingsPage() {
       ) : (
         <div style={{ maxWidth: '640px' }}>
           {/* Preferences Card */}
-          <Card padded title="Interface & Theme Preferences" subtitle="Customize the visual appearance and contrast of the FlowDesk Horizon workspace.">
+          <Card padded title="Display Preferences" subtitle="Choose your preferred color theme for the FlowDesk workspace.">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '10px' }}>

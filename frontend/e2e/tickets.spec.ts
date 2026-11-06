@@ -296,4 +296,134 @@ test.describe('Ticket Creation & Reliability Journeys', () => {
 
     await empPage.close()
   })
+  test('Journey 10: Support Engineer toggles between Active Workload and Resolved History with URL sync and state isolation', async ({
+    page,
+  }) => {
+    await setupApiMocks(page, MOCK_ENGINEER)
+    const token = createMockToken(MOCK_ENGINEER)
+    await page.addInitScript((t) => {
+      sessionStorage.setItem('flowdesk_access_token', t)
+    }, token)
+
+    let activeEndpointCalled = 0
+    let historyEndpointCalled = 0
+
+    await page.route('**/api/support/tickets/my*', async (route) => {
+      activeEndpointCalled++
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          content: [
+            {
+              id: 'ticket-active-1',
+              ticketNumber: 'FD-100201',
+              title: 'Active workload incident',
+              description: 'Investigating high memory consumption.',
+              type: 'INCIDENT',
+              priority: 'HIGH',
+              status: 'IN_PROGRESS',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              assignedAt: new Date().toISOString(),
+              responseSlaStatus: 'HEALTHY',
+              resolutionSlaStatus: 'HEALTHY',
+            },
+          ],
+          page: 0,
+          size: 10,
+          totalElements: 1,
+          totalPages: 1,
+        }),
+      })
+    })
+
+    await page.route('**/api/support/tickets/history*', async (route) => {
+      historyEndpointCalled++
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          content: [
+            {
+              id: 'ticket-hist-1',
+              ticketNumber: 'FD-100202',
+              title: 'Historical resolved database ticket',
+              description: 'Completed query optimization.',
+              type: 'INCIDENT',
+              priority: 'MEDIUM',
+              status: 'RESOLVED',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              assignedAt: new Date().toISOString(),
+              responseSlaStatus: 'HEALTHY',
+              resolutionSlaStatus: 'HEALTHY',
+            },
+          ],
+          page: 0,
+          size: 10,
+          totalElements: 1,
+          totalPages: 1,
+        }),
+      })
+    })
+
+    // Navigate to assigned tickets workbench
+    await page.goto('/support/tickets')
+    await expect(page.getByRole('heading', { name: /my assigned tickets/i })).toBeVisible()
+
+    // 1. Initially on Active Workload
+    const activeTab = page.getByRole('tab', { name: /active workload/i })
+    const historyTab = page.getByRole('tab', { name: /resolved history/i })
+    await expect(activeTab).toHaveAttribute('aria-selected', 'true')
+    await expect(historyTab).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByText('FD-100201').first()).toBeVisible()
+    expect(activeEndpointCalled).toBeGreaterThanOrEqual(1)
+
+    // 2. Click Resolved History tab
+    await historyTab.click()
+
+    // URL must update to view=history
+    await expect(page).toHaveURL(/view=history/)
+    await expect(historyTab).toHaveAttribute('aria-selected', 'true')
+    await expect(activeTab).toHaveAttribute('aria-selected', 'false')
+
+    // History endpoint must be called and display historical ticket
+    expect(historyEndpointCalled).toBeGreaterThanOrEqual(1)
+    await expect(page.getByText('FD-100202').first()).toBeVisible()
+    await expect(page.getByText('Historical resolved database ticket').first()).toBeVisible()
+
+    // 3. Switch back to Active Workload tab
+    await activeTab.click()
+    await expect(page).not.toHaveURL(/view=history/)
+    await expect(activeTab).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByText('FD-100201').first()).toBeVisible()
+
+    // 4. Test empty history view with Return button
+    await page.route('**/api/support/tickets/history*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          content: [],
+          page: 0,
+          size: 10,
+          totalElements: 0,
+          totalPages: 0,
+        }),
+      })
+    })
+
+    await historyTab.click()
+    await expect(page).toHaveURL(/view=history/)
+    await expect(page.getByText(/no resolved or closed tickets/i)).toBeVisible()
+    const viewWorkloadBtn = page.getByRole('button', { name: /view active workload/i })
+    await expect(viewWorkloadBtn).toBeVisible()
+
+    // Clicking "View Active Workload" restores active workload and strips view=history
+    await viewWorkloadBtn.click()
+    await expect(page).not.toHaveURL(/view=history/)
+    await expect(activeTab).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByText('FD-100201').first()).toBeVisible()
+  })
 });

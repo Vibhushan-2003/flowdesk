@@ -244,7 +244,7 @@ export function ArticleViewPage() {
         <div className="kb-meta-bar" style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--color-divider)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <User size={13} />
-            Author: <strong style={{ color: 'var(--color-text-primary)' }}>{article.authorName}</strong>
+            Author: <strong style={{ color: 'var(--color-text-primary)' }}>{article.authorName?.trim() || 'IT Operations'}</strong>
           </span>
           {article.publishedAt && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>

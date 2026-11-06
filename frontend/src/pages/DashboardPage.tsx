@@ -19,7 +19,8 @@ import {
   BookOpen,
   AlertTriangle,
   ArrowRight,
-  } from 'lucide-react'
+  Archive,
+} from 'lucide-react'
 
 import { getDashboardStats } from '../api/dashboard'
 import { useAuth } from '../auth/useAuth'
@@ -451,32 +452,48 @@ export function DashboardPage() {
           {/* Card A: My Assigned Work */}
           <Card
             padded
-            title="Assigned Incidents"
-            subtitle="Active tickets currently assigned to you for investigation."
-            headerActions={<Badge variant="primary" size="sm">Active Queue</Badge>}
+            title="My Assigned Work"
+            subtitle="Tickets currently assigned to your queue."
+            headerActions={<Badge variant="primary" size="sm">{metrics?.support?.assignedActiveTickets ?? 0} Active</Badge>}
           >
             <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-              Respond to customer inquiries, add internal staff notes, or apply Gemini AI Copilot resolution drafts.
+              Investigate tickets, update customer communications, or draft resolution summaries with AI Copilot.
             </p>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => navigate('/support/tickets')}
-              leadingIcon={<UserCheck size={16} />}
-            >
-              Open Assigned Tickets ({metrics?.support?.assignedActiveTickets ?? 0})
-            </Button>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => navigate('/support/tickets')}
+                leadingIcon={<UserCheck size={16} />}
+              >
+                Assigned Tickets ({metrics?.support?.assignedActiveTickets ?? 0})
+              </Button>
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => navigate('/support/tickets?view=history')}
+                leadingIcon={<Archive size={16} />}
+              >
+                Resolved History
+              </Button>
+            </div>
           </Card>
 
           {/* Card B: Support Queue */}
           <Card
             padded
-            title="Unassigned Support Queue"
-            subtitle="Incoming unassigned tickets awaiting engineer claim."
-            headerActions={<Badge variant="warning" size="sm">Intake</Badge>}
+            title="Support Queue"
+            subtitle="Unassigned tickets waiting for an engineer."
+            headerActions={
+              (metrics?.support?.unassignedQueueTickets ?? 0) > 0 ? (
+                <Badge variant="warning" size="sm" dot>Intake Active</Badge>
+              ) : (
+                <Badge variant="success" size="sm">Queue Clear</Badge>
+              )
+            }
           >
             <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-              Review incoming triage submissions, inspect urgency and initial response deadlines, and claim ownership.
+              Review incoming submissions, check SLA deadlines, and claim tickets for investigation.
             </p>
             <Button
               variant="outline"
@@ -484,19 +501,18 @@ export function DashboardPage() {
               onClick={() => navigate('/support/queue')}
               leadingIcon={<Inbox size={16} />}
             >
-              View Support Queue ({metrics?.support?.unassignedQueueTickets ?? 0})
+              Browse Support Queue ({metrics?.support?.unassignedQueueTickets ?? 0})
             </Button>
           </Card>
 
-          {/* Card C: Knowledge Base */}
+          {/* Card C: Help Articles & AI Assistance */}
           <Card
             padded
-            title="Knowledge Base & Deflection"
-            subtitle="Browse, author, and maintain IT support resolution articles."
-            headerActions={<Badge variant="neutral" size="sm">Documentation</Badge>}
+            title="Help Articles & AI Tools"
+            subtitle="Resolution guides and AI copilot resources."
           >
             <p style={{ margin: '0 0 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-              Publish verified solutions to deflect recurring issues and ground Gemini AI Copilot suggestions.
+              Search verified guides, author new troubleshooting articles, or draft solutions inside tickets.
             </p>
             <Button
               variant="outline"
@@ -504,7 +520,7 @@ export function DashboardPage() {
               onClick={() => navigate('/kb')}
               leadingIcon={<BookOpen size={16} />}
             >
-              Knowledge Base
+              Search Help Articles
             </Button>
           </Card>
         </div>
@@ -525,10 +541,12 @@ export function DashboardPage() {
                   margin: 0,
                 }}
               >
-                SLA Operations & Operational Command
+                SLA Operations & Operations Overview
               </h2>
               <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                Real-time incident posture, SLA threshold compliance, and supervisory governance
+                {isAdmin
+                  ? 'Real-time incident posture, SLA threshold compliance, and security controls'
+                  : 'Team workload, supervisory reviews, and SLA performance tracking'}
               </span>
             </div>
 
@@ -558,7 +576,7 @@ export function DashboardPage() {
                     onClick={() => navigate('/admin/users')}
                     leadingIcon={<Users size={14} />}
                   >
-                    Directory
+                    User Directory
                   </Button>
                   <Button
                     variant="outline"
@@ -578,7 +596,7 @@ export function DashboardPage() {
             <Card
               padded
               title="SLA Queue Health & Policy Targets"
-              subtitle="Active breach monitoring and database SLA response/resolution commitments."
+              subtitle="Active breach monitoring and response/resolution commitments."
               headerActions={
                 isLoading ? (
                   <Badge variant="neutral" size="sm">Evaluating...</Badge>
@@ -643,13 +661,13 @@ export function DashboardPage() {
                       Baseline SLA Policy Targets
                     </span>
                     <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                      Database policy defaults (V7)
+                      Default policy targets
                     </span>
                   </div>
 
                   <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
-                      <span>Critical / Urgent:</span>
+                      <span>Critical Priority:</span>
                       <strong style={{ color: 'var(--color-danger)' }}>15m Response / 4h Resolution</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
@@ -657,11 +675,11 @@ export function DashboardPage() {
                       <strong style={{ color: 'var(--color-warning)' }}>30m Response / 8h Resolution</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border)' }}>
-                      <span>Standard / Medium:</span>
+                      <span>Medium Priority:</span>
                       <strong style={{ color: 'var(--color-primary)' }}>1h Response / 24h Resolution</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
-                      <span>Low / Routine:</span>
+                      <span>Low Priority:</span>
                       <strong style={{ color: 'var(--color-text-secondary)' }}>4h Response / 48h Resolution</strong>
                     </div>
                   </div>
@@ -679,16 +697,16 @@ export function DashboardPage() {
               </div>
             </Card>
 
-            {/* Widget 2: Pending Approvals & Service Authorizations */}
+            {/* Widget 2: Pending Approvals */}
             <Card
               padded
-              title="Supervisory Approvals"
-              subtitle="Pending manager reviews and service authorizations."
+              title="Pending Approvals"
+              subtitle="Service authorizations and supervisory reviews."
               headerActions={
                 (metrics?.operations?.pendingApprovals ?? 0) > 0 ? (
                   <Badge variant="warning" size="sm" dot>Action Required</Badge>
                 ) : (
-                  <Badge variant="success" size="sm">Queue Cleared</Badge>
+                  <Badge variant="success" size="sm">Queue Clear</Badge>
                 )
               }
             >
@@ -706,12 +724,12 @@ export function DashboardPage() {
                 >
                   <CheckSquare size={18} style={{ color: 'var(--color-warning-text)', flexShrink: 0 }} />
                   <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
-                    <strong>{metrics?.operations?.pendingApprovals ?? 0} Pending Requests</strong> awaiting supervisory sign-off for hardware & access grants.
+                    <strong>{metrics?.operations?.pendingApprovals ?? 0} Pending Requests</strong> awaiting supervisory review for hardware & access grants.
                   </div>
                 </div>
 
                 <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                  Review requests with elevated authorization requirements. Team lead approval is mandatory before hardware provisioning or elevated role assignments.
+                  Review requests with elevated requirements. Team lead or admin approval is mandatory before hardware provisioning or elevated role assignments.
                 </p>
 
                 <Button
@@ -726,49 +744,73 @@ export function DashboardPage() {
               </div>
             </Card>
 
-            {/* Widget 3: Platform Security Architecture */}
-            <Card
-              padded
-              title="Platform Security Architecture"
-              subtitle="Configured technical safeguards, audit controls, and onboarding policies."
-              headerActions={<Badge variant="neutral" size="sm">Engineered Safeguards</Badge>}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
-                    <ShieldAlert size={16} style={{ color: 'var(--color-primary)' }} />
-                    <span>Attachment Malware Scanning</span>
+            {/* Widget 3: Platform Security Architecture (Admin) or Team Reports (Team Lead) */}
+            {isAdmin ? (
+              <Card
+                padded
+                title="Platform Security Architecture"
+                subtitle="Configured technical safeguards, audit controls, and onboarding policies."
+                headerActions={<Badge variant="neutral" size="sm">Security Features</Badge>}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
+                      <ShieldAlert size={16} style={{ color: 'var(--color-primary)' }} />
+                      <span>Attachment Malware Scanning</span>
+                    </div>
+                    <Badge variant="neutral" size="sm">ClamAV Stream Protocol</Badge>
                   </div>
-                  <Badge variant="neutral" size="sm">ClamAV Stream Protocol</Badge>
-                </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
-                    <ShieldCheck size={16} style={{ color: 'var(--color-primary)' }} />
-                    <span>Security Audit Trail</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
+                      <ShieldCheck size={16} style={{ color: 'var(--color-primary)' }} />
+                      <span>Security Audit Trail</span>
+                    </div>
+                    <Badge variant="neutral" size="sm">PostgreSQL Prevent-Mutation Trigger</Badge>
                   </div>
-                  <Badge variant="neutral" size="sm">PostgreSQL Prevent-Mutation Trigger</Badge>
-                </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
-                    <Users size={16} style={{ color: 'var(--color-primary)' }} />
-                    <span>User Provisioning Policy</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
+                      <Users size={16} style={{ color: 'var(--color-primary)' }} />
+                      <span>User Provisioning Policy</span>
+                    </div>
+                    <Badge variant="neutral" size="sm">Invitation-Only Flow</Badge>
                   </div>
-                  <Badge variant="neutral" size="sm">Invitation-Only Flow</Badge>
-                </div>
 
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={() => navigate(isAdmin ? '/admin/attachments' : '/reports')}
-                  leadingIcon={isAdmin ? <ShieldAlert size={16} /> : <BarChart3 size={16} />}
-                  trailingIcon={<ArrowRight size={14} />}
-                >
-                  {isAdmin ? 'Attachment Security Console' : 'Compliance & Reports'}
-                </Button>
-              </div>
-            </Card>
+                  <Button
+                    variant="outline"
+                    size="md"
+                    onClick={() => navigate('/admin/attachments')}
+                    leadingIcon={<ShieldAlert size={16} />}
+                    trailingIcon={<ArrowRight size={14} />}
+                  >
+                    Attachment Security Console
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <Card
+                padded
+                title="Operational Reports"
+                subtitle="Team resolution analytics and workload distribution."
+                headerActions={<Badge variant="neutral" size="sm">Analytics</Badge>}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                    Inspect ticket resolution times, engineer workloads, and SLA compliance across all support categories.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="md"
+                    onClick={() => navigate('/reports')}
+                    leadingIcon={<BarChart3 size={16} />}
+                    trailingIcon={<ArrowRight size={14} />}
+                  >
+                    Compliance & Reports
+                  </Button>
+                </div>
+              </Card>
+            )}
           </div>
         </div>
       )}

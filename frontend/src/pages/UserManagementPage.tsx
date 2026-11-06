@@ -803,7 +803,7 @@ export function UserManagementPage() {
                     padding: '8px 12px',
                     border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-md)',
-                    background: inviteRoles.has(role) ? 'var(--color-primary-subtle, rgba(37, 99, 235, 0.08))' : 'var(--color-surface)',
+                    background: inviteRoles.has(role) ? 'var(--color-primary-subtle)' : 'var(--color-surface)',
                     cursor: 'pointer',
                     fontSize: 'var(--font-size-xs)',
                   }}
@@ -861,7 +861,7 @@ export function UserManagementPage() {
                   padding: '10px 12px',
                   border: '1px solid var(--color-border)',
                   borderRadius: 'var(--radius-md)',
-                  background: editRoles.has(role) ? 'var(--color-primary-subtle, rgba(37, 99, 235, 0.08))' : 'var(--color-surface)',
+                  background: editRoles.has(role) ? 'var(--color-primary-subtle)' : 'var(--color-surface)',
                   cursor: 'pointer',
                   fontSize: 'var(--font-size-xs)',
                 }}
