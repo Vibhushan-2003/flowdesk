@@ -363,8 +363,7 @@ export function ApprovalInboxPage() {
                 </span>
               )}
             </label>
-            <div className="horizon-input-wrapper">
-              <textarea
+            <textarea
                 id="approval-decision-note"
                 className="horizon-textarea"
                 style={{ minHeight: '100px' }}
@@ -378,8 +377,7 @@ export function ApprovalInboxPage() {
                 disabled={isDeciding}
                 maxLength={2000}
                 required={decisionType === 'reject'}
-              />
-            </div>
+            />
             <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px', textAlign: 'right' }}>
               {decisionNote.length}/2000
             </span>

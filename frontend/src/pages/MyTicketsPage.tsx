@@ -174,14 +174,12 @@ export function MyTicketsPage() {
             <label htmlFor="ticket-search" className="horizon-label sr-only">
               Search title or ticket number
             </label>
-            <div className="horizon-auth-input-wrapper">
-              <span className="horizon-auth-input-icon" aria-hidden="true">
-                <Search size={16} />
-              </span>
+            <div className="horizon-input-wrapper">
+              <Search size={16} className="horizon-input-icon horizon-input-icon--leading" />
               <input
                 id="ticket-search"
                 type="search"
-                className="horizon-auth-input horizon-auth-input-with-icon"
+                className="horizon-input has-leading-icon"
                 value={searchText}
                 maxLength={100}
                 onChange={(event) => setSearchText(event.target.value)}
@@ -195,21 +193,23 @@ export function MyTicketsPage() {
             <label htmlFor="ticket-status-filter" className="horizon-label sr-only">
               Status
             </label>
-            <select
-              id="ticket-status-filter"
-              className="horizon-select"
-              value={selectedStatus}
-              onChange={(event) =>
-                setSelectedStatus(event.target.value as TicketStatus | '')
-              }
-            >
-              <option value="">All statuses</option>
-              {STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {formatLabel(status)}
-                </option>
-              ))}
-            </select>
+            <div className="horizon-select-wrapper">
+              <select
+                id="ticket-status-filter"
+                className="horizon-select"
+                value={selectedStatus}
+                onChange={(event) =>
+                  setSelectedStatus(event.target.value as TicketStatus | '')
+                }
+              >
+                <option value="">All statuses</option>
+                {STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {formatLabel(status)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Priority Filter */}
@@ -217,21 +217,23 @@ export function MyTicketsPage() {
             <label htmlFor="ticket-priority-filter" className="horizon-label sr-only">
               Priority
             </label>
-            <select
-              id="ticket-priority-filter"
-              className="horizon-select"
-              value={selectedPriority}
-              onChange={(event) =>
-                setSelectedPriority(event.target.value as TicketPriority | '')
-              }
-            >
-              <option value="">All priorities</option>
-              {PRIORITIES.map((priority) => (
-                <option key={priority} value={priority}>
-                  {formatLabel(priority)}
-                </option>
-              ))}
-            </select>
+            <div className="horizon-select-wrapper">
+              <select
+                id="ticket-priority-filter"
+                className="horizon-select"
+                value={selectedPriority}
+                onChange={(event) =>
+                  setSelectedPriority(event.target.value as TicketPriority | '')
+                }
+              >
+                <option value="">All priorities</option>
+                {PRIORITIES.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {formatLabel(priority)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Sort Order */}
@@ -239,17 +241,19 @@ export function MyTicketsPage() {
             <label htmlFor="ticket-sort-filter" className="horizon-label sr-only">
               Order
             </label>
-            <select
-              id="ticket-sort-filter"
-              className="horizon-select"
-              value={selectedSort}
-              onChange={(event) =>
-                setSelectedSort(event.target.value as 'newest' | 'oldest')
-              }
-            >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-            </select>
+            <div className="horizon-select-wrapper">
+              <select
+                id="ticket-sort-filter"
+                className="horizon-select"
+                value={selectedSort}
+                onChange={(event) =>
+                  setSelectedSort(event.target.value as 'newest' | 'oldest')
+                }
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </div>
           </div>
         </div>
 

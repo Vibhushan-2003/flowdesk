@@ -288,11 +288,11 @@ export function AuditTrailPage() {
               Search target or actor
             </label>
             <div className="horizon-input-wrapper">
-              <Search size={14} className="horizon-input-icon" />
+              <Search size={16} className="horizon-input-icon horizon-input-icon--leading" />
               <input
                 id="audit-search-input"
                 type="search"
-                className="horizon-input"
+                className="horizon-input has-leading-icon"
                 value={searchQuery}
                 maxLength={100}
                 onChange={(e) => setSearchQuery(e.target.value)}

@@ -541,7 +541,8 @@
   width: 100%;
 }
 
-.horizon-label {
+.horizon-label,
+.horizon-field-label {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
@@ -550,9 +551,26 @@
   gap: var(--space-1);
 }
 
-.horizon-label__required {
+.horizon-label__required,
+.horizon-field-required {
   color: var(--color-danger);
   font-weight: var(--font-weight-bold);
+}
+
+.horizon-form-row {
+  display: grid;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+.horizon-form-row--2col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+  .horizon-form-row--2col {
+    grid-template-columns: 1fr;
+  }
 }
 
 .horizon-input-wrapper {
@@ -560,11 +578,13 @@
   display: flex;
   align-items: center;
   width: 100%;
+  min-height: 42px;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background-color: var(--color-surface);
   transition: all var(--duration-fast) var(--ease-default);
   box-shadow: var(--shadow-xs);
+  box-sizing: border-box;
 }
 
 .horizon-input-wrapper:hover:not(.horizon-input-wrapper--disabled) {
@@ -594,13 +614,24 @@
 .horizon-input {
   width: 100%;
   height: 40px;
+  min-height: 40px;
   padding: 0 var(--space-3);
   background: transparent;
   border: none;
   font-family: var(--font-family-sans);
   font-size: var(--font-size-sm);
+  line-height: 1.5;
   color: var(--color-text-primary);
   box-sizing: border-box;
+}
+
+.horizon-input-wrapper:has(.horizon-input-icon) input:not(.has-leading-icon),
+.horizon-input.has-leading-icon {
+  padding-left: 38px;
+}
+
+.horizon-input.has-trailing-icon {
+  padding-right: 38px;
 }
 
 .horizon-input:focus {
@@ -615,32 +646,55 @@
   cursor: not-allowed;
 }
 
-.horizon-input__icon--left {
-  padding-left: var(--space-3);
+/* Standalone inputs support */
+input.horizon-input:not(.horizon-input-wrapper input) {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  height: 42px;
+  padding: 0 14px;
+}
+
+input.horizon-input:not(.horizon-input-wrapper input):focus {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-focus);
+}
+
+.horizon-input__icon--left,
+.horizon-input-icon-left,
+.horizon-input-icon--leading {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   color: var(--color-text-muted);
   pointer-events: none;
 }
 
-.horizon-input__icon--left + .horizon-input {
-  padding-left: var(--space-2);
-}
-
-.horizon-input__icon--right {
-  padding-right: var(--space-3);
+.horizon-input__icon--right,
+.horizon-input-icon-right,
+.horizon-input-icon--trailing {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   color: var(--color-text-muted);
 }
 
-.horizon-form-error {
+.horizon-form-error,
+.horizon-field-error {
   font-size: var(--font-size-xs);
   color: var(--color-danger);
   margin-top: var(--space-0-5);
 }
 
-.horizon-form-helper {
+.horizon-form-helper,
+.horizon-field-helper {
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
   margin-top: var(--space-0-5);
@@ -654,18 +708,37 @@
 
 .horizon-select {
   width: 100%;
-  height: 40px;
-  padding: 0 var(--space-8) 0 var(--space-3);
+  height: 42px;
+  min-height: 42px;
+  padding: 8px 38px 8px 14px;
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-family: var(--font-family-sans);
   font-size: var(--font-size-sm);
+  line-height: 1.5;
   color: var(--color-text-primary);
   appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px 16px;
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-default);
   box-shadow: var(--shadow-xs);
+  box-sizing: border-box;
+}
+
+[data-theme='dark'] .horizon-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* Avoid duplicate chevrons when Select component renders an inner Chevron icon */
+.horizon-select-wrapper:has(.horizon-select-chevron) .horizon-select,
+.horizon-select-wrapper:has(.horizon-select__icon) .horizon-select {
+  background-image: none;
 }
 
 .horizon-select:hover:not(:disabled) {
@@ -684,7 +757,8 @@
   cursor: not-allowed;
 }
 
-.horizon-select__icon {
+.horizon-select__icon,
+.horizon-select-chevron {
   position: absolute;
   right: var(--space-3);
   top: 50%;
@@ -698,8 +772,8 @@
 /* Textarea */
 .horizon-textarea {
   width: 100%;
-  min-height: 100px;
-  padding: var(--space-2-5) var(--space-3);
+  min-height: 120px;
+  padding: 10px 14px;
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -737,11 +811,59 @@
   box-shadow: 0 0 0 3px var(--color-danger-border) !important;
 }
 
-.horizon-textarea__counter {
+.horizon-textarea__counter,
+.horizon-char-counter {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   text-align: right;
   margin-top: var(--space-1);
+}
+
+/* Attachment Hint Card */
+.horizon-attachment-hint-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-bottom: var(--space-4);
+}
+
+.horizon-attachment-hint-icon {
+  color: var(--color-primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.horizon-attachment-hint-text strong {
+  color: var(--color-text-primary);
+}
+
+/* Create Ticket Page Layout */
+.horizon-create-ticket-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 0 var(--space-8);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.horizon-create-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .horizon-create-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Checkbox */

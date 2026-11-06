@@ -147,9 +147,9 @@ export function KnowledgeBasePage() {
         }
       />
 
-      {/* Hero Search Section */}
-      <section className="kb-hero horizon-card" style={{ marginBottom: '2rem', padding: '2.5rem 1.5rem', textAlign: 'center', background: 'var(--color-surface)' }}>
-        <p className="eyebrow" style={{ color: 'var(--color-primary)', fontWeight: 'var(--font-weight-semibold)', margin: '0 0 0.5rem' }}>
+      {/* Hero Search Section & Unified Discovery Console */}
+      <section className="kb-hero horizon-card" style={{ marginBottom: '1.75rem', padding: '2.5rem 1.5rem 2rem', textAlign: 'center', background: 'var(--color-surface)' }}>
+        <p className="eyebrow" style={{ color: 'var(--color-primary)', fontWeight: 'var(--font-weight-semibold)', margin: '0 0 0.5rem', fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Self-Service Support
         </p>
         <h1 style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', margin: '0 0 0.75rem', color: 'var(--color-text-primary)' }}>
@@ -160,13 +160,11 @@ export function KnowledgeBasePage() {
         </p>
 
         <form onSubmit={handleSearchSubmit} className="kb-search-box" style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', gap: '0.5rem' }}>
-          <div className="horizon-auth-input-wrapper" style={{ flex: 1 }}>
-            <span className="horizon-auth-input-icon" aria-hidden="true">
-              <Search size={18} />
-            </span>
+          <div className="horizon-input-wrapper" style={{ flex: 1 }}>
+            <Search size={18} className="horizon-input-icon horizon-input-icon--leading" />
             <input
               type="text"
-              className="kb-search-input horizon-auth-input horizon-auth-input-with-icon"
+              className="horizon-input has-leading-icon"
               placeholder="Search articles by keywords (e.g. VPN, Wi-Fi, monitor, password)..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
@@ -192,6 +190,29 @@ export function KnowledgeBasePage() {
             </button>
           )}
         </form>
+
+        {/* Integrated Category Filter Pills */}
+        <div className="kb-categories-nav" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px', marginTop: '1.5rem' }}>
+          <button
+            type="button"
+            className={`kb-category-pill horizon-badge ${selectedCategoryId === '' ? 'horizon-badge--primary' : 'horizon-badge--neutral'}`}
+            style={{ cursor: 'pointer', padding: '6px 14px', height: 'auto', fontSize: 'var(--font-size-xs)' }}
+            onClick={() => handleCategorySelect('')}
+          >
+            All Categories
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              className={`kb-category-pill horizon-badge ${selectedCategoryId === cat.id ? 'horizon-badge--primary' : 'horizon-badge--neutral'}`}
+              style={{ cursor: 'pointer', padding: '6px 14px', height: 'auto', fontSize: 'var(--font-size-xs)' }}
+              onClick={() => handleCategorySelect(cat.id)}
+            >
+              {cat.name} {cat.articleCount > 0 ? `(${cat.articleCount})` : ''}
+            </button>
+          ))}
+        </div>
       </section>
 
       {/* Staff Management Tab Bar */}
@@ -223,47 +244,26 @@ export function KnowledgeBasePage() {
           {activeTab === 'management' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>Status:</span>
-              <select
-                className="kb-editor-select horizon-select"
-                style={{ height: '36px', padding: '0 2rem 0 0.75rem', fontSize: 'var(--font-size-xs)', width: 'auto' }}
-                value={managementStatus}
-                onChange={(e) => {
-                  setManagementStatus(e.target.value as ArticleStatus | '')
-                  setPage(0)
-                }}
-              >
-                <option value="">All Statuses</option>
-                <option value="DRAFT">Drafts</option>
-                <option value="PUBLISHED">Published</option>
-                <option value="ARCHIVED">Archived</option>
-              </select>
+              <div className="horizon-select-wrapper" style={{ width: 'auto' }}>
+                <select
+                  className="kb-editor-select horizon-select"
+                  style={{ height: '36px', padding: '0 2rem 0 0.75rem', fontSize: 'var(--font-size-xs)', width: 'auto' }}
+                  value={managementStatus}
+                  onChange={(e) => {
+                    setManagementStatus(e.target.value as ArticleStatus | '')
+                    setPage(0)
+                  }}
+                >
+                  <option value="">All Statuses</option>
+                  <option value="DRAFT">Drafts</option>
+                  <option value="PUBLISHED">Published</option>
+                  <option value="ARCHIVED">Archived</option>
+                </select>
+              </div>
             </div>
           )}
         </div>
       )}
-
-      {/* Category Filter Pills */}
-      <div className="kb-categories-nav" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.75rem' }}>
-        <button
-          type="button"
-          className={`kb-category-pill horizon-badge ${selectedCategoryId === '' ? 'horizon-badge--primary' : 'horizon-badge--neutral'}`}
-          style={{ cursor: 'pointer', padding: '6px 14px', height: 'auto', fontSize: 'var(--font-size-xs)' }}
-          onClick={() => handleCategorySelect('')}
-        >
-          All Categories
-        </button>
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            type="button"
-            className={`kb-category-pill horizon-badge ${selectedCategoryId === cat.id ? 'horizon-badge--primary' : 'horizon-badge--neutral'}`}
-            style={{ cursor: 'pointer', padding: '6px 14px', height: 'auto', fontSize: 'var(--font-size-xs)' }}
-            onClick={() => handleCategorySelect(cat.id)}
-          >
-            {cat.name} {cat.articleCount > 0 ? `(${cat.articleCount})` : ''}
-          </button>
-        ))}
-      </div>
 
       {/* Content Area */}
       {isLoading ? (
@@ -332,7 +332,7 @@ export function KnowledgeBasePage() {
                 </div>
 
                 <div className="kb-card-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid var(--color-divider)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                  <span>By {art.authorName}</span>
+                  <span>By {art.authorName?.trim() || 'IT Operations'}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                       <Eye size={12} />
