@@ -548,3 +548,40 @@
   justify-content: flex-end;
 }
 
+@media (max-width: 640px) {
+  .horizon-workflow-ribbon {
+    padding: var(--space-3);
+    gap: var(--space-2-5);
+  }
+
+  .horizon-workflow-status-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .horizon-workflow-actions {
+    width: 100%;
+    gap: var(--space-2);
+  }
+
+  .horizon-workflow-actions .horizon-btn {
+    flex: 1 1 auto;
+    min-height: 40px;
+  }
+
+  .horizon-composer-container {
+    padding: var(--space-3-5);
+  }
+
+  .horizon-approval-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .horizon-approval-actions .horizon-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+

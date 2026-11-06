@@ -55,6 +55,15 @@ export function CreateTicketPage() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  const isPrivilegedStaff = Boolean(
+    user?.roles?.some(
+      (role) =>
+        role === 'SUPPORT_ENGINEER' ||
+        role === 'TEAM_LEAD' ||
+        role === 'ADMIN',
+    ),
+  )
+
   const locationDraft = (
     location.state as {
       ticketDraft?: TicketDraftState
@@ -139,6 +148,7 @@ export function CreateTicketPage() {
           type,
           title: trimmedTitle,
           description: trimmedDescription,
+          priority,
         },
         accessToken,
         idempotencyKeyRef.current,
@@ -152,6 +162,7 @@ export function CreateTicketPage() {
       setType('INCIDENT')
       setTitle('')
       setDescription('')
+      setPriority('MEDIUM')
     } catch (caughtError) {
       // Retain the same idempotency key on failure so retrying sends the same key
       if (caughtError instanceof Error) {
@@ -333,8 +344,16 @@ export function CreateTicketPage() {
                       <option value="LOW">Low (minor inconvenience or cosmetic)</option>
                       <option value="MEDIUM">Medium (standard business impact)</option>
                       <option value="HIGH">High (significant impact on daily work)</option>
+                      {isPrivilegedStaff && (
+                        <option value="CRITICAL">Critical (complete work stoppage / emergency)</option>
+                      )}
                     </select>
                   </div>
+                  <span className="horizon-field-helper">
+                    {isPrivilegedStaff
+                      ? 'Privileged staff: You may submit tickets directly at Critical priority.'
+                      : 'Employees can submit Low, Medium, or High urgency. Critical priority requires support escalation.'}
+                  </span>
                 </div>
               </div>
 

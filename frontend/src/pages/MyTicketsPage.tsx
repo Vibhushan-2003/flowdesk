@@ -442,24 +442,16 @@ export function MyTicketsPage() {
                     </button>
                     <h2 style={{ fontSize: 'var(--font-size-md)', margin: '4px 0 0' }}>{ticket.title}</h2>
                   </div>
-                  <span
-                    className={`ticket-status support-status status-${ticket.status
-                      .toLowerCase()
-                      .replace(/_/g, '-')}`}
-                  >
-                    {formatLabel(ticket.status)}
-                  </span>
+                  <StatusBadge status={ticket.status} size="sm" />
                 </div>
 
                 <div className="ticket-list-meta" style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
                   <p>
                     <strong>Type:</strong> {formatLabel(ticket.type)}
                   </p>
-                  <p>
-                    <strong>Priority:</strong>{' '}
-                    <span className={`priority-badge priority-${ticket.priority.toLowerCase()}`}>
-                      {formatLabel(ticket.priority)}
-                    </span>
+                  <p style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <strong>Priority:</strong>
+                    <PriorityBadge priority={ticket.priority} size="sm" />
                   </p>
                   <p>
                     <strong>Created:</strong> {formatDate(ticket.createdAt)}

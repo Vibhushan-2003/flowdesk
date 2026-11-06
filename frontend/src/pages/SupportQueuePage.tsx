@@ -344,6 +344,7 @@ export function SupportQueuePage() {
             {/* Priority Filter */}
             <div className="horizon-select-wrapper" style={{ flex: '1 1 150px', minWidth: '140px' }}>
               <select
+                id="queue-priority-filter"
                 className="horizon-select"
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}

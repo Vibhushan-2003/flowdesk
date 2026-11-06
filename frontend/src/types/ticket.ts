@@ -28,6 +28,7 @@ export interface CreateTicketRequest {
   type: TicketType
   title: string
   description: string
+  priority?: TicketPriority
 }
 
 export interface TicketResponse {

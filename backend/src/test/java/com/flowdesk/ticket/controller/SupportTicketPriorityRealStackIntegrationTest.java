@@ -342,4 +342,98 @@ class SupportTicketPriorityRealStackIntegrationTest {
         assertEquals("MEDIUM", event.getMetadata().get("fromPriority"));
         assertEquals("HIGH", event.getMetadata().get("toPriority"));
     }
+
+    @Test
+    @DisplayName("10. Privileged staff (Support Engineer) can create ticket directly with CRITICAL priority")
+    void staffCanCreateCriticalTicket() throws Exception {
+        String res = mockMvc.perform(post("/api/tickets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "INCIDENT",
+                                  "title": "Critical datacenter outage",
+                                  "description": "Entire network datacenter infrastructure failure",
+                                  "priority": "CRITICAL"
+                                }
+                                """)
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priority", is("CRITICAL")))
+                .andReturn().getResponse().getContentAsString();
+
+        String createdTicketNum = com.jayway.jsonpath.JsonPath.read(res, "$.ticketNumber");
+        Ticket createdTicket = ticketRepository.findByTicketNumber(createdTicketNum).orElseThrow();
+        assertEquals(TicketPriority.CRITICAL, createdTicket.getPriority());
+
+        // Verify SLA deadlines initialized with CRITICAL policy (15m response, 240m resolution)
+        assertNotNull(createdTicket.getResponseDueAt());
+        assertNotNull(createdTicket.getResolutionDueAt());
+
+        // Cleanup
+        assignmentRepository.deleteAll(assignmentRepository.findAll().stream()
+                .filter(a -> a.getTicket().getId().equals(createdTicket.getId())).toList());
+        ticketRepository.deleteById(createdTicket.getId());
+    }
+
+    @Test
+    @DisplayName("11. End-to-end SLA recalculation preserves original SLA start time across transitions")
+    void slaRecalculationPreservesStartTimeAcrossAllPriorities() throws Exception {
+        OffsetDateTime initialResponseDue = activeTicket.getResponseDueAt();
+        OffsetDateTime initialResolutionDue = activeTicket.getResolutionDueAt();
+        // Medium SLA policy: response 60m, resolution 1440m
+        OffsetDateTime expectedStart = initialResolutionDue.minusMinutes(1440);
+
+        // A. Escalate from MEDIUM to CRITICAL (15m response, 240m resolution)
+        mockMvc.perform(patch("/api/support/tickets/" + activeTicket.getTicketNumber() + "/priority")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\": \"CRITICAL\"}")
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority", is("CRITICAL")));
+
+        Ticket critTicket = ticketRepository.findById(activeTicket.getId()).orElseThrow();
+        assertEquals(TicketPriority.CRITICAL, critTicket.getPriority());
+        assertEquals(expectedStart.plusMinutes(15).toEpochSecond(), critTicket.getResponseDueAt().toEpochSecond());
+        assertEquals(expectedStart.plusMinutes(240).toEpochSecond(), critTicket.getResolutionDueAt().toEpochSecond());
+
+        // B. De-escalate from CRITICAL to LOW (240m response, 2880m resolution)
+        mockMvc.perform(patch("/api/support/tickets/" + activeTicket.getTicketNumber() + "/priority")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\": \"LOW\"}")
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority", is("LOW")));
+
+        Ticket lowTicket = ticketRepository.findById(activeTicket.getId()).orElseThrow();
+        assertEquals(TicketPriority.LOW, lowTicket.getPriority());
+        assertEquals(expectedStart.plusMinutes(240).toEpochSecond(), lowTicket.getResponseDueAt().toEpochSecond());
+        assertEquals(expectedStart.plusMinutes(2880).toEpochSecond(), lowTicket.getResolutionDueAt().toEpochSecond());
+
+        // C. Transition to IN_PROGRESS (which records first response), then escalate to HIGH (30m response, 480m resolution)
+        // With first response recorded, responseDueAt must remain unchanged (start + 240m from LOW), while resolutionDueAt updates to start + 480m
+        mockMvc.perform(patch("/api/support/tickets/" + activeTicket.getTicketNumber() + "/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"IN_PROGRESS\"}")
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/support/tickets/" + activeTicket.getTicketNumber() + "/priority")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\": \"HIGH\"}")
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority", is("HIGH")));
+
+        Ticket highTicket = ticketRepository.findById(activeTicket.getId()).orElseThrow();
+        assertEquals(TicketPriority.HIGH, highTicket.getPriority());
+        assertNotNull(highTicket.getFirstRespondedAt());
+        // responseDueAt kept preserved start + 240m from LOW because first response was already recorded
+        assertEquals(expectedStart.plusMinutes(240).toEpochSecond(), highTicket.getResponseDueAt().toEpochSecond());
+        assertEquals(expectedStart.plusMinutes(480).toEpochSecond(), highTicket.getResolutionDueAt().toEpochSecond());
+    }
 }
