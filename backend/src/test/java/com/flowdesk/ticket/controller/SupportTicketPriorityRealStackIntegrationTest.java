@@ -45,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -341,5 +342,226 @@ class SupportTicketPriorityRealStackIntegrationTest {
         assertNotNull(event.getMetadata());
         assertEquals("MEDIUM", event.getMetadata().get("fromPriority"));
         assertEquals("HIGH", event.getMetadata().get("toPriority"));
+    }
+
+    @Test
+    @DisplayName("10. Privileged staff (Support Engineer) can create ticket directly with CRITICAL priority")
+    void staffCanCreateCriticalTicket() throws Exception {
+        String res = mockMvc.perform(post("/api/tickets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "INCIDENT",
+                                  "title": "Critical datacenter outage",
+                                  "description": "Entire network datacenter infrastructure failure",
+                                  "priority": "CRITICAL"
+                                }
+                                """)
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priority", is("CRITICAL")))
+                .andReturn().getResponse().getContentAsString();
+
+        String createdTicketNum = com.jayway.jsonpath.JsonPath.read(res, "$.ticketNumber");
+        Ticket createdTicket = ticketRepository.findByTicketNumber(createdTicketNum).orElseThrow();
+        assertEquals(TicketPriority.CRITICAL, createdTicket.getPriority());
+
+        // Verify SLA deadlines initialized with CRITICAL policy (15m response, 240m resolution)
+        assertNotNull(createdTicket.getResponseDueAt());
+        assertNotNull(createdTicket.getResolutionDueAt());
+
+        // Cleanup
+        assignmentRepository.deleteAll(assignmentRepository.findAll().stream()
+                .filter(a -> a.getTicket().getId().equals(createdTicket.getId())).toList());
+        ticketRepository.deleteById(createdTicket.getId());
+    }
+
+    @Test
+    @DisplayName("11. End-to-end SLA recalculation preserves original SLA start time across transitions")
+    void slaRecalculationPreservesStartTimeAcrossAllPriorities() throws Exception {
+        OffsetDateTime initialResponseDue = activeTicket.getResponseDueAt();
+        OffsetDateTime initialResolutionDue = activeTicket.getResolutionDueAt();
+        // Medium SLA policy: response 60m, resolution 1440m
+        OffsetDateTime expectedStart = initialResolutionDue.minusMinutes(1440);
+
+        // A. Escalate from MEDIUM to CRITICAL (15m response, 240m resolution)
+        mockMvc.perform(patch("/api/support/tickets/" + activeTicket.getTicketNumber() + "/priority")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\": \"CRITICAL\"}")
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority", is("CRITICAL")));
+
+        Ticket critTicket = ticketRepository.findById(activeTicket.getId()).orElseThrow();
+        assertEquals(TicketPriority.CRITICAL, critTicket.getPriority());
+        assertEquals(expectedStart.plusMinutes(15).toEpochSecond(), critTicket.getResponseDueAt().toEpochSecond());
+        assertEquals(expectedStart.plusMinutes(240).toEpochSecond(), critTicket.getResolutionDueAt().toEpochSecond());
+
+        // B. De-escalate from CRITICAL to LOW (240m response, 2880m resolution)
+        mockMvc.perform(patch("/api/support/tickets/" + activeTicket.getTicketNumber() + "/priority")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\": \"LOW\"}")
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority", is("LOW")));
+
+        Ticket lowTicket = ticketRepository.findById(activeTicket.getId()).orElseThrow();
+        assertEquals(TicketPriority.LOW, lowTicket.getPriority());
+        assertEquals(expectedStart.plusMinutes(240).toEpochSecond(), lowTicket.getResponseDueAt().toEpochSecond());
+        assertEquals(expectedStart.plusMinutes(2880).toEpochSecond(), lowTicket.getResolutionDueAt().toEpochSecond());
+
+        // C. Transition to IN_PROGRESS (which records first response), then escalate to HIGH (30m response, 480m resolution)
+        // With first response recorded, responseDueAt must remain unchanged (start + 240m from LOW), while resolutionDueAt updates to start + 480m
+        mockMvc.perform(patch("/api/support/tickets/" + activeTicket.getTicketNumber() + "/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"IN_PROGRESS\"}")
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/support/tickets/" + activeTicket.getTicketNumber() + "/priority")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\": \"HIGH\"}")
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority", is("HIGH")));
+
+        Ticket highTicket = ticketRepository.findById(activeTicket.getId()).orElseThrow();
+        assertEquals(TicketPriority.HIGH, highTicket.getPriority());
+        assertNotNull(highTicket.getFirstRespondedAt());
+        // responseDueAt kept preserved start + 240m from LOW because first response was already recorded
+        assertEquals(expectedStart.plusMinutes(240).toEpochSecond(), highTicket.getResponseDueAt().toEpochSecond());
+        assertEquals(expectedStart.plusMinutes(480).toEpochSecond(), highTicket.getResolutionDueAt().toEpochSecond());
+    }
+
+    @Test
+    @DisplayName("12. All four priorities (LOW, MEDIUM, HIGH, CRITICAL) persist from creation into PostgreSQL database and are returned via ticket details API")
+    void allFourPrioritiesPersistThroughDatabaseAndDetailsApi() throws Exception {
+        // 1. Priority LOW created by Employee
+        String lowRes = mockMvc.perform(post("/api/tickets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "INCIDENT",
+                                  "title": "Low priority query",
+                                  "description": "General non-urgent cosmetic inquiry",
+                                  "priority": "LOW"
+                                }
+                                """)
+                        .with(jwt().jwt(j -> j.subject(employee.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priority", is("LOW")))
+                .andReturn().getResponse().getContentAsString();
+
+        String lowNum = com.jayway.jsonpath.JsonPath.read(lowRes, "$.ticketNumber");
+        Ticket lowDb = ticketRepository.findByTicketNumber(lowNum).orElseThrow();
+        assertEquals(TicketPriority.LOW, lowDb.getPriority());
+        assertEquals(lowDb.getCreatedAt().plusMinutes(240).toEpochSecond(), lowDb.getResponseDueAt().toEpochSecond());
+        assertEquals(lowDb.getCreatedAt().plusMinutes(2880).toEpochSecond(), lowDb.getResolutionDueAt().toEpochSecond());
+
+        // Verify details API returns persisted priority
+        mockMvc.perform(get("/api/tickets/" + lowNum)
+                        .with(jwt().jwt(j -> j.subject(employee.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority", is("LOW")));
+
+        // 2. Priority MEDIUM created by Employee (V7 default: response 60m, resolution 1440m)
+        String medRes = mockMvc.perform(post("/api/tickets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "INCIDENT",
+                                  "title": "Medium priority issue",
+                                  "description": "Standard business laptop printer issue",
+                                  "priority": "MEDIUM"
+                                }
+                                """)
+                        .with(jwt().jwt(j -> j.subject(employee.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priority", is("MEDIUM")))
+                .andReturn().getResponse().getContentAsString();
+
+        String medNum = com.jayway.jsonpath.JsonPath.read(medRes, "$.ticketNumber");
+        Ticket medDb = ticketRepository.findByTicketNumber(medNum).orElseThrow();
+        assertEquals(TicketPriority.MEDIUM, medDb.getPriority());
+        assertEquals(medDb.getCreatedAt().plusMinutes(60).toEpochSecond(), medDb.getResponseDueAt().toEpochSecond());
+        assertEquals(medDb.getCreatedAt().plusMinutes(1440).toEpochSecond(), medDb.getResolutionDueAt().toEpochSecond());
+
+        mockMvc.perform(get("/api/tickets/" + medNum)
+                        .with(jwt().jwt(j -> j.subject(employee.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority", is("MEDIUM")));
+
+        // 3. Priority HIGH created by Employee (V7 default: response 30m, resolution 480m)
+        String highRes = mockMvc.perform(post("/api/tickets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "INCIDENT",
+                                  "title": "High priority incident",
+                                  "description": "Department-wide VPN connectivity degradation",
+                                  "priority": "HIGH"
+                                }
+                                """)
+                        .with(jwt().jwt(j -> j.subject(employee.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priority", is("HIGH")))
+                .andReturn().getResponse().getContentAsString();
+
+        String highNum = com.jayway.jsonpath.JsonPath.read(highRes, "$.ticketNumber");
+        Ticket highDb = ticketRepository.findByTicketNumber(highNum).orElseThrow();
+        assertEquals(TicketPriority.HIGH, highDb.getPriority());
+        assertEquals(highDb.getCreatedAt().plusMinutes(30).toEpochSecond(), highDb.getResponseDueAt().toEpochSecond());
+        assertEquals(highDb.getCreatedAt().plusMinutes(480).toEpochSecond(), highDb.getResolutionDueAt().toEpochSecond());
+
+        mockMvc.perform(get("/api/tickets/" + highNum)
+                        .with(jwt().jwt(j -> j.subject(employee.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority", is("HIGH")));
+
+        // 4. Priority CRITICAL created by Privileged Staff (V7 default: response 15m, resolution 240m)
+        String critRes = mockMvc.perform(post("/api/tickets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "INCIDENT",
+                                  "title": "Critical production outage",
+                                  "description": "Primary customer API database cluster down",
+                                  "priority": "CRITICAL"
+                                }
+                                """)
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.priority", is("CRITICAL")))
+                .andReturn().getResponse().getContentAsString();
+
+        String critNum = com.jayway.jsonpath.JsonPath.read(critRes, "$.ticketNumber");
+        Ticket critDb = ticketRepository.findByTicketNumber(critNum).orElseThrow();
+        assertEquals(TicketPriority.CRITICAL, critDb.getPriority());
+        assertEquals(critDb.getCreatedAt().plusMinutes(15).toEpochSecond(), critDb.getResponseDueAt().toEpochSecond());
+        assertEquals(critDb.getCreatedAt().plusMinutes(240).toEpochSecond(), critDb.getResolutionDueAt().toEpochSecond());
+
+        mockMvc.perform(get("/api/tickets/" + critNum)
+                        .with(jwt().jwt(j -> j.subject(assignedEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority", is("CRITICAL")));
+
+        // Cleanup
+        List<Ticket> createdTickets = List.of(lowDb, medDb, highDb, critDb);
+        assignmentRepository.deleteAll(assignmentRepository.findAll().stream()
+                .filter(a -> createdTickets.stream().anyMatch(t -> t.getId().equals(a.getTicket().getId()))).toList());
+        ticketRepository.deleteAll(createdTickets);
     }
 }

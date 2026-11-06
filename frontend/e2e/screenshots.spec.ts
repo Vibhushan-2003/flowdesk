@@ -1521,4 +1521,107 @@ test.describe('Horizon Visual Screenshots Suite', () => {
       fullPage: false,
     })
   })
+
+  test('21: Samsung Galaxy A54 (412x915) Mobile Experience Suite', async ({ page }) => {
+    await setupApiMocks(page, MOCK_ADMIN)
+    const token = createMockToken(MOCK_ADMIN)
+    await page.addInitScript((t) => {
+      sessionStorage.setItem('flowdesk_access_token', t)
+    }, token)
+
+    // Set Samsung Galaxy A54 screen dimensions
+    await page.setViewportSize({ width: 412, height: 915 })
+
+    // A. Dashboard on Galaxy A54
+    await page.goto('/dashboard')
+    await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible()
+    await page.waitForTimeout(300)
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, '21a-galaxy-a54-dashboard.png'),
+      fullPage: false,
+    })
+
+    // B. Mobile Drawer on Galaxy A54
+    const menuBtn = page.locator('.horizon-mobile-menu-btn')
+    await menuBtn.click()
+    const drawerPortal = page.locator('.horizon-mobile-drawer-portal')
+    await expect(drawerPortal).toBeVisible()
+    await page.waitForTimeout(300)
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, '21b-galaxy-a54-drawer.png'),
+      fullPage: false,
+    })
+    await page.locator('.horizon-drawer-close-btn').click()
+    await expect(drawerPortal).toBeHidden()
+
+    // C. Create Ticket with Priority Selector & Escalation Guidance
+    await page.goto('/tickets/new')
+    await expect(page.getByRole('heading', { name: /create a ticket/i })).toBeVisible()
+    await page.waitForTimeout(300)
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, '21c-galaxy-a54-create-ticket.png'),
+      fullPage: false,
+    })
+
+    // D. SLA Dashboard on Galaxy A54
+    await page.route('**/api/sla/dashboard', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          activeTickets: 14,
+          responseBreached: 2,
+          resolutionBreached: 1,
+          responseCompliancePercent: 91.5,
+          resolutionCompliancePercent: 88.0,
+          breachedByPriority: {
+            CRITICAL: 1,
+            HIGH: 1,
+            MEDIUM: 1,
+            LOW: 0,
+          },
+          recentBreaches: [
+            {
+              ticketNumber: 'FD-100299',
+              eventType: 'RESPONSE_BREACHED',
+              priority: 'CRITICAL',
+              status: 'OPEN',
+              occurredAt: '2026-11-02T11:00:00Z',
+            },
+          ],
+        }),
+      })
+    })
+    await page.goto('/sla/dashboard')
+    await expect(page.getByRole('heading', { name: /sla operations/i })).toBeVisible()
+    await page.waitForTimeout(300)
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, '21d-galaxy-a54-sla-dashboard.png'),
+      fullPage: false,
+    })
+
+    // E. Reports & Analytics on Galaxy A54
+    await page.route('**/api/reports/operational*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          dateRange: { startDate: '2026-10-03', endDate: '2026-11-02', generatedAt: '2026-11-02T00:00:00Z' },
+          ticketVolume: { totalCreated: 52, totalResolved: 38, openBacklog: 14 },
+          volumeByStatus: { OPEN: 6, IN_PROGRESS: 5, WAITING_FOR_USER: 3, RESOLVED: 38 },
+          volumeByPriority: { CRITICAL: 4, HIGH: 12, MEDIUM: 26, LOW: 10 },
+          dailyTrends: [],
+          engineerWorkload: [],
+          kbDeflection: { totalSearches: 120, totalViews: 85, totalSolvedDirectly: 24, overallDeflectionRate: 28.2, topDeflectingArticles: [] },
+        }),
+      })
+    })
+    await page.goto('/reports')
+    await expect(page.getByRole('heading', { name: /operational reporting & analytics/i })).toBeVisible()
+    await page.waitForTimeout(300)
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, '21e-galaxy-a54-reports.png'),
+      fullPage: false,
+    })
+  })
 })

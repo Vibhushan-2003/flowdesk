@@ -133,11 +133,14 @@
   grid-template-columns: minmax(0, 1fr) 380px;
   gap: var(--space-6);
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 @media (max-width: 1024px) {
   .horizon-workbench-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -147,6 +150,8 @@
   flex-direction: column;
   gap: var(--space-6);
   min-width: 0;
+  max-width: 100%;
+  width: 100%;
 }
 
 /* Sidebar Column Section */
@@ -176,6 +181,8 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .horizon-workflow-status-meta {
@@ -546,5 +553,42 @@
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-divider);
   justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .horizon-workflow-ribbon {
+    padding: var(--space-3);
+    gap: var(--space-2-5);
+  }
+
+  .horizon-workflow-status-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .horizon-workflow-actions {
+    width: 100%;
+    gap: var(--space-2);
+  }
+
+  .horizon-workflow-actions .horizon-btn {
+    flex: 1 1 auto;
+    min-height: 44px;
+  }
+
+  .horizon-composer-container {
+    padding: var(--space-3-5);
+  }
+
+  .horizon-approval-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .horizon-approval-actions .horizon-btn {
+    width: 100%;
+    min-height: 44px;
+  }
 }
 

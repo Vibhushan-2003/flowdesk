@@ -340,6 +340,8 @@
   display: flex;
   flex-direction: column;
   position: relative;
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* Card Densities */
@@ -2011,6 +2013,7 @@ input.horizon-input:not(.horizon-input-wrapper input):focus {
   box-shadow: var(--shadow-xl);
   width: 100%;
   max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2092,6 +2095,119 @@ input.horizon-input:not(.horizon-input-wrapper input):focus {
 @media (max-width: 900px) {
   .horizon-create-grid {
     grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .horizon-modal-portal {
+    padding: var(--space-2);
+    align-items: flex-end;
+  }
+
+  .horizon-modal-dialog {
+    max-height: 85vh;
+    max-height: 85dvh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    width: 100%;
+    margin: 0;
+  }
+
+  .horizon-modal-header {
+    padding: var(--space-4);
+  }
+
+  .horizon-modal-close-btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .horizon-modal-body {
+    padding: var(--space-4);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .horizon-modal-footer {
+    padding: var(--space-3) var(--space-4);
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .horizon-modal-footer .horizon-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* Form control mobile font size to prevent iOS/Android zoom */
+  .horizon-input,
+  .horizon-select,
+  .horizon-textarea,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="date"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Filter bar mobile stacking */
+  .horizon-filter-bar {
+    padding: var(--space-3);
+    gap: var(--space-2-5);
+  }
+
+  .horizon-filter-fields {
+    min-width: 0;
+    width: 100%;
+    gap: var(--space-2);
+  }
+
+  .horizon-filter-fields .horizon-form-field {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+
+  .horizon-filter-actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+
+  .horizon-filter-actions .horizon-btn {
+    flex: 1;
+    min-height: 40px;
+  }
+
+  /* Mobile touch targets */
+  .notification-bell-button,
+  .theme-toggle-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Responsive card views on mobile */
+  .mobile-ticket-card-view {
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  .mobile-ticket-card,
+  .ticket-list-item {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3-5);
+    box-shadow: var(--shadow-xs);
+    width: 100%;
+    box-sizing: border-box;
   }
 }
 
@@ -2961,5 +3077,52 @@ input.horizon-input:not(.horizon-input-wrapper input):focus {
     padding: 2rem 1.5rem;
     box-shadow: none;
     border: 1px solid var(--color-border);
+  }
+}
+
+@media (max-width: 480px) {
+  .horizon-auth-form-side {
+    padding: var(--space-4) var(--space-3);
+  }
+  .horizon-auth-card {
+    padding: var(--space-5) var(--space-3-5);
+    border-radius: var(--radius-lg);
+  }
+  .horizon-auth-theme-toggle {
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+}
+
+/* ==========================================================================
+   Mobile Touch Targets & Reachability Hardening (WCAG 2.1 AAA 44x44px)
+   ========================================================================== */
+@media (max-width: 640px) {
+  .horizon-btn {
+    min-height: 44px;
+  }
+
+  .horizon-btn--sm {
+    min-height: 44px;
+    height: auto;
+    padding: var(--space-1) var(--space-3-5);
+  }
+
+  .horizon-btn--md {
+    min-height: 44px;
+  }
+
+  .theme-toggle-btn,
+  .notification-bell-button {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    box-sizing: border-box;
+  }
+
+  .horizon-table-container {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
   }
 }

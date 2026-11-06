@@ -11,6 +11,7 @@ export default defineConfig({
     'security-refresh-malware.spec.ts',
     'screenshots.spec.ts',
     'admin-batch-d.spec.ts',
+    'priority-and-mobile-reliability.spec.ts',
   ],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

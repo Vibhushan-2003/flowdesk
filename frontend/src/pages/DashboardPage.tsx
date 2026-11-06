@@ -195,7 +195,7 @@ export function DashboardPage() {
           className="dashboard-kpi-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
             gap: '16px',
             marginBottom: '28px',
           }}
@@ -339,7 +339,7 @@ export function DashboardPage() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '20px' }}>
             {/* Self-Service & Quick Help Hub */}
             <Card
               padded
@@ -373,7 +373,7 @@ export function DashboardPage() {
                 </form>
 
                 {/* Direct Action Buttons */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: '10px' }}>
                   <Button
                     variant="primary"
                     size="md"
@@ -448,7 +448,7 @@ export function DashboardPage() {
 
       {/* 2. SUPPORT ENGINEER DASHBOARD WORKBENCH */}
       {isSupportEngineer && !canViewOperations && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '20px' }}>
           {/* Card A: My Assigned Work */}
           <Card
             padded
@@ -591,7 +591,7 @@ export function DashboardPage() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '20px' }}>
             {/* Widget 1: SLA Queue Breaches & Policy Targets */}
             <Card
               padded

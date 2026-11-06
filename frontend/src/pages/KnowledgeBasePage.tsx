@@ -306,7 +306,7 @@ export function KnowledgeBasePage() {
       ) : (
         <>
           {/* Article Cards Grid */}
-          <div className="kb-articles-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+          <div className="kb-articles-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
             {articlePage.content.map((art) => (
               <article
                 key={art.id}
