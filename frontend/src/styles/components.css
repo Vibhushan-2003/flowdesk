@@ -340,6 +340,8 @@
   display: flex;
   flex-direction: column;
   position: relative;
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* Card Densities */
@@ -3089,5 +3091,38 @@ input.horizon-input:not(.horizon-input-wrapper input):focus {
   .horizon-auth-theme-toggle {
     top: 0.75rem;
     right: 0.75rem;
+  }
+}
+
+/* ==========================================================================
+   Mobile Touch Targets & Reachability Hardening (WCAG 2.1 AAA 44x44px)
+   ========================================================================== */
+@media (max-width: 640px) {
+  .horizon-btn {
+    min-height: 44px;
+  }
+
+  .horizon-btn--sm {
+    min-height: 44px;
+    height: auto;
+    padding: var(--space-1) var(--space-3-5);
+  }
+
+  .horizon-btn--md {
+    min-height: 44px;
+  }
+
+  .theme-toggle-btn,
+  .notification-bell-button {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    box-sizing: border-box;
+  }
+
+  .horizon-table-container {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
   }
 }

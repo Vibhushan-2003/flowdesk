@@ -476,6 +476,14 @@
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
+  min-width: 0;
+}
+
+.horizon-page-container {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* ==========================================================================
@@ -594,6 +602,7 @@
   .horizon-profile-btn {
     min-width: 44px;
     min-height: 44px;
+    height: 44px;
   }
 
   .horizon-topbar-breadcrumbs {
