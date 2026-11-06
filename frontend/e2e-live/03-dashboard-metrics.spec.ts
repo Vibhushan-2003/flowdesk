@@ -27,8 +27,8 @@ test.describe('Real-Stack Live: Role-Based Dashboard Metrics', () => {
     await page.goto('/dashboard')
     await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible()
 
-    // Employee IT support card is visible with live KPI chips
-    await expect(page.getByRole('heading', { name: /it support/i })).toBeVisible()
+    // Employee self-service hub is visible with live KPI chips
+    await expect(page.getByRole('heading', { name: /it self-service hub/i })).toBeVisible()
     await expect(page.locator('.dashboard-kpi-grid').first()).toBeVisible()
     await expect(page.getByText('Open Tickets')).toBeVisible()
 
