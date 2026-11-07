@@ -19,10 +19,11 @@ import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PriorityBadge } from '../components/ui/PriorityBadge'
+import { SlaBadge } from '../components/ui/SlaBadge'
 import { DataTable, type Column } from '../components/ui/DataTable'
 import { Pagination } from '../components/ui/Pagination'
 import { EmptyState } from '../components/ui/EmptyState'
-import { formatDate, formatLabel, formatSlaStatus } from '../utils/formatters'
+import { formatDate, formatLabel } from '../utils/formatters'
 
 import type {
   PageResponse,
@@ -216,15 +217,9 @@ export function MyAssignedTicketsPage() {
     {
       key: 'slaStatus',
       header: 'Resolution SLA',
-      render: (ticket: SupportTicketSummary) => {
-        if (!ticket.resolutionSlaStatus) return <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>&mdash;</span>
-        const isBreached = ticket.resolutionSlaStatus === 'BREACHED'
-        return (
-          <Badge variant={isBreached ? 'danger' : 'success'} size="sm" dot>
-            {formatSlaStatus(ticket.resolutionSlaStatus)}
-          </Badge>
-        )
-      },
+      render: (ticket: SupportTicketSummary) => (
+        <SlaBadge status={ticket.resolutionSlaStatus} size="sm" />
+      ),
       width: '130px',
     },
     {
@@ -499,9 +494,7 @@ export function MyAssignedTicketsPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
                 <span>Assigned {formatDate(ticket.assignedAt || ticket.createdAt)}</span>
                 {ticket.resolutionSlaStatus && (
-                  <Badge variant={ticket.resolutionSlaStatus === 'BREACHED' ? 'danger' : 'success'} size="sm" dot>
-                    {formatSlaStatus(ticket.resolutionSlaStatus)}
-                  </Badge>
+                  <SlaBadge status={ticket.resolutionSlaStatus} size="sm" />
                 )}
               </div>
 

@@ -13,13 +13,14 @@ import {
 import { claimTicket, getSupportQueue } from '../api/ticket'
 import { useAuth } from '../auth/useAuth'
 import type { PageResponse, TicketSummary } from '../types/ticket'
-import { formatDate, formatLabel, formatSlaStatus } from '../utils/formatters'
+import { formatDate, formatLabel } from '../utils/formatters'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PriorityBadge } from '../components/ui/PriorityBadge'
+import { SlaBadge } from '../components/ui/SlaBadge'
 import { DataTable, type Column } from '../components/ui/DataTable'
 import { Pagination } from '../components/ui/Pagination'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -203,14 +204,7 @@ export function SupportQueuePage() {
     {
       key: 'sla',
       header: 'Response SLA',
-      render: (ticket: TicketSummary) => {
-        if (!ticket.responseSlaStatus) return <span style={{ color: 'var(--color-text-muted)' }}>&mdash;</span>
-        return (
-          <Badge variant={ticket.responseSlaStatus === 'BREACHED' ? 'danger' : 'success'} size="sm" dot>
-            {formatSlaStatus(ticket.responseSlaStatus)}
-          </Badge>
-        )
-      },
+      render: (ticket: TicketSummary) => <SlaBadge status={ticket.responseSlaStatus} size="sm" />,
       width: '130px',
     },
     {

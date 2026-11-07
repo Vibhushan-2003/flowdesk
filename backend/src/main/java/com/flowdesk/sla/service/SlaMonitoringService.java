@@ -128,7 +128,7 @@ public class SlaMonitoringService {
     }
 
     @Transactional
-    int monitorBreaches(
+    public int monitorBreaches(
             OffsetDateTime evaluatedAt
     ) {
         Objects.requireNonNull(

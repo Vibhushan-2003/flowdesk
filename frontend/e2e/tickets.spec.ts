@@ -426,4 +426,332 @@ test.describe('Ticket Creation & Reliability Journeys', () => {
     await expect(activeTab).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByText('FD-100201').first()).toBeVisible()
   })
+
+  test('Create Ticket Attachment Workflow: successfully uploads staged files and truthfully displays clean ClamAV scan status', async ({
+    page,
+  }) => {
+    let ticketCreationCount = 0
+    const uploadedAttachments: string[] = []
+
+    await page.route('**/api/tickets', async (route) => {
+      if (route.request().method() === 'POST') {
+        ticketCreationCount++
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: '77777777-7777-7777-7777-777777777777',
+            ticketNumber: 'FD-000077',
+            type: 'INCIDENT',
+            title: 'VPN timeout with packet trace',
+            description: 'Packet trace attached showing TCP handshake timeout',
+            priority: 'HIGH',
+            status: 'OPEN',
+            createdAt: new Date().toISOString(),
+          }),
+        })
+      }
+    })
+
+    await page.route('**/api/tickets/FD-000077/attachments', async (route) => {
+      if (route.request().method() === 'POST') {
+        uploadedAttachments.push('uploaded')
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: `att-id-${uploadedAttachments.length}`,
+            ticketNumber: 'FD-000077',
+            filename: uploadedAttachments.length === 1 ? 'packet-trace.log' : 'network-topology.pdf',
+            contentType: uploadedAttachments.length === 1 ? 'text/plain' : 'application/pdf',
+            sizeBytes: 1024,
+            uploadedByUserId: '11111111-1111-1111-1111-111111111111',
+            uploadedByName: 'Test Employee',
+            createdAt: new Date().toISOString(),
+            scanStatus: 'CLEAN',
+            scanDetails: 'ClamAV 1.4: OK',
+          }),
+        })
+      }
+    })
+
+    await page.goto('/tickets/new')
+
+    await page.getByLabel(/title/i).fill('VPN timeout with packet trace')
+    await page.getByLabel(/description/i).fill('Packet trace attached showing TCP handshake timeout')
+
+    // Stage 2 files
+    await page.locator('#ticket-create-file-input').setInputFiles([
+      {
+        name: 'packet-trace.log',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('SYN sent\nSYN-ACK timed out\nRetrying...'),
+      },
+      {
+        name: 'network-topology.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('%PDF-1.4 network topology mockup %%EOF'),
+      },
+    ])
+
+    // Verify staged files list preview
+    await expect(page.getByText('packet-trace.log')).toBeVisible()
+    await expect(page.getByText('network-topology.pdf')).toBeVisible()
+    await expect(page.getByText('2 / 10 selected')).toBeVisible()
+
+    // Submit button shows staged count
+    const submitBtn = page.getByRole('button', { name: /create ticket with 2 attachments/i })
+    await expect(submitBtn).toBeVisible()
+    await submitBtn.click()
+
+    // Confirmation screen shows ticket number and truthful ClamAV scan status
+    await expect(page.getByRole('heading', { name: /ticket created successfully/i })).toBeVisible()
+    await expect(page.getByText('FD-000077', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Attached Files \(2 of 2 uploaded\)/i)).toBeVisible()
+    await expect(page.getByText('Clean (Verified)').first()).toBeVisible()
+
+    expect(ticketCreationCount).toBe(1)
+    expect(uploadedAttachments.length).toBe(2)
+  })
+
+  test('Create Ticket Attachment Workflow: partial upload failure displays retry button and retries without duplicate ticket creation', async ({
+    page,
+  }) => {
+    let ticketCreationCount = 0
+    let uploadAttemptCount = 0
+
+    await page.route('**/api/tickets', async (route) => {
+      if (route.request().method() === 'POST') {
+        ticketCreationCount++
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: '66666666-6666-6666-6666-666666666666',
+            ticketNumber: 'FD-000066',
+            type: 'INCIDENT',
+            title: 'Partial failure test',
+            description: 'Testing resilient retry on network failure',
+            priority: 'MEDIUM',
+            status: 'OPEN',
+            createdAt: new Date().toISOString(),
+          }),
+        })
+      }
+    })
+
+    await page.route('**/api/tickets/FD-000066/attachments', async (route) => {
+      if (route.request().method() === 'POST') {
+        uploadAttemptCount++
+        if (uploadAttemptCount === 1) {
+          // First file: valid.pdf succeeds
+          await route.fulfill({
+            status: 201,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              id: 'att-66-1',
+              ticketNumber: 'FD-000066',
+              filename: 'valid.pdf',
+              contentType: 'application/pdf',
+              sizeBytes: 512,
+              uploadedByUserId: '11111111-1111-1111-1111-111111111111',
+              uploadedByName: 'Test Employee',
+              createdAt: new Date().toISOString(),
+              scanStatus: 'CLEAN',
+            }),
+          })
+        } else if (uploadAttemptCount === 2) {
+          // Second file: fail.txt fails on initial attempt
+          await route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              message: 'Temporary storage gateway timeout',
+            }),
+          })
+        } else {
+          // Third attempt (retry of fail.txt): succeeds
+          await route.fulfill({
+            status: 201,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              id: 'att-66-2',
+              ticketNumber: 'FD-000066',
+              filename: 'fail.txt',
+              contentType: 'text/plain',
+              sizeBytes: 256,
+              uploadedByUserId: '11111111-1111-1111-1111-111111111111',
+              uploadedByName: 'Test Employee',
+              createdAt: new Date().toISOString(),
+              scanStatus: 'CLEAN',
+            }),
+          })
+        }
+      }
+    })
+
+    await page.goto('/tickets/new')
+
+    await page.getByLabel(/title/i).fill('Partial failure test')
+    await page.getByLabel(/description/i).fill('Testing resilient retry on network failure')
+
+    // Stage 2 files: valid.pdf and fail.txt
+    await page.locator('#ticket-create-file-input').setInputFiles([
+      {
+        name: 'valid.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('%PDF-1.4 test valid %%EOF'),
+      },
+      {
+        name: 'fail.txt',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('Diagnostics details to retry'),
+      },
+    ])
+
+    await page.getByRole('button', { name: /create ticket with 2 attachments/i }).click()
+
+    // Confirmation panel appears for ticket FD-000066
+    await expect(page.getByRole('heading', { name: /ticket created successfully/i })).toBeVisible()
+    await expect(page.getByText('FD-000066', { exact: true })).toBeVisible()
+
+    // Shows partial failure notice and retry button for fail.txt
+    await expect(page.getByText(/Attachment Notice/i)).toBeVisible()
+    await expect(page.getByText('Upload Failed')).toBeVisible()
+    const retryBtn = page.getByRole('button', { name: /retry/i })
+    await expect(retryBtn).toBeVisible()
+
+    // Click retry
+    await retryBtn.click()
+
+    // After retry succeeds, Upload Failed badge is replaced by Clean (Verified) and notice disappears
+    await expect(page.getByText('Clean (Verified)').nth(1)).toBeVisible()
+    await expect(page.getByText(/Attachment Notice/i)).not.toBeVisible()
+
+    // CRITICAL ASSERTION: Ticket creation was dispatched EXACTLY once! NO duplicate ticket created!
+    expect(ticketCreationCount).toBe(1)
+    expect(uploadAttemptCount).toBe(3)
+  })
+
+  test('Create Ticket Attachment Workflow: client-side validation blocks unsupported formats, oversized files, and empty files', async ({
+    page,
+  }) => {
+    await page.goto('/tickets/new')
+
+    // 1. Unsupported extension (.exe)
+    await page.locator('#ticket-create-file-input').setInputFiles([
+      {
+        name: 'malware.exe',
+        mimeType: 'application/x-msdownload',
+        buffer: Buffer.from('MZ binary'),
+      },
+    ])
+    await expect(page.getByText(/File "malware.exe" has an unsupported format/i)).toBeVisible()
+
+    // 2. Empty (0-byte) file
+    await page.locator('#ticket-create-file-input').setInputFiles([
+      {
+        name: 'empty.log',
+        mimeType: 'text/plain',
+        buffer: Buffer.from(''),
+      },
+    ])
+    await expect(page.getByText(/File "empty.log" is empty \(0 bytes\)/i)).toBeVisible()
+
+    // 3. Oversized file (> 10MB)
+    const bigBuffer = Buffer.alloc(10 * 1024 * 1024 + 1024) // 10MB + 1KB
+    await page.locator('#ticket-create-file-input').setInputFiles([
+      {
+        name: 'large_dump.log',
+        mimeType: 'text/plain',
+        buffer: bigBuffer,
+      },
+    ])
+    await expect(page.getByText(/File "large_dump.log" exceeds the maximum limit of 10 MB/i)).toBeVisible()
+
+    // None of the invalid files should be staged
+    await expect(page.getByText('0 / 10 selected')).toBeVisible()
+  })
+
+  test('Create Ticket Attachment Workflow: attachment quota prevents exceeding maximum 10 attachments', async ({
+    page,
+  }) => {
+    await page.goto('/tickets/new')
+
+    // Attempt to stage 11 files
+    const elevenFiles = Array.from({ length: 11 }, (_, i) => ({
+      name: `file_${i + 1}.txt`,
+      mimeType: 'text/plain',
+      buffer: Buffer.from(`Content for file ${i + 1}`),
+    }))
+
+    await page.locator('#ticket-create-file-input').setInputFiles(elevenFiles)
+    await expect(page.getByText(/Maximum 10 attachments allowed per ticket/i)).toBeVisible()
+    await expect(page.getByText('0 / 10 selected')).toBeVisible()
+  })
+
+  test('Create Ticket Attachment Workflow: truthful malware scan reporting for quarantined file', async ({
+    page,
+  }) => {
+    await page.route('**/api/tickets', async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: '55555555-5555-5555-5555-555555555555',
+            ticketNumber: 'FD-000055',
+            type: 'INCIDENT',
+            title: 'Infected attachment security test',
+            description: 'Uploading file that triggers ClamAV signature detection',
+            priority: 'LOW',
+            status: 'OPEN',
+            createdAt: new Date().toISOString(),
+          }),
+        })
+      }
+    })
+
+    // Mock backend returning scanStatus = INFECTED
+    await page.route('**/api/tickets/FD-000055/attachments', async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: 'att-55-eicar',
+            ticketNumber: 'FD-000055',
+            filename: 'eicar-test.txt',
+            contentType: 'text/plain',
+            sizeBytes: 68,
+            uploadedByUserId: '11111111-1111-1111-1111-111111111111',
+            uploadedByName: 'Test Employee',
+            createdAt: new Date().toISOString(),
+            scanStatus: 'INFECTED',
+            scanDetails: 'Malware detected: Eicar-Test-Signature',
+          }),
+        })
+      }
+    })
+
+    await page.goto('/tickets/new')
+
+    await page.getByLabel(/title/i).fill('Infected attachment security test')
+    await page.getByLabel(/description/i).fill('Uploading file that triggers ClamAV signature detection')
+
+    await page.locator('#ticket-create-file-input').setInputFiles([
+      {
+        name: 'eicar-test.txt',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*'),
+      },
+    ])
+
+    await page.getByRole('button', { name: /create ticket with 1 attachment/i }).click()
+
+    // Confirmation screen truthfully warns about malware detection
+    await expect(page.getByRole('heading', { name: /ticket created successfully/i })).toBeVisible()
+    await expect(page.getByText('Quarantined (Malware Detected)')).toBeVisible()
+    await expect(page.getByText(/flagged by automated ClamAV malware scanning and quarantined fail-closed/i)).toBeVisible()
+  })
 });

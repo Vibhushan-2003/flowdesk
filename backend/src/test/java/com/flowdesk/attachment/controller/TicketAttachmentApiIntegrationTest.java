@@ -348,4 +348,48 @@ class TicketAttachmentApiIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message", containsString("finished ticket")));
     }
+
+    @Test
+    @DisplayName("Empty attachment file returns 400 Bad Request")
+    void emptyAttachmentReturns400() throws Exception {
+        MockMultipartFile emptyFile = new MockMultipartFile(
+                "file", "empty.txt", "text/plain", new byte[0]
+        );
+
+        mockMvc.perform(multipart("/api/tickets/" + ticketA.getTicketNumber() + "/attachments")
+                        .file(emptyFile)
+                        .with(jwt().jwt(j -> j.subject(employeeA.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("cannot be empty")));
+    }
+
+    @Test
+    @DisplayName("Malware-infected file upload (EICAR) marks scanStatus INFECTED, status QUARANTINED, and blocks download")
+    void malwareInfectedUploadIsQuarantined() throws Exception {
+        byte[] eicar = com.flowdesk.attachment.malware.TestMalwareScanner.EICAR_SIGNATURE.getBytes(StandardCharsets.US_ASCII);
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "eicar_test.txt", "text/plain", eicar
+        );
+
+        String response = mockMvc.perform(multipart("/api/tickets/" + ticketA.getTicketNumber() + "/attachments")
+                        .file(file)
+                        .with(jwt().jwt(j -> j.subject(employeeA.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.scanStatus", is("INFECTED")))
+                .andExpect(jsonPath("$.scanDetails", containsString("Malware detected")))
+                .andReturn().getResponse().getContentAsString();
+
+        UUID attachmentId = UUID.fromString(com.jayway.jsonpath.JsonPath.read(response, "$.id"));
+        TicketAttachment entity = attachmentRepository.findById(attachmentId).orElseThrow();
+        createdStorageKeys.add(entity.getStorageKey());
+        org.junit.jupiter.api.Assertions.assertEquals(AttachmentStatus.QUARANTINED, entity.getStatus());
+
+        // Download of quarantined attachment must be blocked with 403 Forbidden
+        mockMvc.perform(get("/api/tickets/" + ticketA.getTicketNumber() + "/attachments/" + attachmentId + "/download")
+                        .with(jwt().jwt(j -> j.subject(employeeA.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))))
+                .andExpect(status().isForbidden());
+    }
 }

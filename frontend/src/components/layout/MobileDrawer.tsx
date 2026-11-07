@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { SidebarNavigation } from './SidebarNavigation'
 
@@ -8,12 +8,19 @@ export interface MobileDrawerProps {
 }
 
 export function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
-  // Lock body scroll when mobile drawer is open
+  const previousActiveElement = useRef<HTMLElement | null>(null)
+
+  // Lock body scroll and restore focus when mobile drawer is open/closed
   useEffect(() => {
     if (isOpen) {
+      previousActiveElement.current = document.activeElement as HTMLElement | null
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = ''
+      if (previousActiveElement.current) {
+        previousActiveElement.current.focus?.()
+        previousActiveElement.current = null
+      }
     }
     return () => {
       document.body.style.overflow = ''
