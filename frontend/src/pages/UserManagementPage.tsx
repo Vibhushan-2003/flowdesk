@@ -212,7 +212,7 @@ export function UserManagementPage() {
     setInviteError(null)
 
     try {
-      await createInvitation(accessToken, {
+      const response = await createInvitation(accessToken, {
         email: trimmedEmail,
         firstName: trimmedFirstName,
         lastName: trimmedLastName,
@@ -220,7 +220,28 @@ export function UserManagementPage() {
       })
 
       setIsInviteModalOpen(false)
-      setSuccessMessage(`Invitation dispatched to "${trimmedEmail}".`)
+
+      if (response.invitationUrl) {
+        const targetName = `${trimmedFirstName} ${trimmedLastName}`.trim() || trimmedEmail
+        setShareableInvitation({
+          userId: response.id,
+          userEmail: trimmedEmail,
+          userName: targetName,
+          invitationUrl: response.invitationUrl,
+        })
+        setHasCopiedLink(false)
+
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(response.invitationUrl)
+            .then(() => setHasCopiedLink(true))
+            .catch(() => {
+              // Ignore clipboard failure on auto-copy
+            })
+        }
+        setSuccessMessage(`Invitation created for "${trimmedEmail}". Shareable activation link generated.`)
+      } else {
+        setSuccessMessage(`Invitation email submitted for delivery to "${trimmedEmail}".`)
+      }
       setRefreshTrigger((prev) => prev + 1)
     } catch (caughtError) {
       setInviteError(
@@ -259,7 +280,7 @@ export function UserManagementPage() {
         }
         setSuccessMessage(`Invitation re-issued for "${targetUser.email}". Shareable link generated.`)
       } else {
-        setSuccessMessage(`Invitation re-issued for "${targetUser.email}".`)
+        setSuccessMessage(`Invitation email re-submitted for delivery to "${targetUser.email}".`)
       }
       setRefreshTrigger((prev) => prev + 1)
     } catch (caughtError) {

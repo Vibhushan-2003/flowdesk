@@ -202,6 +202,87 @@ class UserInvitationServiceTest {
         }
 
         @Test
+        @DisplayName("Should include invitationUrl in create response when outbound email is disabled")
+        void shouldIncludeInvitationUrlInCreateWhenEmailDisabled() {
+            EmailProperties emailProps = new EmailProperties();
+            emailProps.setEnabled(false);
+
+            UserInvitationService customService = new UserInvitationService(
+                    userRepository,
+                    userInvitationRepository,
+                    roleRepository,
+                    passwordEncoder,
+                    emailSender,
+                    emailTemplateService,
+                    properties,
+                    auditService,
+                    emailProps
+            );
+
+            CreateUserInvitationRequest request = new CreateUserInvitationRequest(
+                    "offline@flowdesk.test",
+                    "Jane",
+                    "Doe",
+                    Set.of(RoleCode.EMPLOYEE)
+            );
+
+            when(userRepository.existsByEmailIgnoreCase("offline@flowdesk.test")).thenReturn(false);
+            when(userRepository.findWithRolesById(actorAdminId)).thenReturn(Optional.of(actorAdmin));
+            when(roleRepository.findByCodeIn(any())).thenReturn(List.of(employeeRole));
+            when(userRepository.saveAndFlush(any(User.class))).thenAnswer(inv -> {
+                User u = inv.getArgument(0);
+                ReflectionTestUtils.setField(u, "id", UUID.randomUUID());
+                return u;
+            });
+
+            UserResponse response = customService.createInvitation(request, actorAdminId);
+
+            assertNotNull(response);
+            assertNotNull(response.invitationUrl(), "When email is disabled, invitationUrl must be returned in response");
+            assertTrue(response.invitationUrl().startsWith("http://localhost:5173/accept-invitation?token="));
+        }
+
+        @Test
+        @DisplayName("Should omit invitationUrl in create response when outbound email is enabled")
+        void shouldOmitInvitationUrlInCreateWhenEmailEnabled() {
+            EmailProperties emailProps = new EmailProperties();
+            emailProps.setEnabled(true);
+
+            UserInvitationService customService = new UserInvitationService(
+                    userRepository,
+                    userInvitationRepository,
+                    roleRepository,
+                    passwordEncoder,
+                    emailSender,
+                    emailTemplateService,
+                    properties,
+                    auditService,
+                    emailProps
+            );
+
+            CreateUserInvitationRequest request = new CreateUserInvitationRequest(
+                    "online@flowdesk.test",
+                    "Jane",
+                    "Doe",
+                    Set.of(RoleCode.EMPLOYEE)
+            );
+
+            when(userRepository.existsByEmailIgnoreCase("online@flowdesk.test")).thenReturn(false);
+            when(userRepository.findWithRolesById(actorAdminId)).thenReturn(Optional.of(actorAdmin));
+            when(roleRepository.findByCodeIn(any())).thenReturn(List.of(employeeRole));
+            when(userRepository.saveAndFlush(any(User.class))).thenAnswer(inv -> {
+                User u = inv.getArgument(0);
+                ReflectionTestUtils.setField(u, "id", UUID.randomUUID());
+                return u;
+            });
+
+            UserResponse response = customService.createInvitation(request, actorAdminId);
+
+            assertNotNull(response);
+            assertNull(response.invitationUrl(), "When email is enabled, invitationUrl must NOT be leaked in response");
+        }
+
+        @Test
         @DisplayName("Should reject invitation if email already exists")
         void shouldRejectDuplicateEmail() {
             CreateUserInvitationRequest request = new CreateUserInvitationRequest(
@@ -695,8 +776,8 @@ class UserInvitationServiceTest {
         }
 
         @Test
-        @DisplayName("Should reject password activation with HTTP 403 when email delivery is disabled")
-        void shouldRejectPasswordActivationWhenEmailIsDisabled() {
+        @DisplayName("Should allow password activation even when email delivery is disabled")
+        void shouldAllowPasswordActivationWhenEmailIsDisabled() {
             EmailProperties emailProps = new EmailProperties();
             emailProps.setEnabled(false);
 
@@ -712,13 +793,31 @@ class UserInvitationServiceTest {
                     emailProps
             );
 
-            AcceptInvitationRequest request = new AcceptInvitationRequest("raw-token", "Password123!", "Password123!");
+            String rawToken = "offline-token-1234567890";
+            String tokenHash = hashToken(rawToken);
 
-            ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-                    customService.acceptInvitation(request)
+            UUID userId = UUID.randomUUID();
+            User user = User.createInvitedUser("invited@flowdesk.test", "Jane", "Doe", "!INVITED!abc");
+            ReflectionTestUtils.setField(user, "id", userId);
+
+            UserInvitation invitation = new UserInvitation(user, tokenHash, Instant.now().plus(Duration.ofHours(24)));
+
+            when(userInvitationRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(invitation));
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+            when(userInvitationRepository.findByTokenHashForUpdate(tokenHash)).thenReturn(Optional.of(invitation));
+
+            AcceptInvitationRequest request = new AcceptInvitationRequest(
+                    rawToken,
+                    "SecurePassword123!",
+                    "SecurePassword123!"
             );
-            assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
-            assertTrue(ex.getReason().contains("email delivery is disabled"));
+
+            AcceptInvitationResponse response = customService.acceptInvitation(request);
+
+            assertNotNull(response);
+            assertEquals("Invitation accepted successfully. You can now log in.", response.message());
+            assertEquals(UserStatus.ACTIVE, user.getStatus());
+            assertTrue(invitation.isConsumed());
         }
     }
 

@@ -221,4 +221,40 @@ class EmailPropertiesTest {
 
         assertThatCode(properties::validate).doesNotThrowAnyException();
     }
+
+    @Test
+    @DisplayName("Should validate successfully with valid Resend configuration even in production")
+    void validResendConfigurationShouldPassValidation() {
+        EmailProperties properties = new EmailProperties();
+        properties.setProduction(true);
+        properties.setTransport("resend");
+        properties.setResendApiKey("re_prod_test_key_12345");
+        properties.setFromAddress("onboarding@resend.dev");
+
+        // Should not throw, even though SMTP host is localhost and TLS is false
+        assertThatCode(properties::validate).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("Should fail validation when Resend transport has empty or null API key")
+    void resendTransportMissingApiKeyShouldFail() {
+        EmailProperties properties = new EmailProperties();
+        properties.setTransport("resend");
+        properties.setResendApiKey("");
+
+        assertThatThrownBy(properties::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Resend API key");
+    }
+
+    @Test
+    @DisplayName("Should fail validation when transport is neither smtp nor resend")
+    void unsupportedTransportShouldFail() {
+        EmailProperties properties = new EmailProperties();
+        properties.setTransport("sendgrid_v1_legacy");
+
+        assertThatThrownBy(properties::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unsupported app.mail.transport");
+    }
 }

@@ -13,6 +13,7 @@ export default defineConfig({
     'admin-batch-d.spec.ts',
     'priority-and-mobile-reliability.spec.ts',
     'desktop-sidebar-stationary.spec.ts',
+    'invitation-and-password-lifecycle.spec.ts',
   ],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

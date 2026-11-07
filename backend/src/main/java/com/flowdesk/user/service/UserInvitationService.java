@@ -181,7 +181,12 @@ public class UserInvitationService {
                 properties.getTokenValidityDuration()
         );
 
-        return toResponse(savedUser);
+        // When outbound email delivery is disabled, provide the generated invitation URL to the authenticated administrator
+        // so that the account can be activated without SMTP/HTTP delivery. In email-enabled production, this remains null.
+        boolean isEmailDisabled = emailProperties != null && !emailProperties.isEnabled();
+        String shareableUrl = isEmailDisabled ? invitationUrl : null;
+
+        return toResponse(savedUser, shareableUrl);
     }
 
     /**
@@ -254,15 +259,6 @@ public class UserInvitationService {
     @Transactional
     public AcceptInvitationResponse acceptInvitation(AcceptInvitationRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-
-        boolean isEmailDisabled = emailProperties != null && !emailProperties.isEnabled();
-        if (isEmailDisabled) {
-            log.warn("Rejected password-based invitation acceptance because email delivery is disabled");
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Password-based activation is unavailable when email delivery is disabled. Please activate your account using a verified Google account matching your invited email address."
-            );
-        }
 
         if (request.token() == null || request.token().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invitation token is required");
@@ -498,7 +494,7 @@ public class UserInvitationService {
             EmailDeliveryResult result = emailSender.send(message);
 
             if (result != null && result.status() == EmailDeliveryStatus.ACCEPTED) {
-                log.info("Invitation email successfully accepted by SMTP transport for [{}].", maskedEmail);
+                log.info("Invitation email successfully accepted by transport for [{}].", maskedEmail);
             } else {
                 String statusName = (result != null && result.status() != null)
                         ? result.status().name()
@@ -535,6 +531,10 @@ public class UserInvitationService {
     }
 
     private UserResponse toResponse(User user) {
+        return toResponse(user, null);
+    }
+
+    private UserResponse toResponse(User user, String invitationUrl) {
         Set<RoleCode> roles = user.getRoles()
                 .stream()
                 .map(Role::getCode)
@@ -547,7 +547,8 @@ public class UserInvitationService {
                 user.getLastName(),
                 user.getStatus(),
                 roles,
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                invitationUrl
         );
     }
 }

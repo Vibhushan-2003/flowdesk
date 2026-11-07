@@ -19,7 +19,11 @@ public record EmailDeliveryResult(
         String details
 ) {
     public static EmailDeliveryResult accepted(String messageId, String recipient) {
-        return new EmailDeliveryResult(messageId, recipient, EmailDeliveryStatus.ACCEPTED, Instant.now(), "Accepted for delivery by SMTP transport");
+        return new EmailDeliveryResult(messageId, recipient, EmailDeliveryStatus.ACCEPTED, Instant.now(), "Accepted for delivery by outbound email transport");
+    }
+
+    public static EmailDeliveryResult accepted(String messageId, String recipient, String details) {
+        return new EmailDeliveryResult(messageId, recipient, EmailDeliveryStatus.ACCEPTED, Instant.now(), details);
     }
 
     public static EmailDeliveryResult disabled(String recipient) {

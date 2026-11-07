@@ -79,4 +79,40 @@ class EmailProdProfileIntegrationTest {
                             .hasRootCauseMessage("Production email configuration requires a non-localhost SMTP host.");
                 });
     }
+
+    @Test
+    @DisplayName("Under 'prod' profile, Resend transport should wire ResendEmailSender successfully")
+    void shouldWireResendEmailSenderUnderProdProfile() {
+        contextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=prod",
+                        "app.mail.enabled=true",
+                        "app.mail.transport=resend",
+                        "app.mail.resend-api-key=re_mock_test_key_xyz",
+                        "app.mail.from-address=support@flowdesk.io"
+                )
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    com.flowdesk.email.service.EmailSender sender = context.getBean(com.flowdesk.email.service.EmailSender.class);
+                    assertThat(sender).isInstanceOf(com.flowdesk.email.service.ResendEmailSender.class);
+                });
+    }
+
+    @Test
+    @DisplayName("Under 'prod' profile, Resend transport must fail closed if API key is missing")
+    void shouldFailClosedUnderProdProfileWhenResendApiKeyMissing() {
+        contextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=prod",
+                        "app.mail.enabled=true",
+                        "app.mail.transport=resend",
+                        "app.mail.from-address=support@flowdesk.io"
+                )
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .hasRootCauseInstanceOf(IllegalStateException.class)
+                            .hasRootCauseMessage("Resend API key (app.mail.resend-api-key) must be provided when transport is 'resend'.");
+                });
+    }
 }
