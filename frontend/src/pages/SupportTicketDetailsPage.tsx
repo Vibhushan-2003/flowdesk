@@ -36,6 +36,7 @@ import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PriorityBadge } from '../components/ui/PriorityBadge'
+import { SlaBadge } from '../components/ui/SlaBadge'
 import { UserAvatar } from '../components/ui/UserAvatar'
 import { Timeline, TimelineItem } from '../components/ui/Timeline'
 import { Modal } from '../components/ui/Modal'
@@ -50,7 +51,6 @@ import {
   formatDate,
   formatLabel,
   formatOptionalDate,
-  formatSlaStatus,
 } from '../utils/formatters'
 
 function getActionMessage(status: TicketStatus) {
@@ -797,9 +797,7 @@ export function SupportTicketDetailsPage() {
                   <div className="horizon-context-row">
                     <span className="horizon-context-row-label">Response SLA</span>
                     <span className="horizon-context-row-value">
-                      <Badge variant={ticket.responseSlaStatus === 'BREACHED' ? 'danger' : 'success'} size="sm" dot>
-                        {formatSlaStatus(ticket.responseSlaStatus)}
-                      </Badge>
+                      <SlaBadge status={ticket.responseSlaStatus} size="sm" />
                     </span>
                   </div>
 
@@ -811,9 +809,7 @@ export function SupportTicketDetailsPage() {
                   <div className="horizon-context-row">
                     <span className="horizon-context-row-label">Resolution SLA</span>
                     <span className="horizon-context-row-value">
-                      <Badge variant={ticket.resolutionSlaStatus === 'BREACHED' ? 'danger' : 'success'} size="sm" dot>
-                        {formatSlaStatus(ticket.resolutionSlaStatus)}
-                      </Badge>
+                      <SlaBadge status={ticket.resolutionSlaStatus} size="sm" />
                     </span>
                   </div>
 

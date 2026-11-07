@@ -1,22 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { ChangeEvent, DragEvent, FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   HelpCircle,
   Paperclip,
+  UploadCloud,
+  Trash2,
+  RefreshCw,
 } from 'lucide-react'
 
 import { createTicket } from '../api/ticket'
+import { uploadAttachment } from '../api/attachment'
 import { useAuth } from '../auth/useAuth'
 import type {
   TicketPriority,
   TicketResponse,
   TicketType,
 } from '../types/ticket'
-import { formatLabel } from '../utils/formatters'
+import { formatBytes, formatLabel } from '../utils/formatters'
 import { TicketDeflectionCard } from '../components/tickets/TicketDeflectionCard'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Button } from '../components/ui/Button'
@@ -27,12 +32,31 @@ import { PriorityBadge } from '../components/ui/PriorityBadge'
 import '../styles/kb.css'
 
 const TICKET_DRAFT_KEY = 'flowdesk_ticket_draft'
+const MAX_ATTACHMENTS = 10
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
+const ALLOWED_EXTENSIONS = [
+  '.pdf',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.txt',
+  '.log',
+  '.csv',
+]
 
 interface TicketDraftState {
   userId?: string
   type: TicketType
   title: string
   description: string
+}
+
+interface StagedAttachment {
+  id: string
+  file: File
+  status: 'staged' | 'uploading' | 'uploaded' | 'failed'
+  errorMessage?: string
 }
 
 function getStoredTicketDraft(currentUserId?: string): TicketDraftState | null {
@@ -48,6 +72,23 @@ function getStoredTicketDraft(currentUserId?: string): TicketDraftState | null {
   } catch {
     return null
   }
+}
+
+function getFileIcon(filename?: string, contentType?: string): string {
+  const lower = (filename || '').toLowerCase()
+  const cType = (contentType || '').toLowerCase()
+  if (lower.endsWith('.pdf') || cType.includes('pdf')) return '📄'
+  if (
+    lower.endsWith('.png') ||
+    lower.endsWith('.jpg') ||
+    lower.endsWith('.jpeg') ||
+    lower.endsWith('.webp') ||
+    cType.startsWith('image/')
+  ) {
+    return '🖼️'
+  }
+  if (lower.endsWith('.csv') || cType.includes('csv')) return '📊'
+  return '📝'
 }
 
 export function CreateTicketPage() {
@@ -77,12 +118,21 @@ export function CreateTicketPage() {
   const [description, setDescription] = useState(initialDraft?.description ?? '')
   const [priority, setPriority] = useState<TicketPriority>('MEDIUM')
 
+  // Staged attachments state
+  const [stagedFiles, setStagedFiles] = useState<StagedAttachment[]>([])
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [fileValidationError, setFileValidationError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadProgressText, setUploadProgressText] = useState<string | null>(null)
+  const [isRetryingUpload, setIsRetryingUpload] = useState(false)
   const isSubmittingRef = useRef(false)
   const idempotencyKeyRef = useRef<string | null>(null)
 
   const [isSolved, setIsSolved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [partialUploadError, setPartialUploadError] = useState<string | null>(null)
   const [createdTicket, setCreatedTicket] = useState<TicketResponse | null>(null)
 
   // Persist draft in session storage so navigating away to read KB articles preserves form state
@@ -102,9 +152,89 @@ export function CreateTicketPage() {
     setTitle('')
     setDescription('')
     setPriority('MEDIUM')
+    setStagedFiles([])
+    setFileValidationError(null)
     setError(null)
+    setPartialUploadError(null)
+    setUploadProgressText(null)
     sessionStorage.removeItem(TICKET_DRAFT_KEY)
     idempotencyKeyRef.current = null
+  }
+
+  function validateAndAddFiles(filesToAdd: File[]) {
+    setFileValidationError(null)
+
+    if (stagedFiles.length + filesToAdd.length > MAX_ATTACHMENTS) {
+      setFileValidationError(`Maximum ${MAX_ATTACHMENTS} attachments allowed per ticket.`)
+      return
+    }
+
+    const newStaged: StagedAttachment[] = []
+
+    for (const file of filesToAdd) {
+      const lower = file.name.toLowerCase()
+      const isAllowed = ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext))
+      if (!isAllowed) {
+        setFileValidationError(`File "${file.name}" has an unsupported format. Supported: ${ALLOWED_EXTENSIONS.join(', ')}`)
+        return
+      }
+
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        setFileValidationError(`File "${file.name}" exceeds the maximum limit of 10 MB.`)
+        return
+      }
+
+      // Check duplicate by name + size
+      const isDuplicate = stagedFiles.some((s) => s.file.name === file.name && s.file.size === file.size)
+      if (!isDuplicate) {
+        newStaged.push({
+          id: typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `stage-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          file,
+          status: 'staged',
+        })
+      }
+    }
+
+    if (newStaged.length > 0) {
+      setStagedFiles((prev) => [...prev, ...newStaged])
+    }
+  }
+
+  function handleFileInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = event.target.files
+    if (files && files.length > 0) {
+      validateAndAddFiles(Array.from(files))
+    }
+    // Reset file input so user can re-select if needed
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setIsDragOver(true)
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setIsDragOver(false)
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setIsDragOver(false)
+    const files = event.dataTransfer.files
+    if (files && files.length > 0) {
+      validateAndAddFiles(Array.from(files))
+    }
+  }
+
+  function handleRemoveStagedFile(id: string) {
+    setStagedFiles((prev) => prev.filter((item) => item.id !== id))
+    setFileValidationError(null)
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -116,6 +246,7 @@ export function CreateTicketPage() {
     }
 
     setError(null)
+    setPartialUploadError(null)
     setCreatedTicket(null)
 
     if (!accessToken) {
@@ -143,7 +274,7 @@ export function CreateTicketPage() {
     }
 
     try {
-      const response = await createTicket(
+      const ticketResponse = await createTicket(
         {
           type,
           title: trimmedTitle,
@@ -157,8 +288,43 @@ export function CreateTicketPage() {
       // On successful creation, reset idempotency key so next ticket gets a fresh key
       idempotencyKeyRef.current = null
       sessionStorage.removeItem(TICKET_DRAFT_KEY)
-      setCreatedTicket(response)
 
+      // Upload staged attachments sequentially if any
+      if (stagedFiles.length > 0) {
+        let hasFailures = false
+        const currentStaged = [...stagedFiles]
+
+        for (let i = 0; i < currentStaged.length; i++) {
+          const item = currentStaged[i]
+          item.status = 'uploading'
+          setUploadProgressText(`Uploading attachment ${i + 1} of ${currentStaged.length}: ${item.file.name}...`)
+          setStagedFiles([...currentStaged])
+
+          try {
+            await uploadAttachment(ticketResponse.ticketNumber, item.file, 'employee', accessToken)
+            item.status = 'uploaded'
+          } catch (uploadErr) {
+            hasFailures = true
+            item.status = 'failed'
+            item.errorMessage = uploadErr instanceof Error ? uploadErr.message : 'Upload failed'
+          }
+          setStagedFiles([...currentStaged])
+        }
+
+        setUploadProgressText(null)
+
+        if (hasFailures) {
+          // Keep created ticket reference; display partial upload status with retry actions
+          setCreatedTicket(ticketResponse)
+          setPartialUploadError(
+            `Ticket ${ticketResponse.ticketNumber} was created successfully, but one or more attachments failed to upload. You can retry failed files below or proceed to your ticket.`
+          )
+          return
+        }
+      }
+
+      setCreatedTicket(ticketResponse)
+      setStagedFiles([])
       setType('INCIDENT')
       setTitle('')
       setDescription('')
@@ -173,6 +339,32 @@ export function CreateTicketPage() {
     } finally {
       isSubmittingRef.current = false
       setIsSubmitting(false)
+    }
+  }
+
+  async function handleRetryFailedUpload(item: StagedAttachment) {
+    if (!createdTicket || !accessToken || isRetryingUpload) return
+
+    setIsRetryingUpload(true)
+    item.status = 'uploading'
+    item.errorMessage = undefined
+    setStagedFiles([...stagedFiles])
+
+    try {
+      await uploadAttachment(createdTicket.ticketNumber, item.file, 'employee', accessToken)
+      item.status = 'uploaded'
+
+      // Check if all failed files are now resolved
+      const remainingFailed = stagedFiles.filter((f) => f.id !== item.id && f.status === 'failed')
+      if (remainingFailed.length === 0) {
+        setPartialUploadError(null)
+      }
+    } catch (retryErr) {
+      item.status = 'failed'
+      item.errorMessage = retryErr instanceof Error ? retryErr.message : 'Retry failed'
+    } finally {
+      setIsRetryingUpload(false)
+      setStagedFiles([...stagedFiles])
     }
   }
 
@@ -238,11 +430,11 @@ export function CreateTicketPage() {
           </div>
         </section>
       ) : createdTicket ? (
-        /* Confirmation View 2: Ticket Created Successfully */
+        /* Confirmation View 2: Ticket Created Successfully (with attachment status) */
         <section
           className="ticket-success-panel horizon-card"
           aria-live="polite"
-          style={{ padding: '3rem 2rem', textAlign: 'center', maxWidth: '640px', margin: '2rem auto' }}
+          style={{ padding: '3rem 2rem', textAlign: 'center', maxWidth: '680px', margin: '2rem auto' }}
         >
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--color-success-subtle)', color: 'var(--color-success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -261,13 +453,48 @@ export function CreateTicketPage() {
             </strong>
           </p>
 
-          <div className="ticket-success-tags" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '2rem' }}>
+          <div className="ticket-success-tags" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '1.5rem' }}>
             <Badge variant="neutral" size="md">
               {formatLabel(createdTicket.type)}
             </Badge>
             <PriorityBadge priority={createdTicket.priority} size="md" />
             <StatusBadge status={createdTicket.status} size="md" />
           </div>
+
+          {/* Partial Attachment Failure Notice & Retry */}
+          {partialUploadError && (
+            <div style={{ textAlign: 'left', marginBottom: '1.5rem', padding: '1rem', background: 'var(--color-warning-subtle)', border: '1px solid var(--color-warning-border)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--color-warning)' }}>
+                <AlertTriangle size={18} />
+                <strong style={{ fontSize: 'var(--font-size-sm)' }}>Attachment Notice</strong>
+              </div>
+              <p style={{ margin: '0 0 12px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
+                {partialUploadError}
+              </p>
+
+              {/* List of failed attachments with retry button */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {stagedFiles
+                  .filter((item) => item.status === 'failed')
+                  .map((item) => (
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-xs)' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }}>
+                        {item.file.name} ({formatBytes(item.file.size)})
+                      </span>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleRetryFailedUpload(item)}
+                        disabled={isRetryingUpload}
+                        leadingIcon={<RefreshCw size={12} />}
+                      >
+                        Retry upload
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
 
           <div className="ticket-success-actions" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
@@ -296,7 +523,7 @@ export function CreateTicketPage() {
           </div>
         </section>
       ) : (
-        /* Purposeful Two-Area Form Layout: Main Form + Contextual Help */
+        /* Two-Area Form Layout: Main Form + Contextual Help */
         <div className="horizon-create-grid">
           {/* Main Incident / Request Form */}
           <Card padded className="ticket-form-card">
@@ -401,7 +628,7 @@ export function CreateTicketPage() {
                     }}
                     maxLength={5000}
                     placeholder="Provide details: what happened, steps to reproduce, error messages, and any troubleshooting already attempted."
-                    rows={7}
+                    rows={6}
                     disabled={isSubmitting}
                     required
                   />
@@ -412,17 +639,142 @@ export function CreateTicketPage() {
                 </div>
               </div>
 
-              {/* Notice regarding file attachments */}
-              <div className="horizon-attachment-hint-card">
-                <Paperclip size={16} className="horizon-attachment-hint-icon" />
-                <div className="horizon-attachment-hint-text">
-                  <strong>Attachments & Diagnostics:</strong> You can upload screenshots, crash logs, and diagnostic dumps (up to 10 MB, automated ClamAV scan) immediately once your ticket is created.
+              {/* File Attachments Dropzone & Staged File Selection */}
+              <div className="horizon-form-field" style={{ marginTop: '0.5rem' }}>
+                <label className="horizon-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <Paperclip size={15} style={{ color: 'var(--color-primary)' }} />
+                    Attachments & Diagnostics (Optional)
+                  </span>
+                  <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-regular)', color: 'var(--color-text-secondary)' }}>
+                    {stagedFiles.length} / {MAX_ATTACHMENTS} selected
+                  </span>
+                </label>
+
+                {/* Hidden File Input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept={ALLOWED_EXTENSIONS.join(',')}
+                  onChange={handleFileInputChange}
+                  className="attachment-hidden-input"
+                  disabled={isSubmitting}
+                  id="ticket-create-file-input"
+                />
+
+                {/* Interactive Drag & Drop Area */}
+                <div
+                  className={`attachment-dropzone ${isDragOver ? 'attachment-dropzone-active' : ''} ${
+                    isSubmitting ? 'attachment-dropzone-uploading' : ''
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => !isSubmitting && fileInputRef.current?.click()}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !isSubmitting) {
+                      e.preventDefault()
+                      fileInputRef.current?.click()
+                    }
+                  }}
+                  aria-label="Upload attachments dropzone"
+                >
+                  <div className="attachment-dropzone-content">
+                    <span className="attachment-dropzone-icon" aria-hidden="true">
+                      <UploadCloud size={28} style={{ color: 'var(--color-primary)' }} />
+                    </span>
+                    <p className="attachment-dropzone-text">
+                      <strong>Choose files</strong> or drag and drop here
+                    </p>
+                    <p className="attachment-dropzone-hint">
+                      PDF, PNG, JPG, WEBP, TXT, LOG, CSV up to 10 MB each. Scanned automatically with ClamAV.
+                    </p>
+                  </div>
                 </div>
+
+                {/* Validation Error Alert */}
+                {fileValidationError && (
+                  <div className="form-error horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ margin: '0.5rem 0' }}>
+                    <AlertCircle size={15} className="horizon-auth-alert-icon" />
+                    <span>{fileValidationError}</span>
+                  </div>
+                )}
+
+                {/* Staged File List Preview */}
+                {stagedFiles.length > 0 && (
+                  <div className="staged-attachments-list" style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '0.75rem' }}>
+                    {stagedFiles.map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: 'var(--radius-md)',
+                          gap: '10px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                          <span style={{ fontSize: '1.1rem' }}>{getFileIcon(item.file.name, item.file.type)}</span>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <p style={{ margin: 0, fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {item.file.name}
+                            </p>
+                            <span style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)' }}>
+                              {formatBytes(item.file.size)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {item.status === 'staged' && (
+                            <Badge variant="neutral" size="sm">Ready</Badge>
+                          )}
+                          {item.status === 'uploading' && (
+                            <Badge variant="primary" size="sm">Uploading...</Badge>
+                          )}
+                          {item.status === 'uploaded' && (
+                            <Badge variant="success" size="sm">Uploaded</Badge>
+                          )}
+                          {item.status === 'failed' && (
+                            <Badge variant="danger" size="sm">Failed</Badge>
+                          )}
+
+                          {!isSubmitting && (
+                            <button
+                              type="button"
+                              className="horizon-btn horizon-btn--ghost horizon-btn--sm"
+                              onClick={() => handleRemoveStagedFile(item.id)}
+                              aria-label={`Remove ${item.file.name}`}
+                              style={{ padding: '2px', height: '24px', width: '24px' }}
+                            >
+                              <Trash2 size={13} style={{ color: 'var(--color-danger)' }} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              {/* Upload Progress Status Banner */}
+              {uploadProgressText && (
+                <div style={{ margin: '1rem 0', padding: '0.75rem 1rem', background: 'var(--color-primary-subtle)', border: '1px solid var(--color-primary-border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-sm)', color: 'var(--color-primary)' }}>
+                  <RefreshCw size={16} className="animate-spin" />
+                  <span>{uploadProgressText}</span>
+                </div>
+              )}
 
               {/* Error Alert */}
               {error && (
-                <div className="form-error horizon-auth-alert horizon-auth-alert--error" role="alert">
+                <div className="form-error horizon-auth-alert horizon-auth-alert--error" role="alert" style={{ marginTop: '1rem' }}>
                   <AlertCircle size={18} className="horizon-auth-alert-icon" />
                   <span>{error}</span>
                 </div>
@@ -434,8 +786,15 @@ export function CreateTicketPage() {
                 className="horizon-btn horizon-btn--primary horizon-btn--lg horizon-btn--full-width"
                 disabled={isSubmitting}
                 aria-busy={isSubmitting}
+                style={{ marginTop: '1.25rem' }}
               >
-                {isSubmitting ? 'Creating ticket...' : 'Create ticket'}
+                {isSubmitting
+                  ? uploadProgressText
+                    ? 'Uploading attachments...'
+                    : 'Creating ticket...'
+                  : stagedFiles.length > 0
+                  ? `Create ticket with ${stagedFiles.length} ${stagedFiles.length === 1 ? 'attachment' : 'attachments'}`
+                  : 'Create ticket'}
               </button>
             </form>
           </Card>
@@ -452,6 +811,7 @@ export function CreateTicketPage() {
                 setIsSolved(true)
                 setTitle('')
                 setDescription('')
+                setStagedFiles([])
               }}
               onDeflected={() => {
                 sessionStorage.removeItem(TICKET_DRAFT_KEY)

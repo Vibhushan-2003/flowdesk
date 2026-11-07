@@ -22,7 +22,7 @@ export function formatOptionalDate(value: string | null | undefined): string {
   return formatDate(value)
 }
 
-export function formatSlaStatus(status: SlaStatus): string {
+export function formatSlaStatus(status: SlaStatus | null | undefined): string {
   switch (status) {
     case 'MET':
       return 'Met'
@@ -32,6 +32,23 @@ export function formatSlaStatus(status: SlaStatus): string {
       return 'Pending'
     case 'UNKNOWN':
       return 'Unknown'
+    default:
+      return 'Unknown'
+  }
+}
+
+export function getSlaBadgeVariant(
+  status: SlaStatus | null | undefined,
+): 'success' | 'danger' | 'neutral' {
+  switch (status) {
+    case 'MET':
+      return 'success'
+    case 'BREACHED':
+      return 'danger'
+    case 'PENDING':
+    case 'UNKNOWN':
+    default:
+      return 'neutral'
   }
 }
 

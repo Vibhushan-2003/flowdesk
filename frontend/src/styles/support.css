@@ -130,7 +130,7 @@
 
 .horizon-workbench-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1.15fr);
   gap: var(--space-6);
   align-items: start;
   width: 100%;

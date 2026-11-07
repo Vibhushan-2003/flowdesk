@@ -10,6 +10,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { Button } from '../components/ui/Button'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PriorityBadge } from '../components/ui/PriorityBadge'
+import { SlaBadge } from '../components/ui/SlaBadge'
 import { Badge } from '../components/ui/Badge'
 import { Pagination } from '../components/ui/Pagination'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -24,7 +25,6 @@ import type {
 import {
   formatDate,
   formatLabel,
-  formatSlaStatus,
 } from '../utils/formatters'
 
 import '../styles/ticket-filters.css'
@@ -389,20 +389,7 @@ export function MyTicketsPage() {
                       {formatDate(ticket.createdAt)}
                     </td>
                     <td>
-                      <span
-                        style={{
-                          fontSize: 'var(--font-size-xs)',
-                          fontWeight: 'var(--font-weight-medium)',
-                          color:
-                            ticket.responseSlaStatus === 'BREACHED'
-                              ? 'var(--color-danger)'
-                              : ticket.responseSlaStatus === 'MET'
-                              ? 'var(--color-success)'
-                              : 'var(--color-text-secondary)',
-                        }}
-                      >
-                        {formatSlaStatus(ticket.responseSlaStatus)}
-                      </span>
+                      <SlaBadge status={ticket.responseSlaStatus} size="sm" />
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <button
@@ -456,14 +443,14 @@ export function MyTicketsPage() {
                   <p>
                     <strong>Created:</strong> {formatDate(ticket.createdAt)}
                   </p>
-                  <p>
-                    <strong>Response SLA:</strong> {formatSlaStatus(ticket.responseSlaStatus)}
+                  <p style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <strong>Response SLA:</strong> <SlaBadge status={ticket.responseSlaStatus} size="sm" />
                   </p>
                   <p>
                     <strong>Response due:</strong> {formatDate(ticket.responseDueAt)}
                   </p>
-                  <p>
-                    <strong>Resolution SLA:</strong> {formatSlaStatus(ticket.resolutionSlaStatus)}
+                  <p style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <strong>Resolution SLA:</strong> <SlaBadge status={ticket.resolutionSlaStatus} size="sm" />
                   </p>
                   <p>
                     <strong>Resolution due:</strong> {formatDate(ticket.resolutionDueAt)}
