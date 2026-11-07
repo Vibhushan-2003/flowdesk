@@ -10,6 +10,7 @@ export interface AdminUserResponse {
   status: UserStatus
   roles: Role[]
   createdAt: string
+  invitationUrl?: string
 }
 
 export interface CreateUserInvitationRequest {

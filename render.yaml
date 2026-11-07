@@ -46,8 +46,17 @@ services:
       - key: FLOWDESK_BOOTSTRAP_ADMIN_PASSWORD
         generateValue: true
       - key: FLOWDESK_MAIL_ENABLED
-        # Render Free blocks outbound SMTP ports 25, 465, and 587; email must remain disabled
-        value: "false"
+        # Enables transactional email delivery via HTTPS REST API (Resend over port 443)
+        value: "true"
+      - key: FLOWDESK_MAIL_TRANSPORT
+        value: "resend"
+      - key: RESEND_API_KEY
+        # Set to your Resend API Key (re_...) in the Render Dashboard
+        sync: false
+      - key: FLOWDESK_MAIL_FROM_ADDRESS
+        value: "onboarding@resend.dev"
+      - key: FLOWDESK_MAIL_FROM_NAME
+        value: "FlowDesk"
       - key: GOOGLE_OAUTH_ENABLED
         value: "false"
 

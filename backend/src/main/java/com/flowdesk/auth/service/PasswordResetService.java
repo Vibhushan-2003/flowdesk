@@ -154,7 +154,7 @@ public class PasswordResetService {
             return ForgotPasswordResponse.genericSuccess();
         }
 
-        // Delivery ACCEPTED by SMTP transport
+        // Delivery ACCEPTED by outbound email transport
         log.info("Password reset email dispatched to [{}] (expires in {} minutes).",
                 maskedEmail, properties.getTokenValidityMinutes());
 
@@ -279,7 +279,7 @@ public class PasswordResetService {
             EmailDeliveryResult deliveryResult = emailSender.send(securityNotice);
 
             if (deliveryResult != null && deliveryResult.status() == EmailDeliveryStatus.ACCEPTED) {
-                log.info("Password change security notice successfully accepted by SMTP transport for [{}].",
+                log.info("Password change security notice successfully accepted by outbound transport for [{}].",
                         maskedEmail);
             } else {
                 String statusName = (deliveryResult != null && deliveryResult.status() != null)

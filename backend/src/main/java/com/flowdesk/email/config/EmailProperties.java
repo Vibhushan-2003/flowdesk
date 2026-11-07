@@ -34,6 +34,22 @@ public class EmailProperties implements EnvironmentAware {
     private boolean enabled = true;
 
     /**
+     * Outbound email transport mechanism.
+     * Supported values: "smtp" (default), "resend".
+     */
+    private String transport = "smtp";
+
+    /**
+     * API key for Resend HTTPS delivery (used when app.mail.transport=resend).
+     */
+    private String resendApiKey = "";
+
+    /**
+     * Base URL for Resend HTTPS API (defaults to https://api.resend.com).
+     */
+    private String resendBaseUrl = "https://api.resend.com";
+
+    /**
      * SMTP server host (defaults to localhost for local development / Mailpit).
      */
     private String host = "localhost";
@@ -111,10 +127,6 @@ public class EmailProperties implements EnvironmentAware {
             return;
         }
 
-        if (port < 1 || port > 65535) {
-            throw new IllegalStateException("app.mail.port must be between 1 and 65535: " + port);
-        }
-
         if (fromAddress == null || !EMAIL_PATTERN.matcher(fromAddress.trim()).matches()) {
             throw new IllegalStateException("app.mail.from-address must be a valid email address: " + fromAddress);
         }
@@ -131,22 +143,43 @@ public class EmailProperties implements EnvironmentAware {
             throw new IllegalStateException("Email timeouts must not exceed " + MAX_TIMEOUT_MS + " ms to prevent thread starvation.");
         }
 
-        if (isProduction()) {
-            if (host == null || host.isBlank() || isLocalhost(host)) {
-                throw new IllegalStateException("Production email configuration requires a non-localhost SMTP host.");
+        String effectiveTransport = transport != null ? transport.trim().toLowerCase(java.util.Locale.ROOT) : "";
+        if ("resend".equals(effectiveTransport)) {
+            if (resendApiKey == null || resendApiKey.isBlank()) {
+                throw new IllegalStateException("Resend API key (app.mail.resend-api-key) must be provided when transport is 'resend'.");
             }
-            if (!starttls && !ssl) {
-                throw new IllegalStateException("Production email configuration requires STARTTLS or SSL/TLS encryption. Unencrypted SMTP delivery is forbidden in production.");
+            if (resendBaseUrl == null || resendBaseUrl.isBlank()) {
+                throw new IllegalStateException("app.mail.resend-base-url must not be blank.");
             }
-            if (auth && (username == null || username.isBlank() || password == null || password.isBlank())) {
-                throw new IllegalStateException("Production SMTP authentication is enabled but username/password credentials are missing.");
-            }
-            log.info("FlowDesk production email subsystem configured for host: {}:{} (auth={}, starttls={}, ssl={})",
-                    host, port, auth, starttls, ssl);
-        } else {
-            log.info("FlowDesk local development email subsystem configured for {}:{} (Mailpit mode, TLS/auth={})",
-                    host, port, auth);
+            log.info("FlowDesk email subsystem configured for Resend HTTPS API at {} (from={})",
+                    resendBaseUrl, fromAddress);
+            return;
         }
+
+        if ("smtp".equals(effectiveTransport)) {
+            if (port < 1 || port > 65535) {
+                throw new IllegalStateException("app.mail.port must be between 1 and 65535: " + port);
+            }
+            if (isProduction()) {
+                if (host == null || host.isBlank() || isLocalhost(host)) {
+                    throw new IllegalStateException("Production email configuration requires a non-localhost SMTP host.");
+                }
+                if (!starttls && !ssl) {
+                    throw new IllegalStateException("Production email configuration requires STARTTLS or SSL/TLS encryption. Unencrypted SMTP delivery is forbidden in production.");
+                }
+                if (auth && (username == null || username.isBlank() || password == null || password.isBlank())) {
+                    throw new IllegalStateException("Production SMTP authentication is enabled but username/password credentials are missing.");
+                }
+                log.info("FlowDesk production email subsystem configured for host: {}:{} (auth={}, starttls={}, ssl={})",
+                        host, port, auth, starttls, ssl);
+            } else {
+                log.info("FlowDesk local development email subsystem configured for {}:{} (Mailpit mode, TLS/auth={})",
+                        host, port, auth);
+            }
+            return;
+        }
+
+        throw new IllegalStateException("Unsupported app.mail.transport: '" + transport + "'. Must be 'smtp' or 'resend'.");
     }
 
     private static boolean isLocalhost(String host) {
@@ -282,5 +315,29 @@ public class EmailProperties implements EnvironmentAware {
 
     public void setProduction(boolean production) {
         this.production = production;
+    }
+
+    public String getTransport() {
+        return transport;
+    }
+
+    public void setTransport(String transport) {
+        this.transport = transport;
+    }
+
+    public String getResendApiKey() {
+        return resendApiKey;
+    }
+
+    public void setResendApiKey(String resendApiKey) {
+        this.resendApiKey = resendApiKey;
+    }
+
+    public String getResendBaseUrl() {
+        return resendBaseUrl;
+    }
+
+    public void setResendBaseUrl(String resendBaseUrl) {
+        this.resendBaseUrl = resendBaseUrl;
     }
 }

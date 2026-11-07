@@ -227,7 +227,7 @@ test.describe('FlowDesk Horizon Batch D — Admin, SLA & Attachment Security Jou
     await expect(page.getByRole('heading', { name: /invitation link ready/i })).not.toBeVisible()
   })
 
-  test('Accept Invitation: zero-SMTP environment requires verified Google OAuth activation and hides password form', async ({ page }) => {
+  test('Accept Invitation: allows setting password even when email delivery is disabled, offering Google OAuth when enabled', async ({ page }) => {
     await page.route('**/api/auth/oauth2/config', async (route) => {
       await route.fulfill({
         status: 200,
@@ -245,11 +245,13 @@ test.describe('FlowDesk Horizon Batch D — Admin, SLA & Attachment Security Jou
     await page.goto('/accept-invitation?token=mock-secure-token-12345')
 
     await expect(page.getByRole('heading', { name: /set up your account/i })).toBeVisible()
-    await expect(page.getByText(/email delivery is disabled on this environment/i)).toBeVisible()
+    await expect(page.getByText(/email delivery is disabled in this environment/i)).toBeVisible()
     await expect(page.getByRole('button', { name: /activate with google/i })).toBeVisible()
 
-    await expect(page.locator('#accept-new-password')).not.toBeVisible()
-    await expect(page.locator('#accept-confirm-password')).not.toBeVisible()
+    // Password fields are accessible and ready for user onboarding
+    await expect(page.locator('#accept-new-password')).toBeVisible()
+    await expect(page.locator('#accept-confirm-password')).toBeVisible()
+    await expect(page.getByRole('button', { name: /activate account/i })).toBeVisible()
   })
 
   test('Administrative Attachment Rescan: confirms batch size and displays execution report', async ({ page }) => {

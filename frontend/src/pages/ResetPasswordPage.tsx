@@ -1,5 +1,6 @@
 import {
   type FormEvent,
+  useEffect,
   useState,
 } from 'react'
 import {
@@ -26,7 +27,17 @@ export function ResetPasswordPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
-  const token = searchParams.get('token')?.trim() ?? ''
+  // Safely capture token from URL synchronously once, then strip it from browser address bar
+  const [token] = useState<string>(() => {
+    return searchParams.get('token')?.trim() ?? ''
+  })
+
+  useEffect(() => {
+    if (searchParams.has('token')) {
+      // Remove raw token from URL immediately to prevent exposure in history / referrers
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [searchParams])
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
