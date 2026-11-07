@@ -12,6 +12,7 @@ export default defineConfig({
     'screenshots.spec.ts',
     'admin-batch-d.spec.ts',
     'priority-and-mobile-reliability.spec.ts',
+    'desktop-sidebar-stationary.spec.ts',
   ],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

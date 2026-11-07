@@ -11,7 +11,8 @@
   background-color: var(--color-canvas);
   color: var(--color-text-primary);
   position: relative;
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 /* ==========================================================================
