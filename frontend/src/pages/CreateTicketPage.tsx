@@ -57,6 +57,8 @@ interface StagedAttachment {
   file: File
   status: 'staged' | 'uploading' | 'uploaded' | 'failed'
   errorMessage?: string
+  scanStatus?: 'PENDING_SCAN' | 'CLEAN' | 'INFECTED' | 'SCAN_FAILED'
+  scanDetails?: string | null
 }
 
 function getStoredTicketDraft(currentUserId?: string): TicketDraftState | null {
@@ -126,7 +128,7 @@ export function CreateTicketPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadProgressText, setUploadProgressText] = useState<string | null>(null)
-  const [isRetryingUpload, setIsRetryingUpload] = useState(false)
+  const [retryingFileIds, setRetryingFileIds] = useState<string[]>([])
   const isSubmittingRef = useRef(false)
   const idempotencyKeyRef = useRef<string | null>(null)
 
@@ -153,6 +155,7 @@ export function CreateTicketPage() {
     setDescription('')
     setPriority('MEDIUM')
     setStagedFiles([])
+    setRetryingFileIds([])
     setFileValidationError(null)
     setError(null)
     setPartialUploadError(null)
@@ -172,6 +175,11 @@ export function CreateTicketPage() {
     const newStaged: StagedAttachment[] = []
 
     for (const file of filesToAdd) {
+      if (file.size === 0) {
+        setFileValidationError(`File "${file.name}" is empty (0 bytes).`)
+        return
+      }
+
       const lower = file.name.toLowerCase()
       const isAllowed = ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext))
       if (!isAllowed) {
@@ -185,7 +193,9 @@ export function CreateTicketPage() {
       }
 
       // Check duplicate by name + size
-      const isDuplicate = stagedFiles.some((s) => s.file.name === file.name && s.file.size === file.size)
+      const isDuplicate =
+        stagedFiles.some((s) => s.file.name === file.name && s.file.size === file.size) ||
+        newStaged.some((s) => s.file.name === file.name && s.file.size === file.size)
       if (!isDuplicate) {
         newStaged.push({
           id: typeof crypto !== 'undefined' && crypto.randomUUID
@@ -292,23 +302,46 @@ export function CreateTicketPage() {
       // Upload staged attachments sequentially if any
       if (stagedFiles.length > 0) {
         let hasFailures = false
-        const currentStaged = [...stagedFiles]
+        const workingList = [...stagedFiles]
 
-        for (let i = 0; i < currentStaged.length; i++) {
-          const item = currentStaged[i]
-          item.status = 'uploading'
-          setUploadProgressText(`Uploading attachment ${i + 1} of ${currentStaged.length}: ${item.file.name}...`)
-          setStagedFiles([...currentStaged])
+        for (let i = 0; i < workingList.length; i++) {
+          const targetId = workingList[i].id
+          const currentFile = workingList[i].file
+
+          setStagedFiles((prev) =>
+            prev.map((f) => (f.id === targetId ? { ...f, status: 'uploading', errorMessage: undefined } : f)),
+          )
+          setUploadProgressText(`Uploading attachment ${i + 1} of ${workingList.length}: ${currentFile.name}...`)
 
           try {
-            await uploadAttachment(ticketResponse.ticketNumber, item.file, 'employee', accessToken)
-            item.status = 'uploaded'
+            const uploadRes = await uploadAttachment(ticketResponse.ticketNumber, currentFile, 'employee', accessToken)
+            setStagedFiles((prev) =>
+              prev.map((f) =>
+                f.id === targetId
+                  ? {
+                      ...f,
+                      status: 'uploaded',
+                      scanStatus: uploadRes.scanStatus,
+                      scanDetails: uploadRes.scanDetails,
+                    }
+                  : f,
+              ),
+            )
           } catch (uploadErr) {
             hasFailures = true
-            item.status = 'failed'
-            item.errorMessage = uploadErr instanceof Error ? uploadErr.message : 'Upload failed'
+            const errMsg = uploadErr instanceof Error ? uploadErr.message : 'Upload failed'
+            setStagedFiles((prev) =>
+              prev.map((f) =>
+                f.id === targetId
+                  ? {
+                      ...f,
+                      status: 'failed',
+                      errorMessage: errMsg,
+                    }
+                  : f,
+              ),
+            )
           }
-          setStagedFiles([...currentStaged])
         }
 
         setUploadProgressText(null)
@@ -317,14 +350,13 @@ export function CreateTicketPage() {
           // Keep created ticket reference; display partial upload status with retry actions
           setCreatedTicket(ticketResponse)
           setPartialUploadError(
-            `Ticket ${ticketResponse.ticketNumber} was created successfully, but one or more attachments failed to upload. You can retry failed files below or proceed to your ticket.`
+            `Ticket ${ticketResponse.ticketNumber} was created successfully, but one or more attachments failed to upload. You can retry failed files below or proceed to your ticket.`,
           )
           return
         }
       }
 
       setCreatedTicket(ticketResponse)
-      setStagedFiles([])
       setType('INCIDENT')
       setTitle('')
       setDescription('')
@@ -342,29 +374,43 @@ export function CreateTicketPage() {
     }
   }
 
-  async function handleRetryFailedUpload(item: StagedAttachment) {
-    if (!createdTicket || !accessToken || isRetryingUpload) return
+  async function handleRetryFailedUpload(targetId: string) {
+    if (!createdTicket || !accessToken || retryingFileIds.includes(targetId)) return
 
-    setIsRetryingUpload(true)
-    item.status = 'uploading'
-    item.errorMessage = undefined
-    setStagedFiles([...stagedFiles])
+    const item = stagedFiles.find((f) => f.id === targetId)
+    if (!item) return
+
+    setRetryingFileIds((prev) => [...prev, targetId])
+    setStagedFiles((prev) =>
+      prev.map((f) => (f.id === targetId ? { ...f, status: 'uploading', errorMessage: undefined } : f)),
+    )
 
     try {
-      await uploadAttachment(createdTicket.ticketNumber, item.file, 'employee', accessToken)
-      item.status = 'uploaded'
-
-      // Check if all failed files are now resolved
-      const remainingFailed = stagedFiles.filter((f) => f.id !== item.id && f.status === 'failed')
-      if (remainingFailed.length === 0) {
-        setPartialUploadError(null)
-      }
+      const res = await uploadAttachment(createdTicket.ticketNumber, item.file, 'employee', accessToken)
+      setStagedFiles((prev) => {
+        const next = prev.map((f) =>
+          f.id === targetId
+            ? {
+                ...f,
+                status: 'uploaded' as const,
+                scanStatus: res.scanStatus,
+                scanDetails: res.scanDetails,
+              }
+            : f,
+        )
+        const remainingFailed = next.filter((f) => f.status === 'failed')
+        if (remainingFailed.length === 0) {
+          setPartialUploadError(null)
+        }
+        return next
+      })
     } catch (retryErr) {
-      item.status = 'failed'
-      item.errorMessage = retryErr instanceof Error ? retryErr.message : 'Retry failed'
+      const errMsg = retryErr instanceof Error ? retryErr.message : 'Retry failed'
+      setStagedFiles((prev) =>
+        prev.map((f) => (f.id === targetId ? { ...f, status: 'failed', errorMessage: errMsg } : f)),
+      )
     } finally {
-      setIsRetryingUpload(false)
-      setStagedFiles([...stagedFiles])
+      setRetryingFileIds((prev) => prev.filter((id) => id !== targetId))
     }
   }
 
@@ -461,38 +507,125 @@ export function CreateTicketPage() {
             <StatusBadge status={createdTicket.status} size="md" />
           </div>
 
-          {/* Partial Attachment Failure Notice & Retry */}
+          {/* Attached Files & Truthful ClamAV Scan Status */}
+          {stagedFiles.length > 0 && (
+            <div
+              className="ticket-success-attachments"
+              style={{
+                textAlign: 'left',
+                margin: '1.5rem 0',
+                padding: '1.25rem',
+                background: 'var(--color-surface-subtle)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Paperclip size={16} style={{ color: 'var(--color-primary)' }} />
+                  <strong style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)' }}>
+                    Attached Files ({stagedFiles.filter((f) => f.status === 'uploaded').length} of {stagedFiles.length} uploaded)
+                  </strong>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {stagedFiles.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      gap: '12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                      <span style={{ fontSize: '1.1rem' }}>{getFileIcon(item.file.name, item.file.type)}</span>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.file.name}
+                        </p>
+                        <span style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)' }}>
+                          {formatBytes(item.file.size)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      {item.status === 'uploaded' && (
+                        item.scanStatus === 'INFECTED' ? (
+                          <Badge variant="danger" size="sm" dot>
+                            Quarantined (Malware Detected)
+                          </Badge>
+                        ) : item.scanStatus === 'SCAN_FAILED' ? (
+                          <Badge variant="warning" size="sm" dot>
+                            Quarantined (Scan Failed)
+                          </Badge>
+                        ) : item.scanStatus === 'PENDING_SCAN' ? (
+                          <Badge variant="neutral" size="sm" dot>
+                            Scan Pending
+                          </Badge>
+                        ) : (
+                          <Badge variant="success" size="sm" dot>
+                            Clean (Verified)
+                          </Badge>
+                        )
+                      )}
+
+                      {item.status === 'uploading' && (
+                        <Badge variant="primary" size="sm">
+                          Uploading...
+                        </Badge>
+                      )}
+
+                      {item.status === 'failed' && (
+                        <>
+                          <Badge variant="danger" size="sm" dot>
+                            Upload Failed
+                          </Badge>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleRetryFailedUpload(item.id)}
+                            disabled={retryingFileIds.includes(item.id)}
+                            leadingIcon={<RefreshCw size={12} className={retryingFileIds.includes(item.id) ? 'animate-spin' : ''} />}
+                          >
+                            {retryingFileIds.includes(item.id) ? 'Retrying...' : 'Retry'}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Truthful ClamAV Security Notice if any file was quarantined */}
+              {stagedFiles.some((f) => f.scanStatus === 'INFECTED' || f.scanStatus === 'SCAN_FAILED') && (
+                <div style={{ marginTop: '12px', padding: '8px 12px', background: 'var(--color-danger-subtle)', border: '1px solid var(--color-danger-border)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)' }}>
+                  <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                  <span>
+                    One or more attachments were flagged by automated ClamAV malware scanning and quarantined fail-closed. Quarantined files cannot be downloaded.
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Partial Attachment Failure Notice */}
           {partialUploadError && (
             <div style={{ textAlign: 'left', marginBottom: '1.5rem', padding: '1rem', background: 'var(--color-warning-subtle)', border: '1px solid var(--color-warning-border)', borderRadius: 'var(--radius-md)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--color-warning)' }}>
                 <AlertTriangle size={18} />
                 <strong style={{ fontSize: 'var(--font-size-sm)' }}>Attachment Notice</strong>
               </div>
-              <p style={{ margin: '0 0 12px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
+              <p style={{ margin: 0, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)' }}>
                 {partialUploadError}
               </p>
-
-              {/* List of failed attachments with retry button */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {stagedFiles
-                  .filter((item) => item.status === 'failed')
-                  .map((item) => (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-xs)' }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }}>
-                        {item.file.name} ({formatBytes(item.file.size)})
-                      </span>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleRetryFailedUpload(item)}
-                        disabled={isRetryingUpload}
-                        leadingIcon={<RefreshCw size={12} />}
-                      >
-                        Retry upload
-                      </Button>
-                    </div>
-                  ))}
-              </div>
             </div>
           )}
 

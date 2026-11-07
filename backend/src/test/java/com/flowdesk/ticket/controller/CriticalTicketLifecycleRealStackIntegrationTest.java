@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -184,11 +185,23 @@ class CriticalTicketLifecycleRealStackIntegrationTest {
         assertEquals(240, resolutionMinutes, "Critical resolution SLA must be 240 minutes (4 hours)");
 
         // Step 2: Queue visibility & Ticket status for support staff
-        mockMvc.perform(get("/api/tickets/queue")
+        // Since queue is sorted ASC by createdAt (FIFO), locate the page containing this latest ticket
+        String queueInitialRes = mockMvc.perform(get("/api/tickets/queue")
                         .with(jwt().jwt(j -> j.subject(supportEngineer.getId().toString()))
                                 .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").isNumber());
+                .andReturn().getResponse().getContentAsString();
+
+        int totalPages = com.jayway.jsonpath.JsonPath.read(queueInitialRes, "$.totalPages");
+        int targetPage = Math.max(0, totalPages - 1);
+
+        mockMvc.perform(get("/api/tickets/queue?page=" + targetPage + "&size=10")
+                        .with(jwt().jwt(j -> j.subject(supportEngineer.getId().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].ticketNumber", hasItem(ticketNumber)))
+                .andExpect(jsonPath("$.content[?(@.ticketNumber == '" + ticketNumber + "')].priority", hasItem("CRITICAL")))
+                .andExpect(jsonPath("$.content[?(@.ticketNumber == '" + ticketNumber + "')].status", hasItem("OPEN")));
 
         mockMvc.perform(get("/api/tickets/" + ticketNumber)
                         .with(jwt().jwt(j -> j.subject(teamLead.getId().toString()))
